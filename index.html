@@ -1,19 +1,1024 @@
 <!doctype html>
+
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CAST MANAGER</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
-    <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      body { background: #0d0d1a; }
-    </style>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>CAST MANAGER</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#0d0d1a}</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script type="text/babel">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+// —————————————————————————–
+// Storage (localStorage)
+// —————————————————————————–
+const STORAGE_KEY = “castManagerData_v3”;
+
+function loadAll() {
+try {
+const raw = localStorage.getItem(STORAGE_KEY);
+const d = raw ? JSON.parse(raw) : {};
+return { casts: d.casts || [], records: d.records || {}, customers: d.customers || {} };
+} catch {
+return { casts: [], records: {}, customers: {} };
+}
+}
+
+function saveAll(data) {
+try {
+localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+} catch {}
+}
+
+// —————————————————————————–
+// Helpers
+// —————————————————————————–
+const pad      = n => String(n).padStart(2, “0”);
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const yen      = n => n == null ? “–” : `\u00a5${Number(n).toLocaleString()}`;
+const fmtDate  = s => { if (!s) return “”; const [y, m, d] = s.split(”-”); return `${y}/${m}/${d}`; };
+const uid      = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+function calcWorkDays(records, castId, scope) {
+return (records[castId] || []).filter(r => {
+if (scope === “all”) return true;
+if (scope.length === 7) return r.date.slice(0, 7) === scope;
+return r.date.slice(0, 4) === scope;
+}).length;
+}
+
+const METRICS = [
+{ key: “sales”,       label: “売上”,    color: “#e8b86d”, unit: “\u00a5” },
+{ key: “companions”,  label: “同伴数”,  color: “#a78bfa”, unit: “回” },
+{ key: “nominations”, label: “指名組数”,color: “#34d399”, unit: “組” },
+{ key: “workDays”,    label: “出勤日数”,color: “#fb923c”, unit: “日” },
+{ key: “floorCount”,  label: “場内組数”,color: “#60a5fa”, unit: “組” },
+];
+
+function aggregate(records, castId, mode) {
+const rows = records[castId] || [];
+const map  = {};
+rows.forEach(r => {
+const key = mode === “daily” ? r.date : mode === “monthly” ? r.date.slice(0, 7) : r.date.slice(0, 4);
+if (!map[key]) map[key] = { key, sales: 0, companions: 0, nominations: 0, workDays: 0, floorCount: 0 };
+map[key].sales       += Number(r.sales       || 0);
+map[key].companions  += Number(r.companions  || 0);
+map[key].nominations += Number(r.nominations || 0);
+map[key].workDays    += 1;
+map[key].floorCount  += Number(r.floorCount  || 0);
+});
+return Object.values(map).sort((a, b) => a.key.localeCompare(b.key));
+}
+
+const typeColor = t =>
+t === “指名” ? { bg: “#e8b86d18”, fg: “#e8b86d”, border: “#e8b86d44” }
+: t === “同伴” ? { bg: “#34d39918”, fg: “#34d399”, border: “#34d39944” }
+: { bg: “#a78bfa18”, fg: “#a78bfa”, border: “#a78bfa44” };
+
+const blankGuest = () => ({
+_id: uid(), type: “指名”, name: “”, sales: “”,
+bottleNeck: “”, orderBottle: “”, receipt: “”, note: “”
+});
+
+// —————————————————————————–
+// App
+// —————————————————————————–
+function App() {
+const [data,        setData]    = useState(null);
+const [layer,       setLayer]   = useState(“home”);
+const [castPage,    setCastPage]= useState(“input”);
+const [selectedCast,setSC]      = useState(null);
+const [toast,       setToast]   = useState(null);
+
+useEffect(() => {
+setData(loadAll());
+}, []);
+
+const notify = (msg, type = “success”) => {
+setToast({ msg, type });
+setTimeout(() => setToast(null), 2800);
+};
+
+const persist = next => {
+setData(next);
+saveAll(next);
+};
+
+const openCast = id => { setSC(id); setCastPage(“input”); setLayer(“cast”); };
+const goHome   = ()  => setLayer(“home”);
+
+if (!data) return (
+<div style={{ …S.root, display: “flex”, alignItems: “center”, justifyContent: “center” }}>
+<div style={{ color: “#e8b86d”, fontSize: 14, letterSpacing: 2 }}>LOADING…</div>
+</div>
+);
+
+const cast = data.casts.find(c => c.id === selectedCast);
+
+return (
+<div style={S.root}>
+<div style={S.bgDeco1} /><div style={S.bgDeco2} />
+
+```
+  {toast && (
+    <div style={{ ...S.toast, background: toast.type === "error" ? "#7f1d1d" : "#14532d" }}>
+      {toast.msg}
+    </div>
+  )}
+
+  {layer === "home" && (
+    <header style={S.header}>
+      <div style={S.logo}>
+        <span style={S.logoIcon}>✦</span>
+        <span style={S.logoText}>CAST MANAGER</span>
+      </div>
+    </header>
+  )}
+
+  {layer === "cast" && cast && (
+    <>
+      <header style={S.header}>
+        <button style={S.homeBtn} onClick={goHome}>⌂ ホーム</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: 1, justifyContent: "center" }}>
+          <div style={{ ...S.castAvatar, width: 26, height: 26, fontSize: 12 }}>{cast.name[0]}</div>
+          <span style={{ color: "#e8b86d", fontWeight: 700, fontSize: 15, letterSpacing: 1 }}>{cast.name}</span>
+        </div>
+        <div style={{ width: 80 }} />
+      </header>
+      <div style={S.tabBar}>
+        {[
+          ["input",    "✏️", "入力"],
+          ["chart",    "📊", "グラフ"],
+          ["list",     "📋", "履歴"],
+          ["customers","👥", "顧客"],
+        ].map(([key, icon, label]) => (
+          <button key={key} style={{ ...S.tabBarBtn, ...(castPage === key ? S.tabBarBtnActive : {}) }}
+            onClick={() => setCastPage(key)}>
+            <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
+            <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  )}
+
+  <main style={S.main}>
+    {layer === "home" && <HomePage data={data} persist={persist} onOpenCast={openCast} notify={notify} />}
+    {layer === "cast" && selectedCast && <>
+      {castPage === "input"     && <InputPage    castId={selectedCast} data={data} persist={persist} notify={notify} />}
+      {castPage === "chart"     && <ChartPage    castId={selectedCast} data={data} />}
+      {castPage === "list"      && <ListPage     castId={selectedCast} data={data} persist={persist} notify={notify} />}
+      {castPage === "customers" && <CustomerPage castId={selectedCast} data={data} persist={persist} notify={notify} />}
+    </>}
+  </main>
+</div>
+```
+
+);
+}
+
+// —————————————————————————–
+// HomePage
+// —————————————————————————–
+function HomePage({ data, persist, onOpenCast, notify }) {
+const [newName,  setNewName]  = useState(””);
+const [showAdd,  setShowAdd]  = useState(false);
+const [editBdId, setEditBdId] = useState(null);
+const [bdInput,  setBdInput]  = useState(””);
+
+const addCast = () => {
+const name = newName.trim();
+if (!name) return;
+if (data.casts.find(c => c.name === name)) { notify(“同じ名前が既に存在します”, “error”); return; }
+const id = Date.now().toString();
+persist({
+casts:     […data.casts, { id, name, createdAt: todayStr(), birthday: “” }],
+records:   { …data.records,   [id]: [] },
+customers: { …data.customers, [id]: [] },
+});
+setNewName(””); setShowAdd(false); notify(`${name} を追加しました`);
+};
+
+const deleteCast = (e, id, name) => {
+e.stopPropagation();
+if (!confirm(`${name} のデータをすべて削除しますか？`)) return;
+const casts     = data.casts.filter(c => c.id !== id);
+const records   = { …data.records };   delete records[id];
+const customers = { …data.customers }; delete customers[id];
+persist({ casts, records, customers });
+notify(`${name} を削除しました`);
+};
+
+const saveBirthday = (e, id) => {
+e.stopPropagation();
+const casts = data.casts.map(c => c.id === id ? { …c, birthday: bdInput } : c);
+persist({ …data, casts });
+setEditBdId(null); notify(“誕生日を保存しました”);
+};
+
+const daysUntil = bdStr => {
+if (!bdStr) return null;
+const [, m, d] = bdStr.split(”-”);
+const now = new Date();
+const bd  = new Date(now.getFullYear(), Number(m) - 1, Number(d));
+if (bd < now) bd.setFullYear(now.getFullYear() + 1);
+const diff = Math.ceil((bd - now) / 86400000);
+return diff === 0 ? “🎂 今日！” : diff <= 7 ? `🎂 あと${diff}日` : null;
+};
+const fmtBd = bdStr => { if (!bdStr) return null; const [, m, d] = bdStr.split(”-”); return `${Number(m)}/${Number(d)}`; };
+
+const summary = id => {
+const rows = data.records[id] || [];
+const now  = new Date();
+const tm   = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+const pd   = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+const pm   = `${pd.getFullYear()}-${pad(pd.getMonth() + 1)}`;
+const thisRows = rows.filter(r => r.date.slice(0, 7) === tm);
+return {
+thisLabel:       `${now.getMonth() + 1}月`,
+prevLabel:       `${pd.getMonth() + 1}月`,
+thisSales:       thisRows.reduce((s, r) => s + Number(r.sales       || 0), 0),
+prevSales:       rows.filter(r => r.date.slice(0, 7) === pm).reduce((s, r) => s + Number(r.sales || 0), 0),
+thisWork:        thisRows.length,
+thisNominations: thisRows.reduce((s, r) => s + Number(r.nominations || 0), 0),
+};
+};
+
+return (
+<div>
+<div style={S.pageTitle}>
+<h1 style={S.h1}>キャスト一覧</h1>
+<button style={S.btnPrimary} onClick={() => setShowAdd(!showAdd)}>
+{showAdd ? “キャンセル” : “+ キャスト追加”}
+</button>
+</div>
+{showAdd && (
+<div style={S.addForm}>
+<input style={{ …S.input, marginBottom: 0 }} placeholder=“キャスト名を入力”
+value={newName} onChange={e => setNewName(e.target.value)}
+onKeyDown={e => e.key === “Enter” && addCast()} autoFocus />
+<button style={S.btnPrimary} onClick={addCast}>追加</button>
+</div>
+)}
+{data.casts.length === 0
+? <div style={S.empty}><div style={{ fontSize: 40, marginBottom: 12 }}>✦</div><div style={{ color: “#6b7280” }}>キャストを追加してください</div></div>
+: (
+<div style={S.castGrid}>
+{data.casts.map(c => {
+const s = summary(c.id);
+const alert     = daysUntil(c.birthday);
+const bdDisplay = fmtBd(c.birthday);
+return (
+<div key={c.id} style={S.castCard} onClick={() => onOpenCast(c.id)}>
+<div style={S.castCardTop}>
+<div style={S.castAvatar}>{c.name[0]}</div>
+<div style={{ flex: 1, minWidth: 0 }}>
+<div style={S.castName}>{c.name}</div>
+<div style={{ display: “flex”, alignItems: “center”, gap: 6, marginTop: 3, flexWrap: “wrap” }}>
+{bdDisplay
+? <span style={{ color: “#a78bfa”, fontSize: 11 }}>🎂 {bdDisplay}</span>
+: <span style={{ color: “#374151”, fontSize: 11 }}>誕生日未設定</span>}
+{alert && <span style={{ color: “#fbbf24”, fontSize: 11, fontWeight: 700 }}>{alert}</span>}
+<button style={S.bdEditBtn} onClick={e => { e.stopPropagation(); setEditBdId(c.id); setBdInput(c.birthday || “”); }}>
+{bdDisplay ? “変更” : “設定”}
+</button>
+</div>
+</div>
+<button style={S.btnDelete} onClick={e => deleteCast(e, c.id, c.name)}>✕</button>
+</div>
+{editBdId === c.id && (
+<div style={{ padding: “8px 0 4px”, display: “flex”, gap: 8, alignItems: “center” }} onClick={e => e.stopPropagation()}>
+<input type=“date” style={{ …S.input, marginBottom: 0, flex: 1, fontSize: 13, padding: “7px 10px” }}
+value={bdInput} onChange={e => setBdInput(e.target.value)} />
+<button style={{ …S.btnPrimary, padding: “7px 12px”, fontSize: 12 }} onClick={e => saveBirthday(e, c.id)}>保存</button>
+<button style={S.btnGhost} onClick={e => { e.stopPropagation(); setEditBdId(null); }}>✕</button>
+</div>
+)}
+<div style={S.castStats}>
+<Stat label={`${s.thisLabel}売上`} value={yen(s.thisSales)} />
+<Stat label={`${s.prevLabel}売上`} value={yen(s.prevSales)} dim />
+<Stat label={`${s.thisLabel}出勤`} value={`${s.thisWork}日`} dim />
+<Stat label={`${s.thisLabel}指名`} value={`${s.thisNominations}組`} dim />
+</div>
+</div>
+);
+})}
+</div>
+)
+}
+</div>
+);
+}
+
+function Stat({ label, value, dim }) {
+return (
+<div style={{ textAlign: “center”, minWidth: 0 }}>
+<div style={{ color: “#6b7280”, fontSize: 10, marginBottom: 2, whiteSpace: “nowrap” }}>{label}</div>
+<div style={{ color: dim ? “#9ca3af” : “#e8b86d”, fontSize: 12, fontWeight: 700 }}>{value}</div>
+</div>
+);
+}
+
+// —————————————————————————–
+// InputPage
+// —————————————————————————–
+const initForm   = (date) => ({ date: date || todayStr(), sales: “”, companions: “”, nominations: “”, floorCount: “” });
+const initGuests = ()     => [blankGuest()];
+
+const custToGuest = c => ({
+_id:         c.id,
+type:        c.type,
+name:        c.name,
+sales:       c.sales       || “”,
+bottleNeck:  c.bottleNeck  || “”,
+orderBottle: c.orderBottle || “”,
+receipt:     c.receipt     || “”,
+note:        c.note        || “”,
+});
+
+function InputPage({ castId, data, persist, notify }) {
+const [tab,    setTab]    = useState(“daily”);
+const [form,   setForm]   = useState(initForm());
+const [guests, setGuests] = useState(initGuests());
+
+const handleDateChange = newDate => {
+const rec = (data.records[castId] || []).find(r => r.date === newDate);
+setForm({
+date:        newDate,
+sales:       rec ? rec.sales            : “”,
+companions:  rec ? rec.companions       : “”,
+nominations: rec ? rec.nominations      : “”,
+floorCount:  rec ? rec.floorCount || “” : “”,
+});
+const savedCust = (data.customers[castId] || []).filter(c => c.date === newDate);
+setGuests(savedCust.length > 0 ? savedCust.map(custToGuest) : initGuests());
+};
+
+useEffect(() => { handleDateChange(form.date); }, []); // eslint-disable-line
+
+const setF = (k, v) => setForm(f => ({ …f, [k]: v }));
+const setG = (i, k, v) => setGuests(gs => gs.map((g, idx) => idx === i ? { …g, [k]: v } : g));
+
+const existing = (data.records[castId] || []).find(r => r.date === form.date);
+
+const save = () => {
+const record = {
+date:        form.date,
+sales:       Number(form.sales       || 0),
+companions:  Number(form.companions  || 0),
+nominations: Number(form.nominations || 0),
+floorCount:  Number(form.floorCount  || 0),
+};
+const rows = (data.records[castId] || []).filter(r => r.date !== form.date);
+
+```
+const newEntries = guests
+  .filter(g => g.name.trim())
+  .map(g => ({
+    id:          g._id,
+    date:        form.date,
+    type:        g.type,
+    name:        g.name.trim(),
+    sales:       Number(g.sales       || 0),
+    bottleNeck:  g.bottleNeck.trim(),
+    orderBottle: g.orderBottle.trim(),
+    receipt:     g.receipt.trim(),
+    note:        g.note.trim(),
+  }));
+
+const prevCust = (data.customers[castId] || []).filter(c => c.date !== form.date);
+
+persist({
+  ...data,
+  records:   { ...data.records,   [castId]: [...rows, record].sort((a, b) => a.date.localeCompare(b.date)) },
+  customers: { ...data.customers, [castId]: [...prevCust, ...newEntries].sort((a, b) => b.date.localeCompare(a.date)) },
+});
+notify("保存しました");
+```
+
+};
+
+const now          = new Date();
+const thisMonthKey = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+const autoWorkDays = calcWorkDays(data.records, castId, thisMonthKey);
+
+return (
+<div style={{ maxWidth: 520, margin: “0 auto” }}>
+<div style={{ display: “flex”, marginBottom: 20, borderRadius: 10, overflow: “hidden”, border: “1px solid #1e2035” }}>
+{[[“daily”, “📋 日次データ”], [“guest”, “👥 来店顧客”]].map(([key, label]) => (
+<button key={key} onClick={() => setTab(key)}
+style={{
+flex: 1, padding: “11px 0”, fontSize: 14, fontWeight: 600, border: “none”, cursor: “pointer”,
+background: tab === key ? “#1e2035” : “transparent”,
+color: tab === key ? “#e8b86d” : “#6b7280”,
+borderRight: key === “daily” ? “1px solid #1e2035” : “none”,
+}}>
+{label}
+</button>
+))}
+</div>
+
+```
+  <label style={S.label}>日付</label>
+  <input type="date" style={S.input} value={form.date} onChange={e => handleDateChange(e.target.value)} />
+
+  {tab === "daily" && (
+    <>
+      {existing && <div style={S.badge}>この日付のデータは上書きされます</div>}
+      <div style={S.infoBanner}>
+        <span style={{ color: "#fb923c", fontWeight: 700 }}>📅 {now.getMonth() + 1}月の出勤日数</span>
+        <span style={{ color: "#f3f4f6", fontWeight: 700, fontSize: 18, marginLeft: 8 }}>{autoWorkDays}日</span>
+        <span style={{ color: "#6b7280", fontSize: 11, marginLeft: 4 }}>（自動集計）</span>
+      </div>
+      {[
+        { key: "sales",       label: "売上 (円)",  placeholder: "例: 250000" },
+        { key: "companions",  label: "同伴数",      placeholder: "例: 2" },
+        { key: "nominations", label: "指名組数",    placeholder: "例: 8" },
+        { key: "floorCount",  label: "場内組数",    placeholder: "例: 3" },
+      ].map(f => (
+        <div key={f.key}>
+          <label style={S.label}>{f.label}</label>
+          <input type="number" style={S.input} placeholder={f.placeholder}
+            value={form[f.key]} onChange={e => setF(f.key, e.target.value)} />
+        </div>
+      ))}
+    </>
+  )}
+
+  {tab === "guest" && (
+    <div>
+      {guests.map((g, i) => (
+        <GuestCard key={g._id} g={g} index={i} total={guests.length}
+          onChange={(k, v) => setG(i, k, v)}
+          onRemove={() => setGuests(gs => gs.filter((_, idx) => idx !== i))} />
+      ))}
+      <button style={S.btnAdd} onClick={() => setGuests(gs => [...gs, blankGuest()])}>
+        <span style={{ fontSize: 22, lineHeight: 1, marginRight: 4 }}>＋</span> 組を追加
+      </button>
+    </div>
+  )}
+
+  <button style={{ ...S.btnPrimary, width: "100%", padding: "14px", fontSize: 15, marginTop: 16 }} onClick={save}>
+    保存する
+  </button>
+</div>
+```
+
+);
+}
+
+function GuestCard({ g, index, total, onChange, onRemove }) {
+const [open, setOpen] = useState(true);
+const tc = typeColor(g.type);
+return (
+<div style={{ background: “#12122a”, border: “1px solid #1e2035”, borderRadius: 12, marginBottom: 12, overflow: “hidden” }}>
+<div style={{ display: “flex”, alignItems: “center”, padding: “10px 14px”, gap: 10, cursor: “pointer”, background: “#0f0f22”, userSelect: “none” }}
+onClick={() => setOpen(o => !o)}>
+<span style={{ background: “#e8b86d22”, color: “#e8b86d”, fontWeight: 700, fontSize: 12, padding: “2px 8px”, borderRadius: 4, border: “1px solid #e8b86d33”, flexShrink: 0 }}>
+{index + 1}組目
+</span>
+<span style={{ …S.typeBadge, background: tc.bg, color: tc.fg, borderColor: tc.border, flexShrink: 0 }}>{g.type}</span>
+<span style={{ color: g.name ? “#d1d5db” : “#4b5563”, fontSize: 13, flex: 1, overflow: “hidden”, textOverflow: “ellipsis”, whiteSpace: “nowrap” }}>
+{g.name || “未入力”}
+</span>
+{total > 1 && (
+<button
+style={{ background: “#7f1d1d44”, border: “1px solid #7f1d1d”, color: “#fca5a5”, fontSize: 12, borderRadius: 6, padding: “3px 10px”, cursor: “pointer”, flexShrink: 0 }}
+onClick={e => { e.stopPropagation(); onRemove(); }}>
+削除
+</button>
+)}
+<span style={{ color: “#4b5563”, fontSize: 11, flexShrink: 0 }}>{open ? “▲” : “▼”}</span>
+</div>
+{open && (
+<div style={{ padding: “14px 14px 10px” }}>
+<label style={S.label}>種別</label>
+<div style={{ display: “flex”, gap: 8, marginBottom: 12 }}>
+{[“指名”, “場内”, “同伴”].map(t => {
+const c = typeColor(t);
+return (
+<button key={t} onClick={() => onChange(“type”, t)}
+style={{
+flex: 1, padding: “9px 0”, borderRadius: 8, border: “1px solid”, fontSize: 13, fontWeight: 700, cursor: “pointer”,
+borderColor: g.type === t ? c.border : “#2d2d4e”,
+background:  g.type === t ? c.bg     : “transparent”,
+color:       g.type === t ? c.fg     : “#6b7280”,
+}}>
+{t}
+</button>
+);
+})}
+</div>
+{[
+{ key: “name”,        label: “客の名前”,       placeholder: “例: 田中様”,     type: “text” },
+{ key: “sales”,       label: “売上金額 (円)”,   placeholder: “例: 50000”,      type: “number” },
+{ key: “bottleNeck”,  label: “ボトルネック名”,  placeholder: “例: 山崎12年”,   type: “text” },
+{ key: “orderBottle”, label: “オーダーボトル”,  placeholder: “例: ドンペリ白”, type: “text” },
+{ key: “receipt”,     label: “領収書”,          placeholder: “例: 田中商事”,   type: “text” },
+].map(f => (
+<div key={f.key}>
+<label style={S.label}>{f.label}</label>
+<input type={f.type} style={S.input} placeholder={f.placeholder}
+value={g[f.key]} onChange={e => onChange(f.key, e.target.value)} />
+</div>
+))}
+<label style={S.label}>備考</label>
+<textarea style={{ …S.input, resize: “vertical”, minHeight: 58, fontFamily: “inherit”, marginBottom: 4 }}
+placeholder=“メモ・特記事項など” value={g.note} onChange={e => onChange(“note”, e.target.value)} />
+</div>
+)}
+</div>
+);
+}
+
+// —————————————————————————–
+// ChartPage
+// —————————————————————————–
+function ChartPage({ castId, data }) {
+const [mode,          setMode]   = useState(“monthly”);
+const [activeMetrics, setAM]     = useState([“sales”, “companions”, “nominations”]);
+const [selectedKey,   setSelKey] = useState(null);
+const chartData = useMemo(() => aggregate(data.records, castId, mode), [data.records, castId, mode]);
+const allRows   = data.records[castId]  || [];
+const allCust   = data.customers[castId] || [];
+
+const toggle = k => setAM(a => a.includes(k) ? a.filter(x => x !== k) : […a, k]);
+const fmt = key => {
+if (mode === “daily”)   return fmtDate(key);
+if (mode === “monthly”) { const [y, m] = key.split(”-”); return `${y.slice(2)}/${m}`; }
+return key;
+};
+
+const summaryTotals = useMemo(() => {
+const now = new Date();
+let rows;
+if      (mode === “daily”)   rows = allRows.filter(r => r.date.slice(0, 7) === `${now.getFullYear()}-${pad(now.getMonth() + 1)}`);
+else if (mode === “monthly”) rows = allRows.filter(r => r.date.slice(0, 4) === String(now.getFullYear()));
+else                         rows = allRows;
+return {
+sales:       rows.reduce((s, r) => s + Number(r.sales       || 0), 0),
+companions:  rows.reduce((s, r) => s + Number(r.companions  || 0), 0),
+nominations: rows.reduce((s, r) => s + Number(r.nominations || 0), 0),
+workDays:    rows.length,
+floorCount:  rows.reduce((s, r) => s + Number(r.floorCount  || 0), 0),
+};
+}, [allRows, mode]);
+
+const summaryLabel = mode === “daily”   ? `${new Date().getMonth() + 1}月の累計`
+: mode === “monthly” ? `${new Date().getFullYear()}年の累計`
+: “全期間の累計”;
+
+const popCustomers = useMemo(() => {
+if (!selectedKey) return [];
+return allCust.filter(c =>
+mode === “daily”   ? c.date === selectedKey
+: mode === “monthly” ? c.date.slice(0, 7) === selectedKey
+: c.date.slice(0, 4) === selectedKey
+);
+}, [selectedKey, allCust, mode]);
+
+const popLabel = selectedKey
+? mode === “daily”   ? fmtDate(selectedKey)
+: mode === “monthly” ? selectedKey.replace(”-”, “年”) + “月”
+: selectedKey + “年” : “”;
+
+const CTooltip = ({ active, payload, label }) => {
+if (!active || !payload?.length) return null;
+const display = mode === “daily” ? fmtDate(label) : mode === “monthly” ? label.replace(”-”, “年”) + “月” : label + “年”;
+return (
+<div style={{ background: “#1a1a2e”, border: “1px solid #2d2d4e”, borderRadius: 8, padding: “10px 14px”, fontSize: 12 }}>
+<div style={{ color: “#9ca3af”, marginBottom: 6 }}>{display}</div>
+{payload.map(p => (
+<div key={p.dataKey} style={{ color: p.color, marginBottom: 2 }}>
+{METRICS.find(m => m.key === p.dataKey)?.label}: <b>
+{p.dataKey === “sales” ? yen(p.value) : p.value}
+{p.dataKey !== “sales” ? METRICS.find(m => m.key === p.dataKey)?.unit : “”}
+</b>
+</div>
+))}
+<div style={{ color: “#4b5563”, fontSize: 10, marginTop: 4 }}>タップで来店顧客を表示</div>
+</div>
+);
+};
+
+const handleClick = useCallback(e => { if (e?.activeLabel) setSelKey(p => p === e.activeLabel ? null : e.activeLabel); }, []);
+
+return (
+<div>
+<div style={S.pageTitle}>
+<h2 style={S.h2}>グラフ</h2>
+<div style={{ display: “flex”, gap: 6 }}>
+{[“daily”, “monthly”, “yearly”].map(m => (
+<button key={m} style={mode === m ? S.modeActive : S.modeBtn} onClick={() => { setMode(m); setSelKey(null); }}>
+{m === “daily” ? “日別” : m === “monthly” ? “月別” : “年別”}
+</button>
+))}
+</div>
+</div>
+<div style={S.metricToggle}>
+{METRICS.map(m => (
+<button key={m.key}
+style={{ …S.metricBtn, borderColor: activeMetrics.includes(m.key) ? m.color : “#374151”, color: activeMetrics.includes(m.key) ? m.color : “#6b7280”, background: activeMetrics.includes(m.key) ? m.color + “15” : “transparent” }}
+onClick={() => toggle(m.key)}>{m.label}
+</button>
+))}
+</div>
+{chartData.length === 0
+? <div style={S.empty}><div style={{ color: “#6b7280” }}>データがありません</div></div>
+: (
+<>
+{activeMetrics.length > 0 && (
+<div style={{ …S.chartWrap, cursor: “pointer” }}>
+<div style={{ color: “#6b7280”, fontSize: 11, paddingLeft: 8, marginBottom: 4 }}>タップして来店顧客を確認</div>
+<ResponsiveContainer width="100%" height={290}>
+<ComposedChart data={chartData} margin={{ left: 10, right: 20, top: 6, bottom: 5 }} onClick={handleClick}>
+<CartesianGrid strokeDasharray="3 3" stroke="#1e2035" />
+<XAxis dataKey=“key” tickFormatter={fmt} tick={{ fill: “#6b7280”, fontSize: 11 }} />
+{activeMetrics.includes(“sales”) && (
+<YAxis yAxisId=“sales” orientation=“left”
+tickFormatter={v => v >= 10000 ? `${(v / 10000).toFixed(0)}万` : v}
+tick={{ fill: “#e8b86d”, fontSize: 11 }} width={52} />
+)}
+{activeMetrics.some(k => k !== “sales”) && (
+<YAxis yAxisId=“count” orientation=“right” allowDecimals={false}
+tick={{ fill: “#9ca3af”, fontSize: 11 }} width={32} />
+)}
+<Tooltip content={<CTooltip />} />
+<Legend formatter={v => METRICS.find(m => m.key === v)?.label} wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+{activeMetrics.includes(“sales”) && (
+<Bar yAxisId=“sales” dataKey=“sales” radius={[4, 4, 0, 0]}>
+{chartData.map(entry => (
+<Cell key={entry.key} fill={entry.key === selectedKey ? “#ffd280” : “#e8b86d”}
+fillOpacity={entry.key === selectedKey ? 1 : 0.8} />
+))}
+</Bar>
+)}
+{METRICS.filter(m => m.key !== “sales” && activeMetrics.includes(m.key)).map(m => (
+<Line key={m.key} yAxisId=“count” type=“monotone” dataKey={m.key}
+stroke={m.color} strokeWidth={2.5} dot={{ r: 4, fill: m.color, strokeWidth: 0 }} />
+))}
+</ComposedChart>
+</ResponsiveContainer>
+</div>
+)}
+{selectedKey && (
+<div style={S.custPanel}>
+<div style={{ display: “flex”, alignItems: “center”, justifyContent: “space-between”, marginBottom: 12 }}>
+<div style={{ color: “#e8b86d”, fontWeight: 700, fontSize: 14 }}>📋 {popLabel} の来店顧客</div>
+<button style={{ background: “transparent”, border: “none”, color: “#6b7280”, fontSize: 18, cursor: “pointer” }} onClick={() => setSelKey(null)}>✕</button>
+</div>
+{popCustomers.length === 0
+? <div style={{ color: “#6b7280”, fontSize: 13, textAlign: “center”, padding: “16px 0” }}>来店顧客の記録がありません</div>
+: popCustomers.map(c => {
+const tc = typeColor(c.type);
+return (
+<div key={c.id} style={S.popRow}>
+<div style={{ display: “flex”, alignItems: “center”, gap: 8, flex: 1, minWidth: 0 }}>
+<span style={{ …S.typeBadge, background: tc.bg, color: tc.fg, borderColor: tc.border }}>{c.type}</span>
+<span style={{ fontWeight: 700, color: “#f3f4f6”, fontSize: 13, overflow: “hidden”, textOverflow: “ellipsis”, whiteSpace: “nowrap” }}>{c.name}</span>
+</div>
+<div style={{ display: “flex”, gap: 12, flexShrink: 0, fontSize: 12 }}>
+{c.sales > 0 && <span style={{ color: “#e8b86d”, fontWeight: 600 }}>{yen(c.sales)}</span>}
+{c.bottleNeck && <span style={{ color: “#9ca3af” }}>🍾 {c.bottleNeck}</span>}
+</div>
+</div>
+);
+})
+}
+</div>
+)}
+<div style={S.summaryTable}>
+<div style={{ color: “#6b7280”, fontSize: 11, marginBottom: 10 }}>{summaryLabel}</div>
+<div style={S.summaryRow}>
+{METRICS.map(m => (
+<div key={m.key} style={S.summaryCell}>
+<div style={{ color: m.color, fontSize: 11, marginBottom: 4 }}>{m.label}</div>
+<div style={{ color: “#e5e7eb”, fontSize: 15, fontWeight: 700 }}>
+{m.key === “sales” ? yen(summaryTotals[m.key]) : summaryTotals[m.key] + m.unit}
+</div>
+</div>
+))}
+</div>
+</div>
+</>
+)
+}
+</div>
+);
+}
+
+// —————————————————————————–
+// ListPage
+// —————————————————————————–
+function ListPage({ castId, data, persist, notify }) {
+const [editDate, setEditDate] = useState(null);
+const [editForm, setEditForm] = useState({});
+
+const rows = […(data.records[castId] || [])].sort((a, b) => b.date.localeCompare(a.date));
+
+const del = (e, date) => {
+e.stopPropagation();
+if (!confirm(`${fmtDate(date)} のデータを削除しますか？`)) return;
+persist({ …data, records: { …data.records, [castId]: data.records[castId].filter(r => r.date !== date) } });
+notify(“削除しました”);
+};
+
+const startEdit = (e, r) => {
+e.stopPropagation();
+setEditDate(r.date);
+setEditForm({ sales: r.sales, companions: r.companions, nominations: r.nominations, floorCount: r.floorCount || 0 });
+};
+
+const saveEdit = (e, date) => {
+e.stopPropagation();
+const updated = data.records[castId].map(r =>
+r.date === date ? { …r, sales: Number(editForm.sales || 0), companions: Number(editForm.companions || 0), nominations: Number(editForm.nominations || 0), floorCount: Number(editForm.floorCount || 0) } : r
+);
+persist({ …data, records: { …data.records, [castId]: updated } });
+setEditDate(null);
+notify(“更新しました”);
+};
+
+return (
+<div>
+<h2 style={S.h2}>入力履歴</h2>
+{rows.length === 0
+? <div style={S.empty}><div style={{ color: “#6b7280” }}>データがありません</div></div>
+: rows.map((r, i) => (
+<div key={r.date} style={S.listCard}>
+<div style={{ display: “flex”, alignItems: “center”, justifyContent: “space-between”, marginBottom: 12 }}>
+<div style={{ display: “flex”, alignItems: “center”, gap: 10 }}>
+<span style={{ color: “#e8b86d”, fontWeight: 700, fontSize: 15 }}>{fmtDate(r.date)}</span>
+<span style={{ background: “#fb923c22”, color: “#fb923c”, fontSize: 11, fontWeight: 700, padding: “2px 8px”, borderRadius: 20, border: “1px solid #fb923c44” }}>
+{rows.length - i}日目
+</span>
+</div>
+<div style={{ display: “flex”, gap: 6 }}>
+<button style={S.btnEdit}   onClick={e => startEdit(e, r)}>編集</button>
+<button style={S.btnDanger} onClick={e => del(e, r.date)}>削除</button>
+</div>
+</div>
+<div style={{ marginBottom: 12, padding: “10px 14px”, background: “#0d0d1a”, borderRadius: 8, border: “1px solid #e8b86d22”, display: “flex”, alignItems: “center”, justifyContent: “space-between” }}>
+<span style={{ color: “#6b7280”, fontSize: 12 }}>売上</span>
+<span style={{ color: “#e8b86d”, fontWeight: 700, fontSize: 22 }}>{yen(r.sales)}</span>
+</div>
+<div style={{ display: “grid”, gridTemplateColumns: “repeat(3,1fr)”, gap: 8 }}>
+{[
+{ label: “同伴数”,   value: `${r.companions}回`,    color: “#a78bfa” },
+{ label: “指名組数”, value: `${r.nominations}組`,   color: “#34d399” },
+{ label: “場内組数”, value: `${r.floorCount || 0}組`,color: “#60a5fa” },
+].map(item => (
+<div key={item.label} style={{ background: “#0d0d1a”, borderRadius: 8, padding: “8px 10px”, border: “1px solid #1e2035”, textAlign: “center” }}>
+<div style={{ color: “#6b7280”, fontSize: 10, marginBottom: 4 }}>{item.label}</div>
+<div style={{ color: item.color, fontWeight: 700, fontSize: 16 }}>{item.value}</div>
+</div>
+))}
+</div>
+{editDate === r.date && (
+<div style={{ marginTop: 12, padding: “12px”, background: “#0d0d1a”, borderRadius: 8, border: “1px solid #2d2d4e” }} onClick={e => e.stopPropagation()}>
+<div style={{ display: “grid”, gridTemplateColumns: “repeat(2,1fr)”, gap: 10, marginBottom: 12 }}>
+{[
+{ key: “sales”,       label: “売上 (円)” },
+{ key: “companions”,  label: “同伴数” },
+{ key: “nominations”, label: “指名組数” },
+{ key: “floorCount”,  label: “場内組数” },
+].map(f => (
+<div key={f.key}>
+<label style={S.label}>{f.label}</label>
+<input type=“number” style={{ …S.input, marginBottom: 0 }}
+value={editForm[f.key]} onChange={e => setEditForm(ef => ({ …ef, [f.key]: e.target.value }))} />
+</div>
+))}
+</div>
+<div style={{ display: “flex”, gap: 8, justifyContent: “flex-end” }}>
+<button style={S.btnGhost}   onClick={e => { e.stopPropagation(); setEditDate(null); }}>キャンセル</button>
+<button style={S.btnPrimary} onClick={e => saveEdit(e, r.date)}>保存</button>
+</div>
+</div>
+)}
+</div>
+))
+}
+</div>
+);
+}
+
+// —————————————————————————–
+// CustomerPage
+// —————————————————————————–
+function CustomerPage({ castId, data, persist, notify }) {
+const [query,    setQuery]    = useState(””);
+const [openMap,  setOpenMap]  = useState({});
+const [editId,   setEditId]   = useState(null);
+const [editForm, setEditForm] = useState({});
+
+const all = useMemo(() => data.customers[castId] || [], [data.customers, castId]);
+
+const filtered = useMemo(() => {
+const q = query.trim().toLowerCase();
+if (!q) return all;
+return all.filter(c => [c.name, c.type, c.bottleNeck, c.orderBottle, c.receipt, c.note, fmtDate(c.date)].join(” “).toLowerCase().includes(q));
+}, [all, query]);
+
+useEffect(() => { setOpenMap({}); setEditId(null); }, [query]);
+
+const toggle = id => setOpenMap(prev => ({ …prev, [id]: !prev[id] }));
+
+const del = (e, id) => {
+e.stopPropagation();
+if (!confirm(“この顧客データを削除しますか？”)) return;
+persist({ …data, customers: { …data.customers, [castId]: all.filter(c => c.id !== id) } });
+setOpenMap(prev => { const n = { …prev }; delete n[id]; return n; });
+if (editId === id) setEditId(null);
+notify(“削除しました”);
+};
+
+const startEdit = (e, c) => {
+e.stopPropagation();
+setEditId(c.id);
+setEditForm({ type: c.type, name: c.name, sales: c.sales, bottleNeck: c.bottleNeck, orderBottle: c.orderBottle, receipt: c.receipt, note: c.note });
+};
+
+const saveEdit = (e, id) => {
+e.stopPropagation();
+const updated = all.map(c => c.id === id ? { …c, …editForm, sales: Number(editForm.sales || 0) } : c);
+persist({ …data, customers: { …data.customers, [castId]: updated } });
+setEditId(null); notify(“更新しました”);
+};
+
+return (
+<div>
+<div style={S.pageTitle}>
+<h2 style={S.h2}>顧客管理</h2>
+<div style={{ color: “#6b7280”, fontSize: 12 }}>{all.length}件登録</div>
+</div>
+<div style={{ position: “relative”, marginBottom: 8 }}>
+<span style={{ position: “absolute”, left: 12, top: “50%”, transform: “translateY(-50%)”, color: “#4b5563”, fontSize: 15, pointerEvents: “none” }}>🔍</span>
+<input style={{ …S.input, paddingLeft: 38, marginBottom: 0 }}
+placeholder=“名前・ボトル・領収書・備考・日付で検索…”
+value={query} onChange={e => setQuery(e.target.value)} />
+</div>
+{query && (
+<div style={{ color: “#6b7280”, fontSize: 12, marginBottom: 12 }}>
+{filtered.length}件ヒット
+<button style={{ marginLeft: 8, background: “transparent”, border: “none”, color: “#4b5563”, cursor: “pointer”, fontSize: 12 }}
+onClick={() => setQuery(””)}>✕ クリア</button>
+</div>
+)}
+{filtered.length === 0
+? <div style={S.empty}><div style={{ color: “#6b7280” }}>{query ? “該当なし” : “顧客データがありません”}</div></div>
+: filtered.map(c => {
+const tc     = typeColor(c.type);
+const open   = !!openMap[c.id];
+const editing = editId === c.id;
+return (
+<div key={c.id} style={{ background: “#12122a”, border: “1px solid #1e2035”, borderRadius: 10, marginBottom: 6, overflow: “hidden” }}>
+<div style={{ display: “flex”, alignItems: “center”, gap: 8, padding: “12px 14px”, cursor: “pointer”, background: open ? “#16163a” : “#12122a”, userSelect: “none” }}
+onClick={() => toggle(c.id)}>
+<span style={{ …S.typeBadge, background: tc.bg, color: tc.fg, borderColor: tc.border }}>{c.type}</span>
+<span style={{ fontWeight: 700, fontSize: 14, color: “#f3f4f6”, flex: 1, overflow: “hidden”, textOverflow: “ellipsis”, whiteSpace: “nowrap” }}>{c.name}</span>
+<span style={{ color: “#6b7280”, fontSize: 11, flexShrink: 0 }}>{fmtDate(c.date)}</span>
+{c.sales > 0 && <span style={{ color: “#e8b86d”, fontSize: 13, fontWeight: 600, flexShrink: 0 }}>{yen(c.sales)}</span>}
+<span style={{ color: “#4b5563”, fontSize: 11, flexShrink: 0 }}>{open ? “▲” : “▼”}</span>
+</div>
+{open && !editing && (
+<div style={{ padding: “12px 14px”, borderTop: “1px solid #1e2035” }}>
+{[
+[“種別”,          c.type],
+[“売上金額”,      c.sales > 0 ? yen(c.sales) : “–”],
+[“ボトルネック名”,c.bottleNeck  || “–”],
+[“オーダーボトル”,c.orderBottle || “–”],
+[“領収書”,        c.receipt     || “–”],
+[“備考”,          c.note        || “–”],
+].map(([label, val]) => (
+<div key={label} style={{ display: “flex”, gap: 8, marginBottom: 6, fontSize: 13 }}>
+<span style={{ color: “#6b7280”, minWidth: 112, flexShrink: 0 }}>{label}</span>
+<span style={{ color: “#e5e7eb”, wordBreak: “break-word” }}>{val}</span>
+</div>
+))}
+<div style={{ display: “flex”, gap: 8, marginTop: 12, justifyContent: “flex-end” }}>
+<button style={S.btnEdit}   onClick={e => startEdit(e, c)}>編集</button>
+<button style={S.btnDanger} onClick={e => del(e, c.id)}>削除</button>
+</div>
+</div>
+)}
+{open && editing && (
+<div style={{ padding: “12px 14px”, borderTop: “1px solid #1e2035” }} onClick={e => e.stopPropagation()}>
+<label style={S.label}>種別</label>
+<div style={{ display: “flex”, gap: 8, marginBottom: 12 }}>
+{[“指名”, “場内”, “同伴”].map(t => {
+const c2 = typeColor(t);
+return (
+<button key={t} onClick={() => setEditForm(f => ({ …f, type: t }))}
+style={{ flex: 1, padding: “8px 0”, borderRadius: 8, border: “1px solid”, fontSize: 13, fontWeight: 700, cursor: “pointer”, borderColor: editForm.type === t ? c2.border : “#2d2d4e”, background: editForm.type === t ? c2.bg : “transparent”, color: editForm.type === t ? c2.fg : “#6b7280” }}>
+{t}
+</button>
+);
+})}
+</div>
+{[
+{ key: “name”,        label: “客の名前”,      type: “text” },
+{ key: “sales”,       label: “売上金額 (円)”, type: “number” },
+{ key: “bottleNeck”,  label: “ボトルネック名”,type: “text” },
+{ key: “orderBottle”, label: “オーダーボトル”,type: “text” },
+{ key: “receipt”,     label: “領収書”,        type: “text” },
+].map(f => (
+<div key={f.key} style={{ display: “flex”, alignItems: “center”, gap: 10, marginBottom: 10 }}>
+<label style={{ …S.label, marginBottom: 0, minWidth: 112, flexShrink: 0 }}>{f.label}</label>
+<input type={f.type} style={{ …S.input, marginBottom: 0, flex: 1 }}
+value={editForm[f.key] || “”} onChange={e => setEditForm(ef => ({ …ef, [f.key]: e.target.value }))} />
+</div>
+))}
+<div style={{ marginBottom: 10 }}>
+<label style={S.label}>備考</label>
+<textarea style={{ …S.input, resize: “vertical”, minHeight: 50, fontFamily: “inherit”, marginBottom: 0 }}
+value={editForm.note || “”} onChange={e => setEditForm(ef => ({ …ef, note: e.target.value }))} />
+</div>
+<div style={{ display: “flex”, gap: 8, justifyContent: “flex-end” }}>
+<button style={S.btnGhost}   onClick={e => { e.stopPropagation(); setEditId(null); }}>キャンセル</button>
+<button style={S.btnPrimary} onClick={e => saveEdit(e, c.id)}>保存</button>
+</div>
+</div>
+)}
+</div>
+);
+})
+}
+</div>
+);
+}
+
+// —————————————————————————–
+// Styles
+// —————————————————————————–
+const S = {
+root:     { minHeight: “100vh”, background: “#0d0d1a”, color: “#e5e7eb”, fontFamily: “‘Noto Sans JP’,‘Hiragino Sans’,sans-serif”, position: “relative”, overflowX: “hidden” },
+bgDeco1:  { position: “fixed”, top: -200, right: -200, width: 500, height: 500, borderRadius: “50%”, background: “radial-gradient(circle,#e8b86d08,transparent 70%)”, pointerEvents: “none”, zIndex: 0 },
+bgDeco2:  { position: “fixed”, bottom: -200, left: -100, width: 400, height: 400, borderRadius: “50%”, background: “radial-gradient(circle,#a78bfa08,transparent 70%)”, pointerEvents: “none”, zIndex: 0 },
+header:   { position: “sticky”, top: 0, zIndex: 100, background: “rgba(13,13,26,0.92)”, backdropFilter: “blur(12px)”, borderBottom: “1px solid #1e2035”, display: “flex”, alignItems: “center”, justifyContent: “space-between”, padding: “12px 18px”, gap: 12, flexWrap: “wrap” },
+tabBar:   { position: “sticky”, top: 57, zIndex: 99, background: “rgba(13,13,26,0.95)”, backdropFilter: “blur(12px)”, borderBottom: “2px solid #1e2035”, display: “flex”, alignItems: “stretch” },
+tabBarBtn:{ flex: 1, display: “flex”, flexDirection: “column”, alignItems: “center”, justifyContent: “center”, gap: 3, padding: “10px 4px”, border: “none”, background: “transparent”, color: “#6b7280”, cursor: “pointer”, transition: “all .15s”, borderBottom: “2px solid transparent”, marginBottom: “-2px” },
+tabBarBtnActive: { color: “#e8b86d”, borderBottom: “2px solid #e8b86d”, background: “#e8b86d08” },
+logo:     { display: “flex”, alignItems: “center”, gap: 8 },
+logoIcon: { color: “#e8b86d”, fontSize: 18 },
+logoText: { fontSize: 14, fontWeight: 700, letterSpacing: 3, color: “#e8b86d” },
+homeBtn:  { display: “flex”, alignItems: “center”, gap: 6, background: “#1e2035”, border: “1px solid #2d2d4e”, borderRadius: 8, color: “#e8b86d”, fontSize: 13, fontWeight: 700, padding: “8px 14px”, cursor: “pointer”, flexShrink: 0 },
+nav:      { display: “flex”, gap: 5, flexWrap: “wrap” },
+navBtn:   { background: “transparent”, border: “1px solid #1e2035”, borderRadius: 8, color: “#9ca3af”, fontSize: 13, padding: “8px 14px”, cursor: “pointer”, fontWeight: 500 },
+navBtnActive: { background: “#1e2035”, color: “#e8b86d”, borderColor: “#e8b86d44” },
+main:     { padding: “18px 16px”, maxWidth: 820, margin: “0 auto”, position: “relative”, zIndex: 1 },
+pageTitle:{ display: “flex”, alignItems: “center”, justifyContent: “space-between”, marginBottom: 18, flexWrap: “wrap”, gap: 10 },
+h1:       { fontSize: 20, fontWeight: 700, color: “#f3f4f6”, margin: 0 },
+h2:       { fontSize: 17, fontWeight: 700, color: “#f3f4f6”, margin: “0 0 16px” },
+castGrid: { display: “grid”, gridTemplateColumns: “repeat(auto-fill,minmax(270px,1fr))”, gap: 14 },
+castCard: { background: “#12122a”, border: “1px solid #1e2035”, borderRadius: 14, padding: 16, cursor: “pointer” },
+castCardTop: { display: “flex”, alignItems: “center”, gap: 12, marginBottom: 14 },
+castAvatar:  { width: 44, height: 44, borderRadius: “50%”, background: “linear-gradient(135deg,#e8b86d,#a78bfa)”, display: “flex”, alignItems: “center”, justifyContent: “center”, fontSize: 18, fontWeight: 700, color: “#0d0d1a”, flexShrink: 0 },
+castName:  { fontSize: 15, fontWeight: 700, color: “#f3f4f6” },
+castStats: { display: “flex”, justifyContent: “space-around”, borderTop: “1px solid #1e2035”, paddingTop: 12, gap: 4 },
+btnDelete: { marginLeft: “auto”, background: “transparent”, border: “none”, color: “#4b5563”, fontSize: 16, cursor: “pointer”, padding: 4, flexShrink: 0 },
+btnPrimary:{ background: “linear-gradient(135deg,#d4a017,#e8b86d)”, border: “none”, borderRadius: 8, color: “#0d0d1a”, fontSize: 13, fontWeight: 700, padding: “8px 16px”, cursor: “pointer” },
+btnGhost:  { background: “transparent”, border: “1px solid #2d2d4e”, borderRadius: 8, color: “#9ca3af”, fontSize: 13, padding: “7px 14px”, cursor: “pointer” },
+btnEdit:   { background: “#1e2035”, border: “1px solid #2d2d4e”, borderRadius: 6, color: “#9ca3af”, fontSize: 12, padding: “4px 10px”, cursor: “pointer” },
+btnDanger: { background: “#7f1d1d44”, border: “1px solid #7f1d1d”, borderRadius: 6, color: “#fca5a5”, fontSize: 12, padding: “4px 10px”, cursor: “pointer” },
+btnAdd:    { display: “flex”, alignItems: “center”, justifyContent: “center”, gap: 6, width: “100%”, padding: “13px 0”, borderRadius: 10, border: “2px dashed #2d2d4e”, background: “transparent”, color: “#6b7280”, fontSize: 14, fontWeight: 600, cursor: “pointer”, marginTop: 4, marginBottom: 4 },
+bdEditBtn: { background: “transparent”, border: “1px solid #2d2d4e”, borderRadius: 4, color: “#6b7280”, fontSize: 10, padding: “1px 6px”, cursor: “pointer” },
+addForm:   { display: “flex”, gap: 10, marginBottom: 20, alignItems: “center” },
+input:     { background: “#12122a”, border: “1px solid #2d2d4e”, borderRadius: 8, color: “#e5e7eb”, fontSize: 14, padding: “10px 14px”, width: “100%”, marginBottom: 12, boxSizing: “border-box”, outline: “none” },
+label:     { display: “block”, fontSize: 12, color: “#9ca3af”, marginBottom: 4 },
+badge:     { background: “#1e1a00”, border: “1px solid #e8b86d44”, borderRadius: 6, color: “#e8b86d”, fontSize: 12, padding: “6px 12px”, marginBottom: 16 },
+infoBanner:{ background: “#12122a”, border: “1px solid #fb923c33”, borderRadius: 8, padding: “10px 14px”, marginBottom: 16, display: “flex”, alignItems: “center”, flexWrap: “wrap”, gap: 4 },
+empty:     { textAlign: “center”, padding: “60px 0”, color: “#374151” },
+chartWrap: { background: “#12122a”, border: “1px solid #1e2035”, borderRadius: 12, padding: “12px 8px 8px”, marginBottom: 12 },
+modeBtn:   { background: “transparent”, border: “1px solid #2d2d4e”, borderRadius: 8, color: “#9ca3af”, fontSize: 14, padding: “8px 14px”, cursor: “pointer”, fontWeight: 500 },
+modeActive:{ background: “#1e2035”, border: “1px solid #e8b86d44”, borderRadius: 8, color: “#e8b86d”, fontSize: 14, padding: “8px 14px”, cursor: “pointer”, fontWeight: 700 },
+metricToggle: { display: “flex”, gap: 8, flexWrap: “wrap”, marginBottom: 14 },
+metricBtn:    { border: “1px solid”, borderRadius: 20, fontSize: 13, padding: “7px 14px”, cursor: “pointer”, transition: “.2s”, fontWeight: 500 },
+summaryTable: { background: “#12122a”, border: “1px solid #1e2035”, borderRadius: 12, padding: 14, marginTop: 8 },
+summaryRow:   { display: “flex”, gap: 8, flexWrap: “wrap” },
+summaryCell:  { flex: 1, minWidth: 110, background: “#0d0d1a”, borderRadius: 8, padding: “10px”, textAlign: “center” },
+custPanel:    { background: “#12122a”, border: “1px solid #e8b86d33”, borderRadius: 12, padding: 16, marginBottom: 12 },
+listCard:     { background: “#12122a”, border: “1px solid #1e2035”, borderRadius: 12, padding: 14, marginBottom: 12 },
+popRow:       { display: “flex”, alignItems: “center”, justifyContent: “space-between”, gap: 8, padding: “10px 12px”, borderRadius: 8, marginBottom: 4, background: “#0d0d1a”, border: “1px solid #1e2035” },
+toast:        { position: “fixed”, top: 68, left: “50%”, transform: “translateX(-50%)”, color: “#fff”, fontSize: 13, fontWeight: 600, padding: “10px 20px”, borderRadius: 8, zIndex: 999, boxShadow: “0 4px 20px rgba(0,0,0,.4)”, whiteSpace: “nowrap” },
+typeBadge:    { fontSize: 11, fontWeight: 700, padding: “3px 8px”, borderRadius: 4, border: “1px solid”, flexShrink: 0 },
+};
+const {
+ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+Tooltip, Legend, ResponsiveContainer, Cell
+} = Recharts;
+
+ReactDOM.createRoot(document.getElementById(“root”)).render(<App/>);
+</script>
+
+</body>
 </html>
