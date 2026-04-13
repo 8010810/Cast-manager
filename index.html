@@ -11,12 +11,16 @@
 </head>
 <body>
   <div id="root"></div>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.12.7/Recharts.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-  <script type="text/babel">
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useCallback } = React;
+const {
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
+  Tooltip, Legend, ResponsiveContainer, Cell
+} = Recharts;
 
 // —————————————————————————–
 // Storage (localStorage)
@@ -1012,12 +1016,10 @@ popRow:       { display: “flex”, alignItems: “center”, justifyContent: �
 toast:        { position: “fixed”, top: 68, left: “50%”, transform: “translateX(-50%)”, color: “#fff”, fontSize: 13, fontWeight: 600, padding: “10px 20px”, borderRadius: 8, zIndex: 999, boxShadow: “0 4px 20px rgba(0,0,0,.4)”, whiteSpace: “nowrap” },
 typeBadge:    { fontSize: 11, fontWeight: 700, padding: “3px 8px”, borderRadius: 4, border: “1px solid”, flexShrink: 0 },
 };
-const {
-ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid,
-Tooltip, Legend, ResponsiveContainer, Cell
-} = Recharts;
 
-ReactDOM.createRoot(document.getElementById(“root”)).render(<App/>);
+ReactDOM.createRoot(document.getElementById(“root”)).render(
+React.createElement(App)
+);
 </script>
 
 </body>
