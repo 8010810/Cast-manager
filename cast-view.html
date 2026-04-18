@@ -1,0 +1,84 @@
+<!doctype html>
+
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CAST VIEWER</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d1a;color:#e5e7eb;font-family:'Hiragino Sans',sans-serif;min-height:100vh;padding:16px}
+.loading{display:flex;align-items:center;justify-content:center;height:100vh;color:#e8b86d;font-size:14px;letter-spacing:2px}
+.header{text-align:center;padding:20px 0 16px;border-bottom:1px solid #1e2035;margin-bottom:20px}
+.logo{color:#e8b86d;font-size:18px;font-weight:700;letter-spacing:3px}
+.cast-name{color:#f3f4f6;font-size:22px;font-weight:700;margin-top:8px}
+.card{background:#12122a;border:1px solid #1e2035;border-radius:12px;padding:16px;margin-bottom:12px}
+.section-title{color:#e8b86d;font-weight:700;font-size:14px;margin-bottom:12px}
+.guest-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#0d0d1a;border-radius:8px;margin-bottom:6px}
+.badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;border:1px solid;flex-shrink:0}
+.error{text-align:center;padding:40px;color:#fca5a5}
+</style>
+</head>
+<body>
+<div id="root"><div class="loading">読み込み中...</div></div>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+var firebaseConfig={apiKey:"AIzaSyBGxD2CQ-N-0mZYRZbkC5yVsDA4DdGKqeA",authDomain:"cast-manager-b0ae2.firebaseapp.com",projectId:"cast-manager-b0ae2",storageBucket:"cast-manager-b0ae2.firebasestorage.app",messagingSenderId:"111946332168",appId:"1:111946332168:web:a2cfc1de3cf519a46439bd"};
+firebase.initializeApp(firebaseConfig);
+var db=firebase.firestore();
+
+var params=new URLSearchParams(window.location.search);
+var castId=params.get(‘id’);var uid=params.get(‘uid’);
+
+function yen(n){return n==null?’–’:‘¥’+Number(n).toLocaleString();}
+function fmtDate(s){if(!s)return’’;var p=s.split(’-’);return p[0]+’/’+p[1]+’/’+p[2];}
+function pad(n){return String(n).padStart(2,‘0’);}
+
+function typeStyle(t){
+if(t===‘指名’)return{bg:’#e8b86d18’,color:’#e8b86d’,border:’#e8b86d44’};
+if(t===‘同伴’)return{bg:’#34d39918’,color:’#34d399’,border:’#34d39944’};
+return{bg:’#a78bfa18’,color:’#a78bfa’,border:’#a78bfa44’};
+}
+
+if(!castId||!uid){document.getElementById(‘root’).innerHTML=’<div class="error">無効なURLです</div>’;}
+else{
+db.collection(‘users’).doc(uid).collection(‘data’).doc(‘main’).get().then(function(doc){
+if(!doc.exists){document.getElementById(‘root’).innerHTML=’<div class="error">データが見つかりません</div>’;return;}
+var d=doc.data();
+var cast=(d.casts||[]).find(function(c){return c.id===castId;});
+if(!cast){document.getElementById(‘root’).innerHTML=’<div class="error">キャストが見つかりません</div>’;return;}
+var records=(d.records||{})[castId]||[];
+var customers=(d.customers||{})[castId]||[];
+var now=new Date();var tm=now.getFullYear()+’-’+pad(now.getMonth()+1);
+var thisRows=records.filter(function(r){return r.date.slice(0,7)===tm;});
+var thisSales=thisRows.reduce(function(s,r){return s+Number(r.sales||0);},0);
+var thisNominations=thisRows.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+var thisCompanions=thisRows.reduce(function(s,r){return s+Number(r.companions||0);},0);
+var recentCust=customers.slice(0,20);
+
+```
+var html='<div class="header"><div class="logo">✦ CAST MANAGER</div><div class="cast-name">'+cast.name+'</div><div style="color:#6b7280;font-size:12px;margin-top:4px">'+(now.getMonth()+1)+'月のデータ</div></div>';
+html+='<div class="card"><div class="section-title">📊 今月の実績</div>';
+html+='<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">';
+[['売上',yen(thisSales),'#e8b86d'],['出勤',thisRows.length+'日','#fb923c'],['指名',thisNominations+'組','#34d399'],['同伴',thisCompanions+'回','#a78bfa']].forEach(function(item){
+  html+='<div style="background:#0d0d1a;border-radius:8px;padding:10px;text-align:center;border:1px solid #1e2035"><div style="color:#6b7280;font-size:10px;margin-bottom:4px">'+item[0]+'</div><div style="color:'+item[2]+';font-size:16px;font-weight:700">'+item[1]+'</div></div>';
+});
+html+='</div></div>';
+if(recentCust.length>0){
+  html+='<div class="card"><div class="section-title">👥 来店顧客</div>';
+  recentCust.forEach(function(c){
+    var ts=typeStyle(c.type);
+    html+='<div class="guest-row"><span class="badge" style="background:'+ts.bg+';color:'+ts.color+';border-color:'+ts.border+'">'+c.type+'</span><span style="font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.name+'</span><span style="color:#6b7280;font-size:11px">'+fmtDate(c.date)+'</span>'+(c.sales>0?'<span style="color:#e8b86d;font-size:12px;font-weight:700">'+yen(c.sales)+'</span>':'')+'</div>';
+  });
+  html+='</div>';
+}
+document.getElementById('root').innerHTML=html;
+```
+
+}).catch(function(err){document.getElementById(‘root’).innerHTML=’<div class="error">読み込みエラー: ‘+err.message+’</div>’;});
+}
+</script>
+
+</body>
+</html>
