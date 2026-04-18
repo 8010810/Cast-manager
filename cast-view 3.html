@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CAST VIEWER</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d1a;color:#e5e7eb;font-family:'Noto Sans JP','Hiragino Sans',sans-serif;min-height:100vh;padding:16px;max-width:600px;margin:0 auto}
+.loading{display:flex;align-items:center;justify-content:center;height:80vh;color:#e8b86d;font-size:14px;letter-spacing:2px;flex-direction:column;gap:12px}
+.spinner{width:32px;height:32px;border:3px solid #1e2035;border-top-color:#e8b86d;border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.header{text-align:center;padding:24px 0 20px;border-bottom:1px solid #1e2035;margin-bottom:20px}
+.logo{color:#e8b86d;font-size:14px;font-weight:700;letter-spacing:3px;margin-bottom:8px}
+.cast-name{color:#f3f4f6;font-size:26px;font-weight:700}
+.card{background:#12122a;border:1px solid #1e2035;border-radius:12px;padding:16px;margin-bottom:12px}
+.section-title{color:#e8b86d;font-weight:700;font-size:14px;margin-bottom:12px}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat-cell{background:#0d0d1a;border-radius:8px;padding:12px;text-align:center;border:1px solid #1e2035}
+.stat-label{color:#6b7280;font-size:10px;margin-bottom:4px}
+.stat-value{font-size:18px;font-weight:700}
+.guest-row{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#0d0d1a;border-radius:8px;margin-bottom:6px}
+.badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;border:1px solid;flex-shrink:0}
+.error{text-align:center;padding:60px 20px;color:#fca5a5;font-size:14px;line-height:1.8}
+.tab-bar{display:flex;border-bottom:2px solid #1e2035;margin-bottom:16px}
+.tab{flex:1;padding:10px;text-align:center;font-size:13px;font-weight:600;color:#6b7280;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tab.active{color:#e8b86d;border-bottom-color:#e8b86d}
+.page{display:none}.page.active{display:block}
+/* チャート */
+.chart-wrap{background:#12122a;border:1px solid #1e2035;border-radius:12px;padding:12px;margin-bottom:12px;overflow-x:auto}
+svg text{font-family:'Noto Sans JP',sans-serif}
+.mode-bar{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.mode-btn{background:transparent;border:1px solid #2d2d4e;border-radius:8px;color:#9ca3af;font-size:12px;padding:5px 12px;cursor:pointer}
+.mode-btn.active{background:#1e2035;border-color:rgba(232,184,109,0.3);color:#e8b86d;font-weight:700}
+</style>
+</head>
+<body>
+<div id="root">
+  <div class="loading"><div class="spinner"></div><div>読み込み中...</div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.9.0/Recharts.min.js"></script>
+
+<script>
+var params=new URLSearchParams(window.location.search);
+var castId=params.get('id');
+var uid=params.get('uid');
+
+function yen(n){return n==null?'--':'¥'+Number(n).toLocaleString();}
+function fmtDate(s){if(!s)return'';var p=s.split('-');return p[1]+'/'+p[2];}
+function fmtMonth(s){if(!s)return'';var p=s.split('-');return (p[0].slice(2))+'/'+Number(p[1]);}
+function pad(n){return String(n).padStart(2,'0');}
+
+function typeStyle(t){
+  if(t==='指名')return{bg:'rgba(232,184,109,0.12)',color:'#e8b86d',border:'rgba(232,184,109,0.35)'};
+  if(t==='同伴')return{bg:'rgba(52,211,153,0.12)',color:'#34d399',border:'rgba(52,211,153,0.35)'};
+  return{bg:'rgba(167,139,250,0.12)',color:'#a78bfa',border:'rgba(167,139,250,0.35)'};
+}
+
+function showError(msg){
+  document.getElementById('root').innerHTML='<div class="error">⚠️<br><br>'+msg+'</div>';
+}
+
+if(!castId||!uid){showError('無効なURLです');}
+else{
+  var projectId='cast-manager-b0ae2';
+  var url='https://firestore.googleapis.com/v1/projects/'+projectId+'/databases/(default)/documents/users/'+uid+'/data/main';
+  fetch(url)
+    .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    .then(function(json){
+      function parseValue(v){
+        if(!v)return null;
+        if(v.stringValue!==undefined)return v.stringValue;
+        if(v.integerValue!==undefined)return Number(v.integerValue);
+        if(v.doubleValue!==undefined)return Number(v.doubleValue);
+        if(v.booleanValue!==undefined)return v.booleanValue;
+        if(v.arrayValue)return(v.arrayValue.values||[]).map(parseValue);
+        if(v.mapValue)return parseMap(v.mapValue.fields||{});
+        return null;
+      }
+      function parseMap(fields){var obj={};Object.keys(fields).forEach(function(k){obj[k]=parseValue(fields[k]);});return obj;}
+      var data=parseMap(json.fields||{});
+      var casts=data.casts||[];
+      var cast=casts.find(function(c){return c.id===castId;});
+      if(!cast){showError('キャストが見つかりません');return;}
+      var records=(data.records||{})[castId]||[];
+      var customers=(data.customers||{})[castId]||[];
+      renderApp(cast,records,customers);
+    })
+    .catch(function(err){showError('読み込みエラー:<br>'+err.message+'<br><br>Firebaseのセキュリティルールで読み取りを許可してください。');});
+}
+
+function renderApp(cast,records,customers){
+  var e=React.createElement,Fragment=React.Fragment;
+  var useState=React.useState,useMemo=React.useMemo;
+  var RC=window.Recharts||{};
+
+  var now=new Date();
+  var tm=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var thisRows=records.filter(function(r){return r.date&&r.date.slice(0,7)===tm;});
+  var thisSales=thisRows.reduce(function(s,r){return s+Number(r.sales||0);},0);
+  var thisNominations=thisRows.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+  var thisCompanions=thisRows.reduce(function(s,r){return s+Number(r.companions||0);},0);
+  var thisFloor=thisRows.reduce(function(s,r){return s+Number(r.floorCount||0);},0);
+
+  function getMonthlyTarget(mk){
+    if(cast.monthlyTargets&&cast.monthlyTargets[mk]!=null)return Number(cast.monthlyTargets[mk]);
+    return 0;
+  }
+
+  function CastApp(){
+    var s1=useState('summary');var tab=s1[0];var setTab=s1[1];
+    var s2=useState('monthly');var chartMode=s2[0];var setChartMode=s2[1];
+    var s3=useState(String(now.getFullYear()));var selYear=s3[0];var setSelYear=s3[1];
+    var s4=useState('');var query=s4[0];var setQuery=s4[1];
+
+    // グラフデータ
+    var allYears=useMemo(function(){
+      var ys=new Set();records.forEach(function(r){ys.add(r.date.slice(0,4));});
+      ys.add(String(now.getFullYear()));
+      return Array.from(ys).sort(function(a,b){return b.localeCompare(a);});
+    },[]);
+
+    var chartData=useMemo(function(){
+      if(chartMode==='monthly'){
+        var map={};
+        records.filter(function(r){return r.date.slice(0,4)===selYear;}).forEach(function(r){
+          var k=r.date.slice(0,7);
+          if(!map[k])map[k]={key:k,label:Number(k.split('-')[1])+'月',sales:0,nominations:0,companions:0,workDays:0};
+          map[k].sales+=Number(r.sales||0);map[k].nominations+=Number(r.nominations||0);
+          map[k].companions+=Number(r.companions||0);map[k].workDays+=1;
+        });
+        var list=[];
+        for(var mi=1;mi<=12;mi++){
+          var mk=selYear+'-'+pad(mi);
+          var t=getMonthlyTarget(mk);
+          var row=map[mk]||{key:mk,label:mi+'月',sales:0,nominations:0,companions:0,workDays:0};
+          list.push(Object.assign({},row,{target:t>0?t:null}));
+        }
+        return list;
+      }
+      // yearly
+      return allYears.slice().reverse().map(function(yr){
+        var rows=records.filter(function(r){return r.date.slice(0,4)===yr;});
+        return{key:yr,label:yr+'年',sales:rows.reduce(function(s,r){return s+Number(r.sales||0);},0),workDays:rows.length,nominations:rows.reduce(function(s,r){return s+Number(r.nominations||0);},0),companions:rows.reduce(function(s,r){return s+Number(r.companions||0);},0)};
+      });
+    },[chartMode,selYear]);
+
+    // 顧客フィルタ
+    var filteredCust=useMemo(function(){
+      var q=query.trim().toLowerCase();
+      if(!q)return customers;
+      return customers.filter(function(c){return[c.name,c.type,c.bottleNeck,c.note,fmtDate(c.date)].join(' ').toLowerCase().includes(q);});
+    },[query]);
+
+    function Tooltip2(tp){
+      if(!tp.active||!tp.payload||!tp.payload.length)return null;
+      return e('div',{style:{background:'#1a1a2e',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'10px 14px',fontSize:'12px'}},
+        e('div',{style:{color:'#9ca3af',marginBottom:'6px'}},tp.label),
+        tp.payload.filter(function(pp){return pp.value!=null&&pp.dataKey!=='target';}).map(function(pp){
+          return e('div',{key:pp.dataKey,style:{color:pp.color,marginBottom:'2px'}},
+            pp.dataKey==='sales'?'売上':pp.dataKey==='nominations'?'指名':pp.dataKey==='companions'?'同伴':'出勤',': ',
+            e('b',null,pp.dataKey==='sales'?yen(pp.value):pp.value+(pp.dataKey==='workDays'?'日':'組'))
+          );
+        }),
+        tp.payload.find(function(pp){return pp.dataKey==='target'&&pp.value;})&&e('div',{style:{color:'#34d399',marginTop:'4px',borderTop:'1px solid #1e2035',paddingTop:'4px'}},'目標: ',e('b',null,yen(tp.payload.find(function(pp){return pp.dataKey==='target';}).value)))
+      );
+    }
+
+    return e('div',null,
+      // ヘッダー
+      e('div',{style:{textAlign:'center',padding:'20px 0 16px',borderBottom:'1px solid #1e2035',marginBottom:'16px'}},
+        e('div',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700,letterSpacing:'3px',marginBottom:'8px'}},'✦ CAST MANAGER'),
+        e('div',{style:{color:'#f3f4f6',fontSize:'24px',fontWeight:700}},cast.name),
+        e('div',{style:{color:'#6b7280',fontSize:'12px',marginTop:'6px'}},(now.getMonth()+1)+'月のデータ')
+      ),
+
+      // タブ
+      e('div',{style:{display:'flex',borderBottom:'2px solid #1e2035',marginBottom:'16px'}},
+        [['summary','📊 サマリー'],['chart','📈 グラフ'],['customers','👥 顧客']].map(function(item){
+          return e('button',{key:item[0],style:{flex:1,padding:'10px 4px',fontSize:'13px',fontWeight:600,border:'none',background:'transparent',cursor:'pointer',color:tab===item[0]?'#e8b86d':'#6b7280',borderBottom:tab===item[0]?'2px solid #e8b86d':'2px solid transparent',marginBottom:'-2px'},onClick:function(){setTab(item[0]);}},item[1]);
+        })
+      ),
+
+      // サマリー
+      tab==='summary'&&e('div',null,
+        e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'12px'}},
+          e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},'今月の実績'),
+          e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px'}},
+            [['売上',yen(thisSales),'#e8b86d'],['出勤日数',thisRows.length+'日','#fb923c'],['指名組数',thisNominations+'組','#34d399'],['同伴回数',thisCompanions+'回','#a78bfa'],['場内組数',thisFloor+'組','#60a5fa']].map(function(item){
+              return e('div',{key:item[0],style:{background:'#0d0d1a',borderRadius:'8px',padding:'12px',textAlign:'center',border:'1px solid #1e2035'}},
+                e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},item[0]),
+                e('div',{style:{color:item[2],fontSize:'18px',fontWeight:700}},item[1])
+              );
+            })
+          )
+        ),
+        // 月次サマリー（直近6ヶ月）
+        e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px'}},
+          e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},'直近6ヶ月'),
+          Array.from({length:6},function(_,i){
+            var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+            var mk=d.getFullYear()+'-'+pad(d.getMonth()+1);
+            var rows=records.filter(function(r){return r.date.slice(0,7)===mk;});
+            var sales=rows.reduce(function(s,r){return s+Number(r.sales||0);},0);
+            var target=getMonthlyTarget(mk);
+            var pct=target>0?Math.round(sales/target*100):null;
+            return e('div',{key:mk,style:{display:'flex',alignItems:'center',gap:'10px',padding:'8px 0',borderBottom:i<5?'1px solid #1e2035':'none'}},
+              e('div',{style:{color:mk===tm?'#e8b86d':'#9ca3af',fontSize:'13px',fontWeight:mk===tm?700:400,minWidth:'52px'}},(d.getMonth()+1)+'月'),
+              e('div',{style:{flex:1}},
+                e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'3px'}},
+                  e('span',{style:{color:'#e8b86d',fontWeight:700}},yen(sales)),
+                  pct!==null&&e('span',{style:{color:pct>=100?'#34d399':pct>=70?'#fbbf24':'#9ca3af',fontSize:'12px'}},pct+'%')
+                ),
+                target>0&&e('div',{style:{background:'#0d0d1a',borderRadius:'99px',height:'4px',overflow:'hidden'}},
+                  e('div',{style:{background:pct>=100?'#34d399':pct>=70?'#fbbf24':'#e8b86d',height:'100%',width:Math.min(100,pct||0)+'%',borderRadius:'99px'}})
+                )
+              )
+            );
+          })
+        )
+      ),
+
+      // グラフ
+      tab==='chart'&&RC.ComposedChart&&e('div',null,
+        e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
+          e('button',{style:{background:chartMode==='monthly'?'#1e2035':'transparent',border:'1px solid',borderColor:chartMode==='monthly'?'rgba(232,184,109,0.3)':'#2d2d4e',borderRadius:'8px',color:chartMode==='monthly'?'#e8b86d':'#9ca3af',fontSize:'12px',padding:'5px 12px',cursor:'pointer',fontWeight:chartMode==='monthly'?700:400},onClick:function(){setChartMode('monthly');}},'月別'),
+          e('button',{style:{background:chartMode==='yearly'?'#1e2035':'transparent',border:'1px solid',borderColor:chartMode==='yearly'?'rgba(232,184,109,0.3)':'#2d2d4e',borderRadius:'8px',color:chartMode==='yearly'?'#e8b86d':'#9ca3af',fontSize:'12px',padding:'5px 12px',cursor:'pointer',fontWeight:chartMode==='yearly'?700:400},onClick:function(){setChartMode('yearly');}},'年別')
+        ),
+        chartMode==='monthly'&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px',flexWrap:'wrap'}},
+          allYears.map(function(y){return e('button',{key:y,style:{background:selYear===y?'#1e2035':'transparent',border:'1px solid',borderColor:selYear===y?'rgba(232,184,109,0.3)':'#2d2d4e',borderRadius:'8px',color:selYear===y?'#e8b86d':'#9ca3af',fontSize:'12px',padding:'4px 10px',cursor:'pointer'},onClick:function(){setSelYear(y);}},y+'年');})
+        ),
+        e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'12px',overflowX:'auto'}},
+          e('div',{style:{minWidth:'480px'}},
+            e(RC.ResponsiveContainer,{width:'100%',height:260},
+              e(RC.ComposedChart,{data:chartData,margin:{left:8,right:16,top:6,bottom:4}},
+                e(RC.CartesianGrid,{strokeDasharray:'3 3',stroke:'#1e2035'}),
+                e(RC.XAxis,{dataKey:'label',tick:{fill:'#6b7280',fontSize:11}}),
+                e(RC.YAxis,{tickFormatter:function(v){return v>=10000?(v/10000).toFixed(0)+'万':v;},tick:{fill:'#9ca3af',fontSize:10},width:44}),
+                e(RC.Tooltip,{content:e(Tooltip2,null)}),
+                e(RC.Legend,{formatter:function(v){return v==='sales'?'売上':v==='target'?'目標':v==='nominations'?'指名':v==='companions'?'同伴':'出勤';},wrapperStyle:{fontSize:'11px'}}),
+                e(RC.Bar,{dataKey:'sales',fill:'#e8b86d',fillOpacity:0.85,radius:[4,4,0,0],name:'sales'}),
+                e(RC.Line,{type:'monotone',dataKey:'target',stroke:'#34d399',strokeWidth:2,strokeDasharray:'5 3',dot:false,connectNulls:false,name:'target'}),
+                e(RC.Line,{type:'monotone',dataKey:'nominations',stroke:'#34d399',strokeWidth:1.5,dot:{r:3,fill:'#34d399'},name:'nominations'}),
+                e(RC.Line,{type:'monotone',dataKey:'companions',stroke:'#a78bfa',strokeWidth:1.5,dot:{r:3,fill:'#a78bfa'},name:'companions'})
+              )
+            )
+          )
+        )
+      ),
+      tab==='chart'&&!RC.ComposedChart&&e('div',{style:{color:'#6b7280',textAlign:'center',padding:'40px'}},'グラフを読み込めませんでした'),
+
+      // 顧客
+      tab==='customers'&&e('div',null,
+        e('div',{style:{position:'relative',marginBottom:'12px'}},
+          e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'14px',pointerEvents:'none'}},'🔍'),
+          e('input',{style:{background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#e5e7eb',fontSize:'14px',padding:'10px 14px 10px 38px',width:'100%',outline:'none'},placeholder:'名前・種別・日付で検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})
+        ),
+        e('div',{style:{color:'#6b7280',fontSize:'12px',marginBottom:'8px'}},filteredCust.length+'件'),
+        filteredCust.length===0
+          ?e('div',{style:{textAlign:'center',padding:'40px',color:'#4b5563'}},'顧客データがありません')
+          :filteredCust.map(function(c){
+            var ts=typeStyle(c.type);
+            return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'12px 14px',marginBottom:'8px'}},
+              e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:c.bottleNeck||c.note?'8px':'0'}},
+                e('span',{style:{background:ts.bg,color:ts.color,border:'1px solid '+ts.border,fontSize:'11px',fontWeight:700,padding:'3px 8px',borderRadius:'4px',flexShrink:0}},c.type),
+                e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'14px',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.name),
+                e('span',{style:{color:'#6b7280',fontSize:'11px',flexShrink:0}},fmtDate(c.date)),
+                c.sales>0&&e('span',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700,flexShrink:0}},yen(c.sales))
+              ),
+              (c.bottleNeck||c.orderBottle||c.note)&&e('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',fontSize:'12px',color:'#9ca3af'}},
+                c.bottleNeck&&e('span',{},  '🍾 '+c.bottleNeck),
+                c.orderBottle&&e('span',{},'🥂 '+c.orderBottle),
+                c.note&&e('span',{},c.note)
+              )
+            );
+          })
+      )
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(CastApp,null));
+}
+</script>
+</body>
+</html>
