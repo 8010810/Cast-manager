@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/cast-view.html", "destination": "/cast-view.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
