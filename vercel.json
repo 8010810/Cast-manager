@@ -1,6 +1,0 @@
-{
-  "routes": [
-    { "src": "/cast-view.html", "dest": "/cast-view.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
-}
