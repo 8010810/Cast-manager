@@ -4,4 +4,3 @@
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
-
