@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CAST VIEWER</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d1a;color:#e5e7eb;font-family:'Hiragino Sans',sans-serif;min-height:100vh;padding:16px;max-width:600px;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.sp{width:28px;height:28px;border:3px solid #1e2035;border-top-color:#e8b86d;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
+#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;color:#e8b86d;font-size:13px}
+.card{background:#12122a;border:1px solid #1e2035;border-radius:12px;padding:14px;margin-bottom:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.box{background:#0d0d1a;border-radius:8px;padding:10px;text-align:center;border:1px solid #1e2035}
+.lbl{color:#6b7280;font-size:10px;margin-bottom:3px}
+.val{font-size:16px;font-weight:700}
+.tabs{display:flex;border-bottom:2px solid #1e2035;margin-bottom:14px}
+.tab{flex:1;padding:9px 4px;font-size:12px;font-weight:600;border:none;background:transparent;cursor:pointer;color:#6b7280;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tab.on{color:#e8b86d;border-bottom-color:#e8b86d}
+.pane{display:none}.pane.on{display:block}
+.ci{background:#12122a;border:1px solid #1e2035;border-radius:10px;margin-bottom:6px;overflow:hidden}
+.ch{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer}
+.cd{display:none;padding:12px 13px;border-top:1px solid #1e2035}
+.dr{display:flex;gap:8px;margin-bottom:5px;font-size:12px}
+.bdg{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;border:1px solid;flex-shrink:0}
+.bar-wrap{display:flex;align-items:flex-end;gap:3px;height:130px;margin-bottom:8px}
+.bar-col{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;min-width:20px}
+.bar-bg{flex:1;width:100%;position:relative;display:flex;flex-direction:column;justify-content:flex-end}
+.bar-fill{background:#e8b86d;opacity:.9;border-radius:3px 3px 0 0;width:100%}
+.bar-tgt{position:absolute;left:0;right:0;height:2px;background:#34d399;opacity:.9}
+.bar-lbl{font-size:8px;color:#6b7280;text-align:center;width:100%;overflow:hidden;white-space:nowrap}
+.bar-val{font-size:8px;color:#e8b86d;font-weight:700;text-align:center}
+.si-wrap{position:relative;margin-bottom:10px}
+.si-wrap input{background:#12122a;border:1px solid #2d2d4e;border-radius:8px;color:#e5e7eb;font-size:16px;padding:9px 13px 9px 36px;width:100%;outline:none}
+.si-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#4b5563;pointer-events:none;font-size:13px}
+.mbtn{background:transparent;border:1px solid #2d2d4e;border-radius:7px;color:#9ca3af;font-size:11px;padding:4px 10px;cursor:pointer;margin-right:5px;margin-bottom:5px}
+.mbtn.on{background:#1e2035;border-color:rgba(232,184,109,.3);color:#e8b86d;font-weight:700}
+.prog{background:#0d0d1a;border-radius:99px;height:4px;overflow:hidden;margin-top:3px}
+.prog-fill{height:100%;border-radius:99px}
+</style>
+</head>
+<body>
+<div id="loading"><div class="sp"></div>読み込み中...</div>
+<div id="app" style="display:none">
+  <div style="text-align:center;padding:16px 0;border-bottom:1px solid #1e2035;margin-bottom:14px;position:relative">
+    <button onclick="location.reload()" style="position:absolute;top:0;right:0;background:#1e2035;border:1px solid #2d2d4e;border-radius:7px;color:#9ca3af;font-size:10px;padding:5px 9px;cursor:pointer">🔄 更新</button>
+    <div style="color:#e8b86d;font-size:12px;font-weight:700;letter-spacing:3px;margin-bottom:6px">✦ CAST MANAGER</div>
+    <div id="castName" style="color:#f3f4f6;font-size:22px;font-weight:700"></div>
+    <div id="castMonth" style="color:#6b7280;font-size:11px;margin-top:4px"></div>
+  </div>
+  <div class="tabs">
+    <button class="tab on" onclick="showTab('summary',this)">📊 サマリー</button>
+    <button class="tab" onclick="showTab('chart',this)">📈 グラフ</button>
+    <button class="tab" onclick="showTab('customers',this)">👥 顧客</button>
+  </div>
+  <div id="pSummary" class="pane on"></div>
+  <div id="pChart" class="pane">
+    <div id="chartModes" style="margin-bottom:8px"></div>
+    <div id="chartYears" style="margin-bottom:10px"></div>
+    <div class="card" style="overflow-x:auto">
+      <div id="chartBars" class="bar-wrap" style="min-width:340px"></div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:10px;color:#6b7280">
+        <div style="width:10px;height:7px;background:#e8b86d;border-radius:2px"></div>売上
+        <div style="width:14px;height:2px;background:#34d399"></div>目標
+      </div>
+    </div>
+    <div id="chartDetail" style="display:none"></div>
+  </div>
+  <div id="pCustomers" class="pane">
+    <div class="si-wrap"><span class="si-icon">🔍</span><input type="search" id="custSearch" placeholder="名前・種別で検索..."/></div>
+    <div id="custCount" style="color:#6b7280;font-size:11px;margin-bottom:7px"></div>
+    <div id="custList"></div>
+  </div>
+</div>
+
+<script>
+var params=new URLSearchParams(window.location.search);
+var CAST_ID=params.get('id'),UID=params.get('uid');
+var CAST,RECORDS=[],CUSTOMERS=[];
+var chartMode='monthly',chartYear=String(new Date().getFullYear());
+var selChartKey=null;
+
+function yen(n){return n==null?'--':'¥'+Number(n).toLocaleString();}
+function fd(s){if(!s)return'';var p=s.split('-');return p[1]+'/'+p[2];}
+function pad(n){return String(n).padStart(2,'0');}
+function tc(t){
+  if(t==='指名')return{bg:'rgba(232,184,109,.12)',c:'#e8b86d',b:'rgba(232,184,109,.3)'};
+  if(t==='同伴')return{bg:'rgba(52,211,153,.12)',c:'#34d399',b:'rgba(52,211,153,.3)'};
+  return{bg:'rgba(167,139,250,.12)',c:'#a78bfa',b:'rgba(167,139,250,.3)'};
+}
+function gt(mk){var m=CAST&&CAST.monthlyTargets;return m&&m[mk]!=null?Number(m[mk]):0;}
+
+if(!CAST_ID||!UID){
+  document.getElementById('loading').innerHTML='<p style="color:#fca5a5">無効なURLです</p>';
+}else{
+  fetch('https://firestore.googleapis.com/v1/projects/cast-manager-b0ae2/databases/(default)/documents/users/'+UID+'/data/main')
+  .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+  .then(function(json){
+    function pv(v){
+      if(!v)return null;
+      if(v.stringValue!==undefined)return v.stringValue;
+      if(v.integerValue!==undefined)return Number(v.integerValue);
+      if(v.doubleValue!==undefined)return Number(v.doubleValue);
+      if(v.booleanValue!==undefined)return v.booleanValue;
+      if(v.arrayValue)return(v.arrayValue.values||[]).map(pv);
+      if(v.mapValue){var o={};Object.keys(v.mapValue.fields||{}).forEach(function(k){o[k]=pv(v.mapValue.fields[k]);});return o;}
+      return null;
+    }
+    function pm(f){var o={};Object.keys(f).forEach(function(k){o[k]=pv(f[k]);});return o;}
+    var data=pm(json.fields||{});
+    CAST=(data.casts||[]).find(function(c){return c.id===CAST_ID;});
+    if(!CAST){document.getElementById('loading').innerHTML='<p style="color:#fca5a5">キャストが見つかりません</p>';return;}
+    RECORDS=(data.records||{})[CAST_ID]||[];
+    CUSTOMERS=(data.customers||{})[CAST_ID]||[];
+    init();
+  })
+  .catch(function(e){document.getElementById('loading').innerHTML='<p style="color:#fca5a5;padding:10px">エラー: '+e.message+'</p>';});
+}
+
+function init(){
+  var now=new Date();
+  document.getElementById('loading').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('castName').textContent=CAST.name;
+  document.getElementById('castMonth').textContent=(now.getMonth()+1)+'月のデータ';
+  renderSummary();
+  renderChart();
+  renderCustomers('');
+  document.getElementById('custSearch').addEventListener('input',function(){renderCustomers(this.value);});
+}
+
+function showTab(id,btn){
+  document.querySelectorAll('.pane').forEach(function(p){p.classList.remove('on');});
+  document.querySelectorAll('.tab').forEach(function(b){b.classList.remove('on');});
+  document.getElementById('p'+id.charAt(0).toUpperCase()+id.slice(1)).classList.add('on');
+  btn.classList.add('on');
+}
+
+function renderSummary(){
+  var now=new Date(),tm=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var tr=RECORDS.filter(function(r){return r.date&&r.date.slice(0,7)===tm;});
+  var ts=tr.reduce(function(s,r){return s+Number(r.sales||0);},0);
+  var tn=tr.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+  var tc2=tr.reduce(function(s,r){return s+Number(r.companions||0);},0);
+  var tgt=gt(tm);
+  var pct=tgt>0?Math.min(999,Math.round(ts/tgt*100)):null;
+  var pc=pct===null?'#9ca3af':pct>=100?'#34d399':pct>=70?'#fbbf24':'#9ca3af';
+  var h='<div class="card">';
+  h+='<div style="color:#e8b86d;font-weight:700;font-size:13px;margin-bottom:10px">今月の実績</div>';
+  h+='<div class="grid2" style="margin-bottom:'+(tgt>0?'10px':'0')+'">';
+  [['売上',yen(ts),'#e8b86d'],['出勤',tr.length+'日','#fb923c'],['指名',tn+'組','#34d399'],['同伴',tc2+'回','#a78bfa']].forEach(function(x){
+    h+='<div class="box"><div class="lbl">'+x[0]+'</div><div class="val" style="color:'+x[2]+'">'+x[1]+'</div></div>';
+  });
+  h+='</div>';
+  if(tgt>0){
+    h+='<div class="grid2" style="margin-bottom:8px">';
+    h+='<div class="box"><div class="lbl">目標</div><div class="val" style="color:#e5e7eb;font-size:14px">'+yen(tgt)+'</div></div>';
+    h+='<div class="box" style="border-color:'+(ts>=tgt?'#34d39933':'#fca5a533')+'"><div class="lbl">差異</div><div class="val" style="color:'+(ts>=tgt?'#34d399':'#fca5a5')+';font-size:14px">'+(ts-tgt>=0?'+':'')+yen(ts-tgt)+'</div></div>';
+    h+='<div class="box" style="border-color:'+(pct>=100?'#34d39933':'#1e2035')+'"><div class="lbl">達成率</div><div class="val" style="color:'+pc+';font-size:14px">'+pct+'%</div></div>';
+    h+='</div>';
+    h+='<div class="prog"><div class="prog-fill" style="background:'+pc+';width:'+Math.min(100,pct||0)+'%"></div></div>';
+  }
+  h+='</div>';
+  h+='<div class="card"><div style="color:#e8b86d;font-weight:700;font-size:13px;margin-bottom:10px">直近6ヶ月</div>';
+  for(var i=0;i<6;i++){
+    var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    var mk=d.getFullYear()+'-'+pad(d.getMonth()+1);
+    var rows=RECORDS.filter(function(r){return r.date&&r.date.slice(0,7)===mk;});
+    var s=rows.reduce(function(a,r){return a+Number(r.sales||0);},0);
+    var tg=gt(mk),p2=tg>0?Math.min(100,Math.round(s/tg*100)):null;
+    var pc2=p2===null?'#9ca3af':p2>=100?'#34d399':p2>=70?'#fbbf24':'#9ca3af';
+    h+='<div style="padding:6px 0;'+(i<5?'border-bottom:1px solid #1e2035':'')+';">';
+    h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:'+(tg>0?'3px':'0')+'">';
+    h+='<div style="color:'+(mk===tm?'#e8b86d':'#9ca3af')+';font-size:12px;font-weight:'+(mk===tm?700:400)+';min-width:36px">'+(d.getMonth()+1)+'月</div>';
+    h+='<span style="color:#e8b86d;font-weight:700;flex:1">'+yen(s)+'</span>';
+    if(tg>0)h+='<span style="color:#6b7280;font-size:10px">'+yen(tg)+'</span>';
+    if(p2!==null)h+='<span style="color:'+pc2+';font-size:11px;font-weight:700">'+p2+'%</span>';
+    h+='</div>';
+    if(tg>0)h+='<div class="prog"><div class="prog-fill" style="background:'+(p2>=100?'#34d399':p2>=70?'#fbbf24':'#e8b86d')+';width:'+(p2||0)+'%"></div></div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  document.getElementById('pSummary').innerHTML=h;
+}
+
+function getAllYears(){
+  var ys=new Set();
+  RECORDS.forEach(function(r){ys.add(r.date.slice(0,4));});
+  ys.add(String(new Date().getFullYear()));
+  return Array.from(ys).sort(function(a,b){return b.localeCompare(a);});
+}
+
+function getChartData(){
+  if(chartMode==='monthly'){
+    var list=[];
+    for(var mi=1;mi<=12;mi++){
+      var mk=chartYear+'-'+pad(mi);
+      var rows=RECORDS.filter(function(r){return r.date&&r.date.slice(0,7)===mk;});
+      list.push({key:mk,label:mi+'月',sales:rows.reduce(function(a,r){return a+Number(r.sales||0);},0),target:gt(mk)});
+    }
+    return list;
+  }
+  return getAllYears().slice().reverse().map(function(yr){
+    var rows=RECORDS.filter(function(r){return r.date&&r.date.slice(0,4)===yr;});
+    return{key:yr,label:yr+'年',sales:rows.reduce(function(a,r){return a+Number(r.sales||0);},0),target:0};
+  });
+}
+
+function renderChart(){
+  var years=getAllYears();
+  // モードボタン
+  var mh='';
+  [['monthly','月別'],['yearly','年別']].forEach(function(m){
+    mh+='<button class="mbtn'+(chartMode===m[0]?' on':'')+'" onclick="setChartMode(\''+m[0]+'\')">'+m[1]+'</button>';
+  });
+  document.getElementById('chartModes').innerHTML=mh;
+  // 年ボタン
+  var yh='';
+  if(chartMode==='monthly'){
+    years.forEach(function(y){
+      yh+='<button class="mbtn'+(chartYear===y?' on':'')+'" onclick="setChartYear(\''+y+'\')">'+y+'年</button>';
+    });
+  }
+  document.getElementById('chartYears').innerHTML=yh;
+  // バー
+  var cd=getChartData();
+  var mx=Math.max.apply(null,cd.map(function(d){return Math.max(d.sales,d.target||0);}));
+  if(mx===0)mx=1;
+  var bh='';
+  cd.forEach(function(d){
+    var h=Math.round((d.sales/mx)*110);
+    var th=d.target>0?Math.round((d.target/mx)*110):0;
+    var vl=d.sales>=10000?Math.round(d.sales/10000)+'万':d.sales>0?String(d.sales):'';
+    var isSel=selChartKey===d.key;
+    bh+='<div class="bar-col" onclick="selectBar(\''+d.key+'\')" style="cursor:pointer">';
+    if(vl)bh+='<div class="bar-val" style="color:'+(isSel?'#ffd280':'#e8b86d')+'">'+vl+'</div>';
+    bh+='<div class="bar-bg">';
+    bh+='<div class="bar-fill" style="height:'+h+'px;background:'+(isSel?'#ffd280':'#e8b86d')+'"></div>';
+    if(th>0)bh+='<div class="bar-tgt" style="bottom:'+th+'px"></div>';
+    bh+='</div>';
+    bh+='<div class="bar-lbl" style="color:'+(isSel?'#e8b86d':'#6b7280')+';font-weight:'+(isSel?700:400)+'">'+d.label+'</div>';
+    bh+='</div>';
+  });
+  document.getElementById('chartBars').innerHTML=bh;
+  // 詳細
+  renderChartDetail(cd);
+}
+
+function renderChartDetail(cd){
+  var det=document.getElementById('chartDetail');
+  if(!selChartKey){det.style.display='none';return;}
+  var d=cd.find(function(x){return x.key===selChartKey;});
+  if(!d){det.style.display='none';return;}
+  var tg2=gt(selChartKey);
+  var pct2=tg2>0?Math.min(999,Math.round(d.sales/tg2*100)):null;
+  var pc2=pct2===null?'#9ca3af':pct2>=100?'#34d399':pct2>=70?'#fbbf24':'#9ca3af';
+  var h='<div class="card" style="margin-top:10px">';
+  h+='<div style="display:flex;justify-content:space-between;margin-bottom:10px">';
+  h+='<div style="color:#e8b86d;font-weight:700;font-size:13px">'+d.label+'</div>';
+  h+='<button onclick="clearBar()" style="background:transparent;border:none;color:#6b7280;cursor:pointer;font-size:15px">✕</button>';
+  h+='</div>';
+  h+='<div class="grid2" style="margin-bottom:10px">';
+  h+='<div class="box"><div class="lbl">売上</div><div class="val" style="color:#e8b86d;font-size:14px">'+yen(d.sales)+'</div></div>';
+  if(tg2>0)h+='<div class="box"><div class="lbl">目標</div><div class="val" style="color:#e5e7eb;font-size:14px">'+yen(tg2)+'</div></div>';
+  if(pct2!==null)h+='<div class="box" style="border-color:'+(pct2>=100?'#34d39933':'#1e2035')+'"><div class="lbl">達成率</div><div class="val" style="color:'+pc2+';font-size:14px">'+pct2+'%</div></div>';
+  h+='</div>';
+  // 来店顧客
+  var cust=CUSTOMERS.filter(function(c){
+    return chartMode==='monthly'?c.date&&c.date.slice(0,7)===selChartKey:c.date&&c.date.slice(0,4)===selChartKey;
+  });
+  h+='<div style="color:#9ca3af;font-size:11px;font-weight:600;margin-bottom:6px">来店顧客（'+cust.length+'件）</div>';
+  if(cust.length===0){h+='<div style="color:#4b5563;font-size:12px">記録なし</div>';}
+  else cust.forEach(function(c){
+    var t=tc(c.type);
+    h+='<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid #1e2035">';
+    h+='<span class="bdg" style="background:'+t.bg+';color:'+t.c+';border-color:'+t.b+'">'+c.type+'</span>';
+    h+='<span style="flex:1;font-size:12px;font-weight:700;color:#f3f4f6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+c.name+'</span>';
+    h+='<span style="color:#6b7280;font-size:10px;flex-shrink:0">'+fd(c.date)+'</span>';
+    if(c.sales>0)h+='<span style="color:#e8b86d;font-size:11px;font-weight:700;flex-shrink:0">'+yen(c.sales)+'</span>';
+    h+='</div>';
+  });
+  h+='</div>';
+  det.innerHTML=h;
+  det.style.display='block';
+}
+
+function renderCustomers(q){
+  var query=q.toLowerCase();
+  var list=query?CUSTOMERS.filter(function(c){return[c.name,c.type,c.bottleNeck,c.note,fd(c.date)].join(' ').toLowerCase().includes(query);}):CUSTOMERS;
+  document.getElementById('custCount').textContent=list.length+'件';
+  var h='';
+  list.forEach(function(c,i){
+    var t=tc(c.type);
+    h+='<div class="ci">';
+    h+='<div class="ch" onclick="toggleCust('+i+')">';
+    h+='<span class="bdg" style="background:'+t.bg+';color:'+t.c+';border-color:'+t.b+'">'+c.type+'</span>';
+    h+='<span style="font-weight:700;color:#f3f4f6;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px">'+c.name+'</span>';
+    h+='<span style="color:#6b7280;font-size:10px;flex-shrink:0">'+fd(c.date)+'</span>';
+    if(c.sales>0)h+='<span style="color:#e8b86d;font-size:12px;font-weight:700;flex-shrink:0;margin-left:5px">'+yen(c.sales)+'</span>';
+    h+='<span id="arr'+i+'" style="color:#4b5563;font-size:10px;margin-left:5px">▼</span>';
+    h+='</div>';
+    h+='<div id="cd'+i+'" class="cd">';
+    [['種別',c.type],['売上',c.sales>0?yen(c.sales):'--'],['ボトルネック',c.bottleNeck||'--'],['オーダーボトル',c.orderBottle||'--'],['領収書',c.receipt||'--'],['備考',c.note||'--']].forEach(function(r){
+      h+='<div class="dr"><span style="color:#6b7280;min-width:90px;flex-shrink:0">'+r[0]+'</span><span style="color:#e5e7eb;word-break:break-word">'+r[1]+'</span></div>';
+    });
+    h+='</div></div>';
+  });
+  if(!h)h='<div style="text-align:center;padding:30px;color:#4b5563">顧客データがありません</div>';
+  document.getElementById('custList').innerHTML=h;
+}
+
+window.toggleCust=function(i){
+  var d=document.getElementById('cd'+i),a=document.getElementById('arr'+i);
+  if(!d)return;
+  var open=d.style.display==='block';
+  d.style.display=open?'none':'block';
+  if(a)a.textContent=open?'▼':'▲';
+};
+window.setChartMode=function(m){chartMode=m;selChartKey=null;renderChart();};
+window.setChartYear=function(y){chartYear=y;selChartKey=null;renderChart();};
+window.selectBar=function(k){selChartKey=selChartKey===k?null:k;renderChart();};
+window.clearBar=function(){selChartKey=null;renderChart();};
+</script>
+</body>
+</html>
