@@ -1,4 +1,4 @@
-<!doctype html> <html lang="ja"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>CAST MANAGER</title> 
+<!doctype html><html lang="ja"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>CAST MANAGER</title>
 <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#0d0d1a;color:#e5e7eb;font-family:'Hiragino Sans',sans-serif;min-height:100vh}input,textarea,button,select{font-family:inherit}input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}select{background:#12122a;color:#e5e7eb;border:1px solid #2d2d4e;border-radius:8px;padding:10px 14px;width:100%;margin-bottom:12px;outline:none;font-size:14px}table{border-spacing:0}@keyframes spin{to{transform:rotate(360deg)}}</style>
 </head><body>
 <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e8b86d;font-size:14px">読み込み中...</div></div>
@@ -2463,63 +2463,85 @@ function AttendancePage(p){
 
   var s0=useState('main');var subPage=s0[0];var setSubPage=s0[1];
   var s1=useState({});var attStatus=s1[0];var setAttStatus=s1[1];
+  // scheduledTime: {castId: 'HH:MM'} 出勤予定時間
+  var s1b=useState({});var scheduledTime=s1b[0];var setScheduledTime=s1b[1];
   var s2=useState({startHour:20,interval:30});var timeSetting=s2[0];var setTimeSetting=s2[1];
   var s3=useState(false);var showTimeSetting=s3[0];var setShowTimeSetting=s3[1];
-  var s4=useState('');var searchQ=s4[0];var setSearchQ=s4[1];
   var s5=useState(false);var editMode=s5[0];var setEditMode=s5[1];
   var s6=useState(null);var editTarget=s6[0];var setEditTarget=s6[1];
   var s7=useState(null);var timeModal=s7[0];var setTimeModal=s7[1];
-  var s8=useState(null);var extraCast=s8[0];var setExtraCast=s8[1];
+  // 追加出勤モーダル
+  var s8=useState(false);var showAddModal=s8[0];var setShowAddModal=s8[1];
+  var s8b=useState('');var addSearch=s8b[0];var setAddSearch=s8b[1];
+  var s8c=useState(null);var addCast=s8c[0];var setAddCast=s8c[1];
+  var s8d=useState('出勤');var addStatus=s8d[0];var setAddStatus=s8d[1];
+  var s8e=useState('');var addTime=s8e[0];var setAddTime=s8e[1];
   var s9=useState({});var absenceData=s9[0];var setAbsenceData=s9[1];
   var s10=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var absMonth=s10[0];var setAbsMonth=s10[1];
   var s11=useState('当欠');var absTab=s11[0];var setAbsTab=s11[1];
   var s12=useState('');var modalTime=s12[0];var setModalTime=s12[1];
-  var s13=useState('出勤');var extraStatus=s13[0];var setExtraStatus=s13[1];
-  var s14=useState('');var extraTime=s14[0];var setExtraTime=s14[1];
   var s15=useState('');var editTime=s15[0];var setEditTime=s15[1];
   var s16=useState(String(20));var settingHour=s16[0];var setSettingHour=s16[1];
   var s17=useState(String(30));var settingIntv=s17[0];var setSettingIntv=s17[1];
+  // 追加出勤キャスト（シフト外）
+  var s18=useState([]);var extraCasts=s18[0];var setExtraCasts=s18[1];
 
   useEffect(function(){
     if(!p.uid)return;
     db.collection('users').doc(p.uid).collection('attendance').doc('settings').get()
       .then(function(doc){if(doc.exists){var d=doc.data();if(d.timeSetting){setTimeSetting(d.timeSetting);setSettingHour(String(d.timeSetting.startHour));setSettingIntv(String(d.timeSetting.interval));}if(d.absenceData)setAbsenceData(d.absenceData);}}).catch(function(){});
     db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).get()
-      .then(function(doc){if(doc.exists)setAttStatus(doc.data().status||{});}).catch(function(){});
+      .then(function(doc){if(doc.exists){var d=doc.data();setAttStatus(d.status||{});setScheduledTime(d.scheduledTime||{});setExtraCasts(d.extraCasts||[]);}}).catch(function(){});
   },[p.uid]);
 
-  useEffect(function(){
-    if(timeModal)setModalTime(timeModal.defaultTime||'');
-  },[timeModal]);
-  useEffect(function(){
-    if(extraCast){setExtraStatus('出勤');setExtraTime('');}
-  },[extraCast]);
-  useEffect(function(){
-    if(editTarget)setEditTime(editTarget.time||'');
-  },[editTarget]);
+  useEffect(function(){if(timeModal)setModalTime(timeModal.defaultTime||'');},[timeModal]);
+  useEffect(function(){if(editTarget)setEditTime(editTarget.time||'');},[editTarget]);
 
   function saveSettings(ts,ad){
     if(!p.uid)return;
     db.collection('users').doc(p.uid).collection('attendance').doc('settings').set({timeSetting:ts,absenceData:ad});
   }
-  function saveAttStatus(ns){
-    setAttStatus(ns);
+  function saveAll(ns,nst,nec){
+    var status=ns||attStatus;var schTime=nst||scheduledTime;var ec=nec||extraCasts;
+    setAttStatus(status);setScheduledTime(schTime);setExtraCasts(ec);
     if(!p.uid)return;
-    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:ns});
+    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec});
   }
   function getAtt(castId){return attStatus[castId]||{status:'未通過',time:''};}
+
   function setStatus(castId,status,time){
     var ns=Object.assign({},attStatus);
     ns[castId]={status:status,time:time||''};
-    saveAttStatus(ns);
-    if(status==='当欠'||status==='遅刻'){
-      var nad=Object.assign({},absenceData);
-      if(!nad[todayStr])nad[todayStr]={absences:[]};
-      var ex=nad[todayStr].absences.filter(function(a){return a.castId!==castId;});
-      ex.push({castId:castId,type:status,time:time||''});
-      nad[todayStr].absences=ex;
-      setAbsenceData(nad);saveSettings(timeSetting,nad);
+    // 遅刻判定: 出勤ステータスで、予定時間より遅い場合
+    var sched=scheduledTime[castId];
+    if(status==='出勤'&&sched&&time){
+      var schedMin=parseInt(sched.split(':')[0])*60+parseInt(sched.split(':')[1]);
+      var actualMin=parseInt(time.split(':')[0])*60+parseInt(time.split(':')[1]);
+      if(actualMin>schedMin){
+        // 遅刻記録
+        var nad=Object.assign({},absenceData);
+        if(!nad[todayStr])nad[todayStr]={absences:[]};
+        var ex=nad[todayStr].absences.filter(function(a){return!(a.castId===castId&&a.type==='遅刻');});
+        ex.push({castId:castId,type:'遅刻',time:time});
+        nad[todayStr].absences=ex;
+        setAbsenceData(nad);saveSettings(timeSetting,nad);
+      }
     }
+    if(status==='当欠'){
+      var nad2=Object.assign({},absenceData);
+      if(!nad2[todayStr])nad2[todayStr]={absences:[]};
+      var ex2=nad2[todayStr].absences.filter(function(a){return!(a.castId===castId&&a.type==='当欠');});
+      ex2.push({castId:castId,type:'当欠',time:time||''});
+      nad2[todayStr].absences=ex2;
+      setAbsenceData(nad2);saveSettings(timeSetting,nad2);
+    }
+    saveAll(ns,null,null);
+  }
+
+  function setScheduled(castId,time){
+    var ns=Object.assign({},scheduledTime);
+    ns[castId]=time;
+    saveAll(null,ns,null);
   }
 
   var todayCasts=useMemo(function(){
@@ -2535,9 +2557,18 @@ function AttendancePage(p){
     return result;
   },[p.data.shifts,p.data.casts]);
 
+  // 追加出勤キャストをマージ
   var allTodayCasts=useMemo(function(){
-    return todayCasts.douhan.concat(todayCasts.work).concat(todayCasts.pending);
-  },[todayCasts]);
+    var base=todayCasts.douhan.concat(todayCasts.work).concat(todayCasts.pending);
+    var shiftIds=new Set(base.map(function(x){return x.cast.id;}));
+    extraCasts.forEach(function(ec){
+      if(!shiftIds.has(ec.castId)){
+        var cast=(p.data.casts||[]).find(function(c){return c.id===ec.castId;});
+        if(cast)base.push({cast:cast,shiftTime:'',isExtra:true,extraStatus:ec.status,extraTime:ec.time});
+      }
+    });
+    return base;
+  },[todayCasts,extraCasts,p.data.casts]);
 
   function getSlots(){
     var slots=[];var startMin=timeSetting.startHour*60;
@@ -2570,26 +2601,25 @@ function AttendancePage(p){
         else bySlot.push({label:sl,startMin:slot?slot.startMin:0,casts:[{cast:c,time:tm}]});
         return;
       }
-      if(st==='未通過'){
-        var ss2=item.shiftTime;
-        if(!ss2){notPassed.push({cast:c,shiftTime:''});return;}
-        var sm2=parseInt(ss2.split(':')[0])*60+parseInt(ss2.split(':')[1]);
+      // 未通過: 保留は除外、出勤予定時間が直近スロット内のみ
+      if(st==='未通過'&&!item.isExtra){
+        // シフトのステータスが保留なら表示しない
+        var shifts=p.data.shifts||{};
+        var sh=(shifts[c.id]||{})[todayStr];
+        if(sh&&sh.status==='pending')return;
+        var sched=scheduledTime[c.id]||item.shiftTime;
+        if(!sched){return;}
+        var sm2=parseInt(sched.split(':')[0])*60+parseInt(sched.split(':')[1]);
         if(!curSlot)return;
         if(sm2>curSlot.slotEnd)return;
-        notPassed.push({cast:c,shiftTime:ss2});
+        notPassed.push({cast:c,shiftTime:sched});
       }
     });
     bySlot.sort(function(a,b){return a.startMin-b.startMin;});
     bySlot.forEach(function(sl){sl.casts.sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});});
     passing.sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
     return{douhan:douhan,bySlot:bySlot,passing:passing,absent:absent,notPassed:notPassed};
-  },[attStatus,allTodayCasts,timeSetting]);
-
-  var searchResults=useMemo(function(){
-    if(!searchQ.trim())return[];
-    var q=searchQ.trim();var ids=new Set(allTodayCasts.map(function(x){return x.cast.id;}));
-    return(p.data.casts||[]).filter(function(c){return c.name&&c.name.includes(q)&&!ids.has(c.id);});
-  },[searchQ,allTodayCasts,p.data.casts]);
+  },[attStatus,allTodayCasts,timeSetting,scheduledTime,p.data.shifts]);
 
   var absenceSummary=useMemo(function(){
     var map={};
@@ -2620,6 +2650,14 @@ function AttendancePage(p){
     return days;
   },[absenceData,absMonth,absTab]);
 
+  // 追加出勤の検索結果
+  var addSearchResults=useMemo(function(){
+    if(!addSearch.trim())return[];
+    var q=addSearch.trim();
+    var ids=new Set(allTodayCasts.map(function(x){return x.cast.id;}));
+    return(p.data.casts||[]).filter(function(c){return c.name&&c.name.includes(q)&&!ids.has(c.id);}).slice(0,5);
+  },[addSearch,allTodayCasts,p.data.casts]);
+
   var attColors={'未通過':{color:'#6b7280',bg:'#1e2035',border:'#374151'},'通過':{color:'#34d399',bg:'#34d39918',border:'#34d399'},'出勤':{color:'#60a5fa',bg:'#60a5fa18',border:'#60a5fa'},'同伴':{color:'#a78bfa',bg:'#a78bfa18',border:'#a78bfa'},'当欠':{color:'#f87171',bg:'#f8717118',border:'#f87171'}};
   var secStyle={color:'#e8b86d',fontWeight:700,fontSize:'13px',padding:'6px 0',marginTop:'12px',marginBottom:'4px',borderBottom:'1px solid #e8b86d33'};
   var rowStyle={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'#12122a',borderRadius:'8px',marginBottom:'4px'};
@@ -2630,6 +2668,30 @@ function AttendancePage(p){
   var btnRow={display:'flex',gap:'8px'};
   var btnOk={flex:1,background:'#e8b86d',color:'#0d0d1a',border:'none',borderRadius:'8px',padding:'10px',fontWeight:700,cursor:'pointer'};
   var btnCancel={flex:1,background:'transparent',color:'#6b7280',border:'1px solid #374151',borderRadius:'8px',padding:'10px',cursor:'pointer'};
+
+  // 管理ページのキャストリスト（出勤予定時間でソート）
+  var manageCasts=useMemo(function(){
+    var list=[];
+    ['douhan','work','pending'].forEach(function(type){
+      todayCasts[type].forEach(function(item){
+        list.push({cast:item.cast,type:type,shiftTime:item.shiftTime});
+      });
+    });
+    // 追加出勤も追加
+    extraCasts.forEach(function(ec){
+      var cast=(p.data.casts||[]).find(function(c){return c.id===ec.castId;});
+      if(cast&&!list.find(function(x){return x.cast.id===ec.castId;})){
+        list.push({cast:cast,type:'extra',shiftTime:'',isExtra:true,extraStatus:ec.status,extraTime:ec.time});
+      }
+    });
+    // 出勤予定時間でソート
+    list.sort(function(a,b){
+      var ta=scheduledTime[a.cast.id]||'99:99';
+      var tb=scheduledTime[b.cast.id]||'99:99';
+      return ta.localeCompare(tb);
+    });
+    return list;
+  },[todayCasts,extraCasts,scheduledTime,p.data.casts]);
 
   return e('div',{style:{paddingBottom:'80px'}},
     // 時間入力モーダル
@@ -2643,30 +2705,13 @@ function AttendancePage(p){
         )
       )
     ),
-    // 急遽出勤モーダル
-    extraCast&&e('div',{style:modalBg},
-      e('div',{style:modalBox},
-        e('div',{style:modalTitle},'急遽出勤: '+extraCast.name),
-        e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}},
-          ['出勤','同伴'].map(function(st){
-            var col=attColors[st];var active=extraStatus===st;
-            return e('button',{key:st,style:{flex:1,background:active?col.bg:'transparent',color:active?col.color:'#6b7280',border:'1px solid '+(active?col.border:'#374151'),borderRadius:'8px',padding:'8px',cursor:'pointer',fontWeight:700},onClick:function(){setExtraStatus(st);}},st);
-          })
-        ),
-        e('input',{type:'time',value:extraTime,onChange:function(ev){setExtraTime(ev.target.value);},style:timeInputStyle}),
-        e('div',{style:btnRow},
-          e('button',{style:btnOk,onClick:function(){setStatus(extraCast.id,extraStatus,extraTime);setExtraCast(null);setSearchQ('');}},'確定'),
-          e('button',{style:btnCancel,onClick:function(){setExtraCast(null);}},'キャンセル')
-        )
-      )
-    ),
     // 編集モーダル
     editTarget&&e('div',{style:modalBg},
       e('div',{style:modalBox},
         e('div',{style:modalTitle},getCastName(editTarget.castId)+' 時間編集'),
         e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle}),
         e('div',{style:btnRow},
-          e('button',{style:btnOk,onClick:function(){var ns=Object.assign({},attStatus);if(ns[editTarget.castId])ns[editTarget.castId]=Object.assign({},ns[editTarget.castId],{time:editTime});saveAttStatus(ns);setEditTarget(null);setEditMode(false);}},'保存'),
+          e('button',{style:btnOk,onClick:function(){var ns=Object.assign({},attStatus);if(ns[editTarget.castId])ns[editTarget.castId]=Object.assign({},ns[editTarget.castId],{time:editTime});saveAll(ns,null,null);setEditTarget(null);setEditMode(false);}},'保存'),
           e('button',{style:btnCancel,onClick:function(){setEditTarget(null);}},'キャンセル')
         )
       )
@@ -2693,7 +2738,42 @@ function AttendancePage(p){
         )
       )
     ),
+    // 追加出勤モーダル
+    showAddModal&&e('div',{style:modalBg},
+      e('div',{style:Object.assign({},modalBox,{width:'310px'})},
+        e('div',{style:modalTitle},'追加出勤'),
+        e('div',{style:{position:'relative',marginBottom:'12px'}},
+          e('input',{type:'text',placeholder:'名前で検索...',value:addSearch,onChange:function(ev){setAddSearch(ev.target.value);setAddCast(null);},
+            style:{width:'100%',background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#f3f4f6',padding:'10px',fontSize:'14px'}}),
+          addSearchResults.length>0&&!addCast&&e('div',{style:{position:'absolute',top:'100%',left:0,right:0,background:'#1a1a2e',border:'1px solid #2d2d4e',borderRadius:'8px',zIndex:10,maxHeight:'140px',overflowY:'auto'}},
+            addSearchResults.map(function(c){return e('div',{key:c.id,style:{padding:'10px 12px',cursor:'pointer',borderBottom:'1px solid #1e2035',color:'#f3f4f6',fontSize:'14px'},onClick:function(){setAddCast(c);setAddSearch(c.name);}},c.name);})
+          )
+        ),
+        addCast&&e('div',{style:{color:'#34d399',fontSize:'12px',marginBottom:'12px'}},'選択: '+addCast.name),
+        e('div',{style:{display:'flex',gap:'8px',marginBottom:'12px'}},
+          ['出勤','同伴'].map(function(st){
+            var col=attColors[st];var active=addStatus===st;
+            return e('button',{key:st,style:{flex:1,background:active?col.bg:'transparent',color:active?col.color:'#6b7280',border:'1px solid '+(active?col.border:'#374151'),borderRadius:'8px',padding:'8px',cursor:'pointer',fontWeight:700},onClick:function(){setAddStatus(st);}},st);
+          })
+        ),
+        e('input',{type:'time',value:addTime,onChange:function(ev){setAddTime(ev.target.value);},style:timeInputStyle}),
+        e('div',{style:btnRow},
+          e('button',{style:btnOk,onClick:function(){
+            if(!addCast)return;
+            var nec=extraCasts.filter(function(x){return x.castId!==addCast.id;});
+            nec.push({castId:addCast.id,status:addStatus,time:addTime});
+            setExtraCasts(nec);
+            var ns=Object.assign({},attStatus);
+            ns[addCast.id]={status:addStatus,time:addTime};
+            saveAll(ns,null,nec);
+            setShowAddModal(false);setAddSearch('');setAddCast(null);setAddTime('');
+          }},'追加'),
+          e('button',{style:btnCancel,onClick:function(){setShowAddModal(false);setAddSearch('');setAddCast(null);}},'キャンセル')
+        )
+      )
+    ),
 
+    // サブナビ
     e('div',{style:{display:'flex',gap:'4px',marginBottom:'16px',background:'#12122a',borderRadius:'10px',padding:'4px'}},
       ['管理','ボード','当欠・遅刻'].map(function(label,i){
         var keys=['main','board','absence'];var active=subPage===keys[i];
@@ -2701,52 +2781,51 @@ function AttendancePage(p){
       })
     ),
 
+    // ── 管理タブ ──
     subPage==='main'&&e('div',null,
       e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
-        e('div',{style:{color:'#9ca3af',fontSize:'12px'}},timeSetting.startHour+'時〜 '+timeSetting.interval+'分刻み'),
-        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 10px',color:'#9ca3af',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowTimeSetting(true);}},'⚙ 時間設定')
+        e('button',{style:{background:'#e8b86d22',border:'1px solid #e8b86d',borderRadius:'8px',padding:'6px 14px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setShowAddModal(true);setAddSearch('');setAddCast(null);setAddTime('');setAddStatus('出勤');}},'+ 追加出勤'),
+        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 10px',color:'#9ca3af',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowTimeSetting(true);}},'⚙ 設定')
       ),
-      e('div',{style:{position:'relative',marginBottom:'12px'}},
-        e('input',{type:'text',placeholder:'急遽出勤の名前を検索...',value:searchQ,onChange:function(ev){setSearchQ(ev.target.value);},style:{width:'100%',background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#f3f4f6',padding:'10px 12px',fontSize:'14px'}}),
-        searchResults.length>0&&e('div',{style:{position:'absolute',top:'100%',left:0,right:0,background:'#1a1a2e',border:'1px solid #2d2d4e',borderRadius:'8px',zIndex:50,maxHeight:'160px',overflowY:'auto'}},
-          searchResults.map(function(c){return e('div',{key:c.id,style:{padding:'10px 12px',cursor:'pointer',borderBottom:'1px solid #1e2035',color:'#f3f4f6',fontSize:'14px'},onClick:function(){setExtraCast(c);}},c.name);})
-        )
-      ),
-      ['douhan','work','pending'].map(function(type){
-        var list=todayCasts[type];if(!list||list.length===0)return null;
-        var lbl={douhan:'同伴',work:'出勤',pending:'保留'};var clr={douhan:'#a78bfa',work:'#60a5fa',pending:'#fbbf24'};
-        return e('div',{key:type},
-          e('div',{style:Object.assign({},secStyle,{color:clr[type],borderBottomColor:clr[type]+'33'})},lbl[type]+' ('+list.length+')'),
-          list.map(function(item){
-            var att=getAtt(item.cast.id);var isGrayed=att.status!=='未通過';
-            return e('div',{key:item.cast.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'10px 12px',marginBottom:'6px'}},
-              e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}},
-                e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:isGrayed?'#4b5563':'#f3f4f6'}},item.cast.name),
-                att.time&&e('span',{style:{fontSize:'11px',color:'#9ca3af'}},att.time)
-              ),
-              e('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
-                ['未通過','通過','出勤','同伴','当欠'].map(function(st){
-                  var col=attColors[st];var isActive=att.status===st;
-                  return e('button',{key:st,style:{padding:'4px 8px',borderRadius:'6px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'11px',fontWeight:isActive?700:400,cursor:'pointer'},
-                    onClick:function(){
-                      if(st==='出勤'||st==='同伴'||st==='当欠'){var n=new Date();setTimeModal({castId:item.cast.id,status:st,statusLabel:st,castName:item.cast.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
-                      else setStatus(item.cast.id,st,'');
-                    }},st);
-                })
-              )
-            );
-          })
+      manageCasts.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'今日のシフトに登録されているキャストがいません'),
+      manageCasts.map(function(item){
+        var c=item.cast;var att=getAtt(c.id);var isGrayed=att.status!=='未通過';
+        var sched=scheduledTime[c.id]||'';
+        var lbl={douhan:'同伴',work:'出勤',pending:'保留',extra:'追加'}[item.type]||'';
+        var lblColor={douhan:'#a78bfa',work:'#60a5fa',pending:'#fbbf24',extra:'#34d399'}[item.type]||'#6b7280';
+        return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'10px 12px',marginBottom:'6px'}},
+          // 名前行
+          e('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'8px'}},
+            e('span',{style:{fontSize:'10px',color:lblColor,fontWeight:700,minWidth:'24px'}},lbl),
+            e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:isGrayed?'#4b5563':'#f3f4f6'}},c.name),
+            // 出勤予定時間入力
+            e('input',{type:'time',value:sched,onChange:function(ev){setScheduled(c.id,ev.target.value);},
+              style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#9ca3af',padding:'3px 6px',fontSize:'12px',width:'90px'}}),
+            att.time&&e('span',{style:{fontSize:'11px',color:'#6b7280',minWidth:'40px',textAlign:'right'}},att.time)
+          ),
+          // ステータスボタン行
+          e('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
+            ['未通過','通過','出勤','同伴','当欠'].map(function(st){
+              var col=attColors[st];var isActive=att.status===st;
+              return e('button',{key:st,style:{padding:'4px 8px',borderRadius:'6px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'11px',fontWeight:isActive?700:400,cursor:'pointer'},
+                onClick:function(){
+                  if(st==='出勤'||st==='同伴'||st==='当欠'){var n=new Date();setTimeModal({castId:c.id,status:st,statusLabel:st,castName:c.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
+                  else setStatus(c.id,st,'');
+                }},st);
+            })
+          )
         );
-      }),
-      allTodayCasts.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'今日のシフトに登録されているキャストがいません')
+      })
     ),
 
+    // ── ボードタブ ──
     subPage==='board'&&e('div',null,
-      e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}},
-        e('div',{style:{color:'#9ca3af',fontSize:'12px'}},timeSetting.startHour+'時〜 '+timeSetting.interval+'分刻み'),
+      e('div',{style:{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:'16px'}},
         e('div',{style:{display:'flex',gap:'8px'}},
           e('button',{style:{background:editMode?'#e8b86d22':'transparent',border:'1px solid '+(editMode?'#e8b86d':'#374151'),borderRadius:'8px',padding:'6px 10px',color:editMode?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditMode(!editMode);}},editMode?'✕ 編集中':'✏ 編集'),
-          e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).get().then(function(doc){if(doc.exists)setAttStatus(doc.data().status||{});});}},'↻ 更新')
+          e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#6b7280',fontSize:'12px',cursor:'pointer'},
+            onClick:function(){if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).get().then(function(doc){if(doc.exists){var d=doc.data();setAttStatus(d.status||{});setScheduledTime(d.scheduledTime||{});setExtraCasts(d.extraCasts||[]);}});}
+          },'↻ 更新')
         )
       ),
       boardData.douhan.length>0&&e('div',null,e('div',{style:secStyle},'同伴'),boardData.douhan.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#a78bfa'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));})),
@@ -2754,9 +2833,10 @@ function AttendancePage(p){
       boardData.passing.length>0&&e('div',null,e('div',{style:secStyle},'通過'),boardData.passing.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#34d399'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));})),
       boardData.notPassed.length>0&&e('div',null,e('div',{style:secStyle},'未通過'),boardData.notPassed.map(function(item){return e('div',{key:item.cast.id,style:rowStyle},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#6b7280'}},item.cast.name),item.shiftTime&&e('span',{style:{fontSize:'11px',color:'#fbbf24'}},'予定 '+item.shiftTime));})),
       boardData.absent.length>0&&e('div',null,e('div',{style:secStyle},'当欠'),boardData.absent.map(function(item){return e('div',{key:item.cast.id,style:rowStyle},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#f87171'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));})),
-      boardData.douhan.length===0&&boardData.bySlot.length===0&&boardData.passing.length===0&&boardData.notPassed.length===0&&boardData.absent.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'今日のシフトに登録されているキャストがいません')
+      boardData.douhan.length===0&&boardData.bySlot.length===0&&boardData.passing.length===0&&boardData.notPassed.length===0&&boardData.absent.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'表示するデータがありません')
     ),
 
+    // ── 当欠・遅刻タブ ──
     subPage==='absence'&&e('div',null,
       e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px',alignItems:'center'}},
         e('select',{value:absMonth,onChange:function(ev){setAbsMonth(ev.target.value);},style:{flex:1,background:'#12122a',color:'#e5e7eb',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px',fontSize:'13px',marginBottom:0}},
@@ -2774,11 +2854,13 @@ function AttendancePage(p){
         :e('div',null,absenceSummary.filter(function(x){return x[absTab]>0;}).map(function(item){
           return e('div',{key:item.castId,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'12px',marginBottom:'6px'}},
             e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},getCastName(item.castId)),e('span',{style:{fontWeight:700,fontSize:'16px',color:'#f87171'}},item[absTab]+'回')),
-            e('div',{style:{display:'flex',flexWrap:'wrap',gap:'4px'}},item.dates.filter(function(d){return d.type===absTab;}).map(function(d){return e('div',{key:d.date,style:{background:'#0d0d1a',borderRadius:'6px',padding:'3px 8px',fontSize:'11px',color:'#9ca3af'}},d.date.slice(5)+(d.time?' '+d.time:''));}))
+            e('div',{style:{display:'flex',flexWrap:'wrap',gap:'4px'}},item.dates.filter(function(d){return d.type===absTab;}).map(function(d){return e('div',{key:d.date+d.type,style:{background:'#0d0d1a',borderRadius:'6px',padding:'3px 8px',fontSize:'11px',color:'#9ca3af'}},d.date.slice(5)+(d.time?' '+d.time:''));}))
           );
         }))
     )
   );
 }
+
+
 })();
 </script></body></html>
