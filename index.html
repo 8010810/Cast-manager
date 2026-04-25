@@ -15,8 +15,8 @@ var firebaseConfig={apiKey:"AIzaSyBGxD2CQ-N-0mZYRZbkC5yVsDA4DdGKqeA",authDomain:
 firebase.initializeApp(firebaseConfig);var auth=firebase.auth();var db=firebase.firestore();
 function signInWithGoogle(){var provider=new firebase.auth.GoogleAuthProvider();return auth.signInWithPopup(provider);}
 function fbSignOut(){return auth.signOut();}
-function loadFromDB(uid){return db.collection('users').doc(uid).collection('data').doc('main').get().then(function(doc){if(doc.exists){var d=doc.data();return{casts:d.casts||[],records:d.records||{},customers:d.customers||{},folders:d.folders||[],shifts:d.shifts||{},visits:d.visits||[]};}return{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[]};}).catch(function(){return{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[]};});}
-function saveToDB(uid,data){return db.collection('users').doc(uid).collection('data').doc('main').set({casts:data.casts,records:data.records,customers:data.customers,folders:data.folders||[],shifts:data.shifts||{},visits:data.visits||[]}).catch(function(e){console.error('Save error:',e);});}
+function loadFromDB(uid){return db.collection('users').doc(uid).collection('data').doc('main').get().then(function(doc){if(doc.exists){var d=doc.data();return{casts:d.casts||[],records:d.records||{},customers:d.customers||{},folders:d.folders||[],shifts:d.shifts||{},visits:d.visits||[],quota:d.quota||{}};}return{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};}).catch(function(){return{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};});}
+function saveToDB(uid,data){return db.collection('users').doc(uid).collection('data').doc('main').set({casts:data.casts,records:data.records,customers:data.customers,folders:data.folders||[],shifts:data.shifts||{},visits:data.visits||[],quota:data.quota||{}}).catch(function(e){console.error('Save error:',e);});}
 </script><script>
 // ═══════════════════════════════════════════════════════════════════════════
 // CAST MANAGER - 全面リニューアル版
@@ -1257,10 +1257,11 @@ function ShiftPage(p){
   var s9=useState(function(){var d=new Date();d.setDate(d.getDate()-d.getDay());return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());});
   var weekStart=s9[0];var setWeekStart=s9[1];
   var s10=useState(false);var showCalView=s10[0];var setShowCalView=s10[1];
+  var s_sd=useState(null);var selDayIdx=s_sd[0];var setSelDayIdx=s_sd[1];
   // カレンダービューでタップした日
   var s11=useState(null);var calSelDate=s11[0];var setCalSelDate=s11[1];
   // 定数シフト設定（曜日ごと）: {0:3,1:4,...} 日=0〜土=6
-  var s12=useState({});var quotaMap=s12[0];var setQuotaMap=s12[1];
+  var s12=useState(p.data.quota||{});var quotaMap=s12[0];var setQuotaMap=s12[1];
   var s13=useState(false);var showQuota=s13[0];var setShowQuota=s13[1];
 
   var shifts=p.data.shifts||{};
@@ -1288,6 +1289,10 @@ function ShiftPage(p){
   },[p.data.casts,query,selShiftFolder,p.data.folders]);
 
   function getShift(castId,date){return(shifts[castId]||{})[date]||null;}
+  function saveQuota(){
+    p.persist(Object.assign({},p.data,{quota:quotaMap}));
+    setShowQuota(false);
+  }
   function setShiftData(castId,date,val){
     var ns=Object.assign({},shifts);
     if(!ns[castId])ns[castId]={};
@@ -1404,8 +1409,7 @@ function ShiftPage(p){
     e('div',{style:{...S.pageTitle,marginBottom:'12px'}},
       e('h1',{style:S.h1},'シフト管理')
     ),
-    // カレンダー表示ボタン
-    e('button',{style:{...S.btnGhost,width:'100%',padding:'11px',fontSize:'13px',marginBottom:'10px'},onClick:function(){setShowCalView(true);}}, e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:13,height:13,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2},e('rect',{x:3,y:4,width:18,height:18,rx:2}),e('line',{x1:16,y1:2,x2:16,y2:6}),e('line',{x1:8,y1:2,x2:8,y2:6}),e('line',{x1:3,y1:10,x2:21,y2:10})),'カレンダーで全員表示')),
+    // カレンダーボタン削除済み
     // 定数設定と差異表示
     e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',marginBottom:'10px',padding:'12px'}},
       e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}},
@@ -1413,7 +1417,7 @@ function ShiftPage(p){
           e('svg',{width:13,height:13,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2},e('line',{x1:18,y1:20,x2:18,y2:10}),e('line',{x1:12,y1:20,x2:12,y2:4}),e('line',{x1:6,y1:20,x2:6,y2:14})),
           '曜日別定数・差異'
         ),
-        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'6px',padding:'3px 8px',color:'#6b7280',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowQuota(function(v){return !v;});}},showQuota?'定数を隠す':'定数を設定')
+        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'6px',padding:'3px 8px',color:'#6b7280',fontSize:'11px',cursor:'pointer'},onClick:function(){if(showQuota){saveQuota();}else{setShowQuota(true);}}},showQuota?'保存':'定数を設定')
       ),
       showQuota&&e('div',{style:{marginBottom:'10px'}},
         e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'6px'}},'各曜日の目標出勤人数'),
@@ -1430,7 +1434,7 @@ function ShiftPage(p){
         e('thead',null,
           e('tr',null,
             e('th',{style:{padding:'4px 2px',textAlign:'left',color:'#6b7280',fontWeight:600,fontSize:'11px'}},''),
-            dayLabels.map(function(d,i){return e('th',{key:i,style:{padding:'4px 2px',textAlign:'center',color:i===0?'#fca5a5':i===6?'#60a5fa':'#9ca3af',fontWeight:600,fontSize:'11px'}},d);})
+            dayLabels.map(function(d,i){return e('th',{key:i,style:{padding:'4px 2px',textAlign:'center',color:i===0?'#fca5a5':i===6?'#60a5fa':'#9ca3af',fontWeight:600,fontSize:'11px',cursor:'pointer'},onClick:function(){setSelDayIdx(selDayIdx===i?null:i);}},d+'↑');})
           )
         ),
         e('tbody',null,
@@ -1452,6 +1456,44 @@ function ShiftPage(p){
         )
       )
     ),
+    // 曜日タップ詳細パネル
+    selDayIdx!==null&&(function(){
+      var ORDER=['douhan','work','pending'];
+      var LABELS={douhan:'同伴',work:'出勤',pending:'保留'};
+      var COLORS={douhan:'#a78bfa',work:'#60a5fa',pending:'#fbbf24'};
+      // 今週のselDayIdx曜日の日付
+      var wdates=getWeekDates();
+      var targetDate=wdates[selDayIdx];
+      var grouped={douhan:[],work:[],pending:[]};
+      filteredCasts.forEach(function(c){
+        var sh=(shifts[c.id]||{})[targetDate];
+        if(!sh)return;
+        if(sh.status==='douhan')grouped.douhan.push({cast:c,time:sh.time||''});
+        else if(sh.status==='work')grouped.work.push({cast:c,time:sh.time||''});
+        else if(sh.status==='pending')grouped.pending.push({cast:c,time:sh.time||''});
+      });
+      var hasAny=grouped.douhan.length>0||grouped.work.length>0||grouped.pending.length>0;
+      return e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'14px',marginBottom:'12px'}},
+        e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}},
+          e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px'}},dayLabels[selDayIdx]+'曜日 ('+targetDate.slice(5)+')'),
+          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer',fontSize:'16px'},onClick:function(){setSelDayIdx(null);}},'✗')
+        ),
+        !hasAny&&e('div',{style:{color:'#4b5563',fontSize:'13px'}},'シフト未登録'),
+        ORDER.map(function(status){
+          var list=grouped[status];
+          if(list.length===0)return null;
+          return e('div',{key:status,style:{marginBottom:'8px'}},
+            e('div',{style:{color:COLORS[status],fontWeight:700,fontSize:'12px',marginBottom:'4px'}},LABELS[status]+' ('+list.length+')'),
+            list.map(function(item){
+              return e('div',{key:item.cast.id,style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'5px 8px',background:'#0d0d1a',borderRadius:'6px',marginBottom:'2px'}},
+                e('span',{style:{fontSize:'13px',color:'#f3f4f6',fontWeight:600}},item.cast.name),
+                item.time&&e('span',{style:{fontSize:'11px',color:'#9ca3af'}},item.time)
+              );
+            })
+          );
+        })
+      );
+    })(),
     // フォルダフィルタ
     e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',paddingBottom:'2px'}},
       e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(selShiftFolder==='all'?'#e8b86d':'#374151'),background:selShiftFolder==='all'?'#e8b86d22':'transparent',color:selShiftFolder==='all'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:selShiftFolder==='all'?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder('all');}},'全員'),
@@ -1499,7 +1541,7 @@ function ShiftPage(p){
                   e('button',{style:{fontSize:'9px',padding:'1px 5px',borderRadius:'4px',border:'1px solid',cursor:'pointer',background:c.inactive?'#1e2035':'transparent',color:c.inactive?'#6b7280':'#374151',borderColor:c.inactive?'#374151':'#2d2d4e',lineHeight:1.4},onClick:function(){
                     var updated=p.data.casts.map(function(cx){return cx.id===c.id?Object.assign({},cx,{inactive:!cx.inactive}):cx;});
                     p.persist(Object.assign({},p.data,{casts:updated}));
-                  }},c.inactive?'死':'生')
+                  }},c.inactive?'死在籍':'生在籍')
                 ),
                 c.contractShift&&e('div',{style:{fontSize:'9px',color:'#6b7280'}},c.contractShift)
               ),
