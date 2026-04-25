@@ -2738,7 +2738,14 @@ function AttendancePage(p){
 
   function getSlots(){
     var slots=[];var startMin=timeSetting.startHour*60;
-    for(var i=0;i<24;i++){var sm=startMin+i*timeSetting.interval;if(sm>=1440)break;slots.push({label:pad(Math.floor(sm/60))+':'+pad(sm%60),startMin:sm,endMin:sm+timeSetting.interval});}
+    // 翌3時まで（180分=3時間）をカバー
+    var maxMin=startMin+27*60; // 最大27スロット分
+    for(var i=0;i<48;i++){
+      var sm=startMin+i*timeSetting.interval;
+      if(sm>=maxMin)break;
+      var dispMin=sm%1440; // 24時間内に正規化（表示用）
+      slots.push({label:pad(Math.floor(dispMin/60)%24)+':'+pad(dispMin%60),startMin:sm,endMin:sm+timeSetting.interval});
+    }
     return slots;
   }
   function getCurrentSlot(){
@@ -2758,6 +2765,7 @@ function AttendancePage(p){
       if(st==='通過'){passing.push({cast:c,time:tm});return;}
       if(st==='出勤'){
         var tMin=tm?parseInt(tm.split(':')[0])*60+parseInt(tm.split(':')[1]):null;
+        if(tMin!=null&&tMin<timeSetting.startHour*60)tMin+=1440;
         var slot=null;
         if(tMin!=null)for(var i=0;i<slots.length;i++){if(tMin>=slots[i].startMin&&tMin<slots[i].endMin){slot=slots[i];break;}}
         if(!slot&&slots.length>0)slot=slots[slots.length-1];
@@ -2824,7 +2832,7 @@ function AttendancePage(p){
     return(p.data.casts||[]).filter(function(c){return c.name&&c.name.includes(q)&&!ids.has(c.id);}).slice(0,5);
   },[addSearch,allTodayCasts,p.data.casts]);
 
-  var attColors={'未通過':{color:'#6b7280',bg:'#1e2035',border:'#374151'},'通過':{color:'#34d399',bg:'#34d39918',border:'#34d399'},'出勤':{color:'#60a5fa',bg:'#60a5fa18',border:'#60a5fa'},'同伴':{color:'#a78bfa',bg:'#a78bfa18',border:'#a78bfa'},'当欠':{color:'#f87171',bg:'#f8717118',border:'#f87171'}};
+  var attColors={'未通過':{color:'#6b7280',bg:'#1e2035',border:'#374151'},'通過':{color:'#34d399',bg:'#34d39918',border:'#34d399'},'出勤':{color:'#60a5fa',bg:'#60a5fa18',border:'#60a5fa'},'同伴':{color:'#a78bfa',bg:'#a78bfa18',border:'#a78bfa'},'当欠':{color:'#f87171',bg:'#f8717118',border:'#f87171'},'保留':{color:'#fbbf24',bg:'#fbbf2418',border:'#fbbf24'}};
   var secStyle={color:'#e8b86d',fontWeight:700,fontSize:'13px',padding:'6px 0',marginTop:'12px',marginBottom:'4px',borderBottom:'1px solid #e8b86d33'};
   var rowStyle={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'8px 12px',background:'#12122a',borderRadius:'8px',marginBottom:'4px'};
   var modalBg={position:'fixed',inset:0,background:'rgba(0,0,0,0.75)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center'};
@@ -2994,7 +3002,7 @@ function AttendancePage(p){
           var timeLabel=scheduledTime[c.id]||att.time||'';
           return e('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:'6px',padding:'7px 10px',background:'#12122a',borderRadius:'8px',marginBottom:'4px'}},
             e('span',{style:{fontWeight:700,fontSize:'13px',color:'#f3f4f6',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.name),
-            ['未通過','通過','出勤','同伴','当欠'].map(function(st){
+            ['未通過','通過','出勤','同伴'].map(function(st){
               var col=attColors[st];var isActive=att.status===st;
               return e('button',{key:st,style:{padding:'3px 6px',borderRadius:'5px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'10px',fontWeight:isActive?700:400,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0},
                 onClick:function(){
@@ -3086,11 +3094,27 @@ function AttendancePage(p){
                   e('span',{style:{background:lblColor+'22',color:lblColor,border:'1px solid '+lblColor+'66',borderRadius:'6px',padding:'2px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}},lbl),
                   e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:confirmStatus==='absent'||isPending?'#4b5563':'#f3f4f6'}},c.name),
                   selTime&&e('span',{style:{fontSize:'12px',color:'#60a5fa',fontWeight:700}},selTime),
-                  // ○ボタン
-                  e('button',{style:{background:selTime&&!isPending&&confirmStatus!=='absent'?'#60a5fa33':'transparent',border:'2px solid '+(selTime&&!isPending&&confirmStatus!=='absent'?'#60a5fa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:selTime&&!isPending&&confirmStatus!=='absent'?'#60a5fa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'16px',fontWeight:700},
+                  // 同ボタン（同伴）
+                  e('button',{style:{background:att.status==='同伴'?'#a78bfa33':'transparent',border:'2px solid '+(att.status==='同伴'?'#a78bfa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:att.status==='同伴'?'#a78bfa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'11px',fontWeight:700},
                     onClick:function(){
-                      // ○: 保留・当欠を解除してscheduled有りに戻す
-                      if(att.status==='保留'||att.status==='当欠'){setStatus(c.id,'未通過','');}
+                      var t=scheduledTime[c.id]||selTime||'';
+                      if(!t){var n=new Date();t=pad(n.getHours())+':'+pad(n.getMinutes());}
+                      var nst=Object.assign({},scheduledTime);nst[c.id]=t;
+                      var ns=Object.assign({},attStatus);ns[c.id]={status:'同伴',time:t};
+                      saveAll(ns,nst,null);
+                    }
+                  },'同'),
+                  // ○ボタン（出勤）
+                  e('button',{style:{background:selTime&&att.status!=='同伴'&&!isPending&&confirmStatus!=='absent'?'#60a5fa33':'transparent',border:'2px solid '+(selTime&&att.status!=='同伴'&&!isPending&&confirmStatus!=='absent'?'#60a5fa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:selTime&&att.status!=='同伴'&&!isPending&&confirmStatus!=='absent'?'#60a5fa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'16px',fontWeight:700},
+                    onClick:function(){
+                      var t=selTime||scheduledTime[c.id]||'';
+                      var nst=Object.assign({},scheduledTime);nst[c.id]=t||nst[c.id];
+                      if(att.status==='同伴'||att.status==='当欠'){
+                        var ns=Object.assign({},attStatus);ns[c.id]={status:'未通過',time:''};
+                        saveAll(ns,nst,null);
+                      } else {
+                        saveAll(attStatus,nst,null);
+                      }
                     }
                   },'○'),
                   // △ボタン（保留）
