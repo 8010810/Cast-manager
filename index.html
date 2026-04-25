@@ -2629,9 +2629,9 @@ function AttendancePage(p){
   var todayStr=adjNow.getFullYear()+'-'+pad(adjNow.getMonth()+1)+'-'+pad(adjNow.getDate());
 
   var s0=useState('main');var subPage=s0[0];var setSubPage=s0[1];
-  var s1=useState(p.attData?p.attData.status:{});var attStatus=s1[0];var setAttStatus=s1[1];
+  var s1=useState({});var attStatus=s1[0];var setAttStatus=s1[1];
   // scheduledTime: {castId: 'HH:MM'} 出勤予定時間
-  var s1b=useState(p.attData?p.attData.scheduledTime:{});var scheduledTime=s1b[0];var setScheduledTime=s1b[1];
+  var s1b=useState({});var scheduledTime=s1b[0];var setScheduledTime=s1b[1];
   var s2=useState({startHour:20,interval:30});var timeSetting=s2[0];var setTimeSetting=s2[1];
   var s3=useState(false);var showTimeSetting=s3[0];var setShowTimeSetting=s3[1];
   var s5=useState(false);var editMode=s5[0];var setEditMode=s5[1];
@@ -2651,16 +2651,16 @@ function AttendancePage(p){
   var s16=useState(String(20));var settingHour=s16[0];var setSettingHour=s16[1];
   var s17=useState(String(30));var settingIntv=s17[0];var setSettingIntv=s17[1];
   // 追加出勤キャスト（シフト外）
-  var s18=useState(p.attData?p.attData.extraCasts:[]);var extraCasts=s18[0];var setExtraCasts=s18[1];
+  var s18=useState([]);var extraCasts=s18[0];var setExtraCasts=s18[1];
   // confirmTypes: {castId: 'douhan'|'work'|'pending'|'absent'} 出確での選択タイプ
-  var s19=useState(p.attData?p.attData.confirmTypes||{}:{});var confirmTypes=s19[0];var setConfirmTypes=s19[1];
+  var s19=useState({});var confirmTypes=s19[0];var setConfirmTypes=s19[1];
 
   useEffect(function(){
     if(!p.uid)return;
     db.collection('users').doc(p.uid).collection('attendance').doc('settings').get()
       .then(function(doc){if(doc.exists){var d=doc.data();if(d.timeSetting){setTimeSetting(d.timeSetting);setSettingHour(String(d.timeSetting.startHour));setSettingIntv(String(d.timeSetting.interval));}if(d.absenceData)setAbsenceData(d.absenceData);}}).catch(function(){});
     db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).get()
-      .then(function(doc){if(doc.exists){var d=doc.data();setAttStatus(d.status||{});setScheduledTime(d.scheduledTime||{});setExtraCasts(d.extraCasts||[]);}}).catch(function(){});
+      .then(function(doc){if(doc.exists){var d=doc.data();setAttStatus(d.status||{});setScheduledTime(d.scheduledTime||{});setExtraCasts(d.extraCasts||[]);setConfirmTypes(d.confirmTypes||{});}}).catch(function(){});
   },[p.uid]);
 
   useEffect(function(){if(timeModal)setModalTime(timeModal.defaultTime||'');},[timeModal]);
@@ -2673,7 +2673,6 @@ function AttendancePage(p){
   function saveAll(ns,nst,nec,nct){
     var status=ns||attStatus;var schTime=nst||scheduledTime;var ec=nec||extraCasts;var ct=nct||confirmTypes;
     setAttStatus(status);setScheduledTime(schTime);setExtraCasts(ec);setConfirmTypes(ct);
-    if(p.setAttData)p.setAttData({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
     if(!p.uid)return;
     db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
   }
@@ -2916,7 +2915,6 @@ function AttendancePage(p){
               var nad=updateAbsences(castId,currentStatus,editTime,absenceData,confirmTypes);
               setAbsenceData(nad);saveSettings(timeSetting,nad);
               setAttStatus(ns);setExtraCasts(extraCasts);
-              if(p.setAttData)p.setAttData({status:ns,scheduledTime:scheduledTime,extraCasts:extraCasts,confirmTypes:confirmTypes});
               if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:ns,scheduledTime:scheduledTime,extraCasts:extraCasts,confirmTypes:confirmTypes});
               setEditTarget(null);setEditMode(false);
             }},'保存'),
@@ -3172,13 +3170,18 @@ function AttendancePage(p){
                         saveAll(ns,nst,null,nct);
                       }else{
                         nct[c.id]='absent';delete nst[c.id];
+                        // confirmTypes/scheduledTimeを先に反映
                         setConfirmTypes(nct);setScheduledTime(nst);
-                        if(p.setAttData)p.setAttData(Object.assign({},p.attData||{},{confirmTypes:nct,scheduledTime:nst}));
-                        if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set(Object.assign({},{status:attStatus,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct}));
-                        // 保留以外は当欠として記録
+                        var n2=new Date();var absTime2=pad(n2.getHours())+':'+pad(n2.getMinutes());
                         if(item.type!=='pending'){
-                          var n2=new Date();
-                          setStatus(c.id,'当欠',pad(n2.getHours())+':'+pad(n2.getMinutes()));
+                          // 当欠記録 + status更新 + Firebase保存
+                          var ns3=Object.assign({},attStatus);ns3[c.id]={status:'当欠',time:absTime2};
+                          var nad5=updateAbsences(c.id,'当欠',absTime2,absenceData,nct);
+                          setAbsenceData(nad5);saveSettings(timeSetting,nad5);
+                          setAttStatus(ns3);
+                          if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:ns3,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct});
+                        } else {
+                          if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:attStatus,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct});
                         }
                       }
                     }
