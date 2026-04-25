@@ -317,14 +317,14 @@ function FolderMKDetail(p){
   return e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d33',borderRadius:'12px',padding:'14px',marginBottom:'16px'}},
     e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
       e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},p.selFolderMK+'　キャスト別売上'),
-      e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer',fontSize:'16px'},onClick:function(){p.setSelFolderMK(null);}},'✕')
+      e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer',fontSize:'16px'},onClick:function(){p.setSelFolderMK(null);}},'✗')
     ),
     castSales.length===0
       ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'4px 0'}},'データなし')
       :e('div',null,castSales.map(function(item,i){
         return e('div',{key:item.name,style:{marginBottom:'8px'}},
           e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'3px'}},
-            e('span',{style:{width:'18px',fontSize:'12px',textAlign:'center'}},i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1)),
+            e('span',{style:{width:'18px',fontSize:'12px',textAlign:'center'}},e('span',{style:{fontWeight:700,color:i===0?'#f59e0b':i===1?'#9ca3af':i===2?'#b45309':'#6b7280'}},i===0?'1':i===1?'2':i===2?'3':String(i+1))),
             e('span',{style:{flex:1,fontSize:'13px',fontWeight:700,color:'#f3f4f6'}},item.name),
             e('span',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px'}},yen(item.sales))
           ),
@@ -440,7 +440,7 @@ function FolderDetail(p){
   return e(FolderErrorBoundary,null,e('div',null,
     e('div',{style:S.pageTitle},
       e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
-        e('span',{style:{fontSize:'20px'}},'📁'),
+        e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
         e('h2',{style:Object.assign({},S.h2,{margin:0})},p.folder.name)
       ),
       e('div',{style:{color:'#6b7280',fontSize:'12px'}},p.folderCasts.length+'名')
@@ -448,7 +448,7 @@ function FolderDetail(p){
     showFAI&&e('div',{style:{background:'#12122a',border:'1px solid #a78bfa44',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
       e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
         e('span',{style:{color:'#a78bfa',fontWeight:700}},p.folder.name+' AI分析'),
-        e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setShowFAI(false);}},'✕')
+        e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setShowFAI(false);}},'✗')
       ),
       faiLoading?e('div',{style:{color:'#6b7280',fontSize:'13px'}},'分析中...'):e('div',{style:{color:'#e5e7eb',fontSize:'13px',lineHeight:'1.8',whiteSpace:'pre-wrap'}},faiResult)
     ),
@@ -503,7 +503,7 @@ function FolderDetail(p){
               cpct!==null&&e('span',{style:{color:cpct>=100?'#34d399':cpct>=70?'#fbbf24':'#9ca3af',fontSize:'12px'}},cpct+'%達成')
             )
           ),
-          e('button',{style:{background:'#1e2035',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#9ca3af',fontSize:'12px',padding:'4px 8px',cursor:'pointer'},onClick:function(){setQrCast(c.id);}}, '📱 QR')
+          e('button',{style:{background:'#1e2035',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#9ca3af',fontSize:'12px',padding:'4px 8px',cursor:'pointer'},onClick:function(){setQrCast(c.id);}}, e('span',{style:{display:'flex',alignItems:'center',gap:'3px'}},e('svg',{width:11,height:11,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2},e('rect',{x:3,y:3,width:7,height:7}),e('rect',{x:14,y:3,width:7,height:7}),e('rect',{x:14,y:14,width:7,height:7}),e('rect',{x:3,y:14,width:7,height:7})),'QR'))
         );
       }),
     qrCast&&e(QRModal,null)
@@ -517,6 +517,9 @@ function MyCastPage(p){
   var openFolder=p.openFolderProp||null;
   var setOpenFolder=p.setOpenFolderProp||function(){};
   var s4=useState(false);var showAddFolder=s4[0];var setShowAddFolder=s4[1];
+  var s_efm=useState(false);var editFolderMode=s_efm[0];var setEditFolderMode=s_efm[1];
+  var s_sel=useState({});var selectedCastIds=s_sel[0];var setSelectedCastIds=s_sel[1];
+  var s_tgt=useState('');var targetFolderId=s_tgt[0];var setTargetFolderId=s_tgt[1];
 
   var folders=p.data.folders||[];
 
@@ -532,6 +535,35 @@ function MyCastPage(p){
     }
   },[openFolder,p.isActive]);
 
+  function moveCastsToFolder(){
+    if(!targetFolderId)return;
+    var ids=Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];});
+    if(ids.length===0)return;
+    var now2=new Date();var curMK=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+    var newCasts=p.data.casts.map(function(c){
+      if(!ids.includes(c.id))return c;
+      // folderHistory更新
+      var existingHist=c.folderHistory||[];
+      var currentFolder=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(c.id);});
+      var currentFolderId=currentFolder?currentFolder.id:null;
+      if(existingHist.length===0&&currentFolderId){
+        var allRecs=(p.data.records[c.id]||[]);
+        var firstMonth=allRecs.length>0?allRecs.slice().sort(function(a,b){return a.date.localeCompare(b.date);})[0].date.slice(0,7):'2020-01';
+        existingHist=[{folderId:currentFolderId,from:firstMonth}];
+      }
+      var hist=existingHist.filter(function(h){return h.from!==curMK;});
+      hist.push({folderId:targetFolderId,from:curMK});
+      return Object.assign({},c,{folderHistory:hist});
+    });
+    var newFolders=(p.data.folders||[]).map(function(f){
+      var newIds=(f.castIds||[]).filter(function(id){return!ids.includes(id);});
+      if(f.id===targetFolderId)newIds=newIds.concat(ids.filter(function(id){return!newIds.includes(id);}));
+      return Object.assign({},f,{castIds:newIds});
+    });
+    p.persist(Object.assign({},p.data,{casts:newCasts,folders:newFolders}));
+    setEditFolderMode(false);setSelectedCastIds({});setTargetFolderId('');
+    p.notify('フォルダを変更しました','success');
+  }
   function addFolder(){
     var name=folderName.trim();if(!name)return;
     var newFolder={id:uid(),name:name,castIds:[]};
@@ -557,7 +589,28 @@ function MyCastPage(p){
   return e('div',null,
     e('div',{style:S.pageTitle},
       e('h1',{style:S.h1},'MG実績'),
-      e('button',{style:S.btnPrimary,onClick:function(){setShowAddFolder(!showAddFolder);}},showAddFolder?'キャンセル':'+ フォルダ追加')
+      e('div',{style:{display:'flex',gap:'8px'}},
+        e('button',{style:S.btnPrimary,onClick:function(){setShowAddFolder(!showAddFolder);setEditFolderMode(false);}},showAddFolder?'キャンセル':'+ フォルダ追加'),
+        e('button',{style:{background:editFolderMode?'#e8b86d22':'transparent',border:'1px solid '+(editFolderMode?'#e8b86d':'#4b5563'),borderRadius:'8px',padding:'6px 12px',color:editFolderMode?'#e8b86d':'#9ca3af',fontSize:'12px',fontWeight:700,cursor:'pointer'},
+          onClick:function(){setEditFolderMode(!editFolderMode);setSelectedCastIds({});setShowAddFolder(false);}
+        },editFolderMode?'完了':'編集')
+      )
+    ),
+    editFolderMode&&Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length>0&&e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'12px',marginBottom:'12px'}},
+      e('div',{style:{color:'#e8b86d',fontSize:'12px',fontWeight:700,marginBottom:'8px'}},Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length+'名選択中'),
+      e('select',{value:targetFolderId,onChange:function(ev){setTargetFolderId(ev.target.value);},style:{width:'100%',background:'#12122a',color:'#e5e7eb',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px',fontSize:'13px',marginBottom:'8px'}},
+        e('option',{value:''},'移動先フォルダを選択'),
+        folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
+      ),
+      e('button',{style:{width:'100%',background:'#e8b86d',color:'#0d0d1a',border:'none',borderRadius:'8px',padding:'10px',fontWeight:700,cursor:'pointer',fontSize:'13px'},onClick:moveCastsToFolder},'フォルダを変更')
+    ),
+    editFolderMode&&Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length>0&&e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'12px',marginBottom:'12px'}},
+      e('div',{style:{color:'#e8b86d',fontSize:'12px',fontWeight:700,marginBottom:'8px'}},Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length+'名選択中 → 移動先:'),
+      e('select',{value:targetFolderId,onChange:function(ev){setTargetFolderId(ev.target.value);},style:{width:'100%',background:'#12122a',color:'#e5e7eb',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px',fontSize:'13px',marginBottom:'8px'}},
+        e('option',{value:''},'フォルダを選択'),
+        folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
+      ),
+      e('button',{style:{width:'100%',background:'#e8b86d',color:'#0d0d1a',border:'none',borderRadius:'8px',padding:'10px',fontWeight:700,cursor:'pointer',fontSize:'13px'},onClick:moveCastsToFolder},'フォルダを変更')
     ),
     showAddFolder&&e('div',{style:S.addForm},
       e('input',{style:{...S.input,marginBottom:0},placeholder:'フォルダ名を入力',value:folderName,autoFocus:true,onChange:function(ev){setFolderName(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')addFolder();}}),
@@ -569,12 +622,12 @@ function MyCastPage(p){
         var fCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
         return e('div',{key:folder.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',marginBottom:'10px',overflow:'hidden'}},
           e('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',cursor:'pointer'},onClick:function(){setOpenFolder(folder.id);}},
-            e('span',{style:{fontSize:'20px'}},'📁'),
+            e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
             editFolderId===folder.id
               ?e('div',{style:{display:'flex',gap:'8px',flex:1},onClick:function(ev){ev.stopPropagation();}},
                 e('input',{style:{...S.input,marginBottom:0,flex:1,fontSize:'13px',padding:'6px 10px'},value:folderName,autoFocus:true,onChange:function(ev){setFolderName(ev.target.value);}}),
                 e('button',{style:{...S.btnPrimary,padding:'6px 12px',fontSize:'12px'},onClick:function(){saveFolder(folder.id);}},'保存'),
-                e('button',{style:S.btnGhost,onClick:function(){setEditFolderId(null);}},'✕')
+                e('button',{style:S.btnGhost,onClick:function(){setEditFolderId(null);}},'✗')
               )
               :e(Fragment,null,
                 e('div',{style:{flex:1}},
@@ -585,6 +638,18 @@ function MyCastPage(p){
                 e('button',{style:{...S.btnDanger,marginLeft:'4px'},onClick:function(ev){ev.stopPropagation();deleteFolder(folder.id,folder.name);}},'削除'),
                 e('span',{style:{color:'#4b5563',fontSize:'14px'}}, '›')
               )
+          ),
+          editFolderMode&&e('div',{style:{padding:'8px 16px 12px',borderTop:'1px solid #1e2035'}},
+            fCasts.map(function(c){
+              var checked=!!selectedCastIds[c.id];
+              return e('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:'8px',padding:'6px 0',cursor:'pointer'},
+                onClick:function(){var ns=Object.assign({},selectedCastIds);if(ns[c.id])delete ns[c.id];else ns[c.id]=folder.id;setSelectedCastIds(ns);}},
+                e('div',{style:{width:'18px',height:'18px',borderRadius:'4px',border:'2px solid '+(checked?'#e8b86d':'#374151'),background:checked?'#e8b86d':'transparent',display:'flex',alignItems:'center',justifyContent:'center'}},
+                  checked&&e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'#0d0d1a',strokeWidth:3},e('polyline',{points:'20 6 9 17 4 12'}))
+                ),
+                e('span',{style:{fontSize:'13px',color:'#e5e7eb'}},c.name)
+              );
+            })
           )
         );
       })
@@ -751,7 +816,7 @@ function SalesPage(p){
     selectedMK&&e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'14px',marginBottom:'12px'}},
       e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'10px'}},
         e('div',{style:{color:'#e8b86d',fontWeight:700}},(function(){var d=chartData.find(function(x){return x.key===selectedMK;});return d?d.label:'';})()),
-        e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setSelectedMK(null);}},'✕')
+        e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setSelectedMK(null);}},'✗')
       ),
       e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'12px'}},
         (function(){
@@ -776,7 +841,7 @@ function SalesPage(p){
         return ranks.map(function(item,i){
           return e('div',{key:item.name,style:{marginBottom:'8px'}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'3px'}},
-              e('span',{style:{width:'18px',fontSize:'12px',textAlign:'center'}},i===0?'🥇':i===1?'🥈':i===2?'🥉':String(i+1)),
+              e('span',{style:{width:'18px',fontSize:'12px',textAlign:'center'}},e('span',{style:{fontWeight:700,color:i===0?'#f59e0b':i===1?'#9ca3af':i===2?'#b45309':'#6b7280'}},i===0?'1':i===1?'2':i===2?'3':String(i+1))),
               e('span',{style:{flex:1,fontSize:'13px',fontWeight:700,color:'#f3f4f6'}},item.name),
               e('span',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700}},yen(item.sales))
             ),
@@ -819,7 +884,7 @@ function SalesPage(p){
                 ?e(Fragment,null,
                   e('input',{type:'number',style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#e5e7eb',fontSize:'13px',padding:'4px 8px',flex:1,outline:'none'},value:targetInput,autoFocus:true,onChange:function(ev){setTargetInput(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')saveTargetForCast(targetCast,mk);}}),
                   e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'6px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,padding:'4px 10px',cursor:'pointer'},onClick:function(){saveTargetForCast(targetCast,mk);}},'保存'),
-                  e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setEditTargetMK(null);}},'✕')
+                  e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setEditTargetMK(null);}},'✗')
                 )
                 :e(Fragment,null,
                   e('span',{style:{color:mt>0?'#e5e7eb':'#4b5563',fontSize:'13px',flex:1}},mt>0?yen(mt):'未設定'),
@@ -875,7 +940,7 @@ function SalesPage(p){
           :rkSorted.map(function(item,idx){
             var val=item[rkMetric];
             var bw=Math.round(val/rkMax*100);
-            var medal=idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':'';
+            var medal=idx===0?'1':idx===1?'2':idx===2?'3':'';var medalColor=idx===0?'#f59e0b':idx===1?'#9ca3af':idx===2?'#b45309':'#6b7280';
             var dispVal=rkMetric==='sales'?yen(val):val+'組';
             return e('div',{key:item.id,style:{marginBottom:'12px'}},
               e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}},
@@ -914,7 +979,7 @@ function CastListPage(p){
   // detail開いた時にsubBackを設定
   React.useEffect(function(){
     if(p.onSetSubBack){
-      if(detail){p.onSetSubBack(function(){return function(){setDetail(null);setEditCast(null);};});}
+      if(detail){p.onSetSubBack(function(){return function(){setDetail(null);setEditCast(null);return false;};});}
       else{p.onSetSubBack(null);}
     }
   },[detail]);
@@ -1017,7 +1082,7 @@ function CastListPage(p){
         e('div',{style:{display:'flex',gap:'8px'}},
           !isEditing&&e('button',{style:S.btnEdit,onClick:function(){
             var cf=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(detail);});
-            setEditCast(detail);setEditForm({birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||''});
+            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||''});
           }}, '編集'),
           e('button',{style:S.btnDanger,onClick:function(){deleteCastItem(cast.id,cast.name);}}, '削除')
         )
@@ -1030,7 +1095,7 @@ function CastListPage(p){
         ),
         isEditing
           ?e('div',null,
-            [['birthday','誕生日','date'],['realName','本名','text'],['hometown','出身地','text'],['height','身長 (cm)','number'],['contractShift','契約シフト','text']].map(function(f){
+            [['name','キャスト名','text'],['birthday','誕生日','date'],['realName','本名','text'],['hometown','出身地','text'],['height','身長 (cm)','number'],['contractShift','契約シフト','text']].map(function(f){
               return e('div',{key:f[0]},
                 e('label',{style:S.label},f[1]),
                 e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:f[0]==='height'?'例: 165':'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
@@ -1095,7 +1160,7 @@ function CastListPage(p){
     ),
     // 検索
     e('div',{style:{position:'relative',marginBottom:'10px'}},
-      e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'15px',pointerEvents:'none'}},'🔍'),
+      e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'15px',pointerEvents:'none'}},e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round'},e('circle',{cx:11,cy:11,r:8}),e('line',{x1:21,y1:21,x2:16.65,y2:16.65}))),
       e('input',{style:{...S.input,paddingLeft:'38px',marginBottom:0},placeholder:'名前・本名・出身地・身長・メモで検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})
     ),
     // 並べ替え
@@ -1140,6 +1205,7 @@ function ShiftPage(p){
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
   var s2=useState('week');var viewMode=s2[0];var setViewMode=s2[1];
   var s3=useState('');var query=s3[0];var setQuery=s3[1];
+  var s_sf=useState('all');var selShiftFolder=s_sf[0];var setSelShiftFolder=s_sf[1];
   var s4=useState(null);var editCell=s4[0];var setEditCell=s4[1];
   var s5=useState({status:'work',time:''});var editVal=s5[0];var setEditVal=s5[1];
   var s6=useState(false);var aiLoading=s6[0];var setAiLoading=s6[1];
@@ -1171,9 +1237,12 @@ function ShiftPage(p){
 
   var filteredCasts=useMemo(function(){
     var q=query.trim().toLowerCase();
-    if(!q)return p.data.casts;
-    return p.data.casts.filter(function(c){return c.name.toLowerCase().includes(q);});
-  },[p.data.casts,query]);
+    var base=q?p.data.casts.filter(function(c){return c.name.toLowerCase().includes(q);}):p.data.casts;
+    if(selShiftFolder==='all')return base;
+    var folder=(p.data.folders||[]).find(function(f){return f.id===selShiftFolder;});
+    if(!folder)return base;
+    return base.filter(function(c){return(folder.castIds||[]).includes(c.id);});
+  },[p.data.casts,query,selShiftFolder,p.data.folders]);
 
   function getShift(castId,date){return(shifts[castId]||{})[date]||null;}
   function setShiftData(castId,date,val){
@@ -1239,7 +1308,7 @@ function ShiftPage(p){
       e('div',{style:{background:'#0d0d1a',borderRadius:'16px',padding:'14px',maxWidth:'900px',margin:'0 auto'}},
         e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
           e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'15px'}},yr+'年'+mo+'月 シフト'),
-          e('button',{style:{...S.btnGhost,padding:'6px 14px'},onClick:function(){setShowCalView(false);setCalSelDate(null);}},'✕')
+          e('button',{style:{...S.btnGhost,padding:'6px 14px'},onClick:function(){setShowCalView(false);setCalSelDate(null);}},'✗')
         ),
         e('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',marginBottom:'4px'}},
           dayLabels.map(function(d,i){return e('div',{key:d,style:{textAlign:'center',fontSize:'10px',fontWeight:600,color:i===0?'#fca5a5':i===6?'#60a5fa':'#6b7280',padding:'2px 0'}},d);})
@@ -1293,48 +1362,60 @@ function ShiftPage(p){
       e('h1',{style:S.h1},'シフト管理')
     ),
     // カレンダー表示ボタン
-    e('button',{style:{...S.btnGhost,width:'100%',padding:'11px',fontSize:'13px',marginBottom:'10px'},onClick:function(){setShowCalView(true);}}, '📅 カレンダーで全員表示'),
+    e('button',{style:{...S.btnGhost,width:'100%',padding:'11px',fontSize:'13px',marginBottom:'10px'},onClick:function(){setShowCalView(true);}}, e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:13,height:13,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2},e('rect',{x:3,y:4,width:18,height:18,rx:2}),e('line',{x1:16,y1:2,x2:16,y2:6}),e('line',{x1:8,y1:2,x2:8,y2:6}),e('line',{x1:3,y1:10,x2:21,y2:10})),'カレンダーで全員表示')),
     // 定数設定と差異表示
-    e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',marginBottom:'10px',overflow:'hidden'}},
-      e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',cursor:'pointer'},onClick:function(){setShowQuota(function(v){return !v;});}},
-        e('div',{style:{color:'#f3f4f6',fontSize:'13px',fontWeight:600}},'📊 曜日別定数・差異'),
-        e('span',{style:{color:'#4b5563',fontSize:'12px'}},showQuota?'▲':'▼')
+    e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',marginBottom:'10px',padding:'12px'}},
+      e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}},
+        e('div',{style:{color:'#f3f4f6',fontSize:'13px',fontWeight:600,display:'flex',alignItems:'center',gap:'6px'}},
+          e('svg',{width:13,height:13,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2},e('line',{x1:18,y1:20,x2:18,y2:10}),e('line',{x1:12,y1:20,x2:12,y2:4}),e('line',{x1:6,y1:20,x2:6,y2:14})),
+          '曜日別定数・差異'
+        ),
+        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'6px',padding:'3px 8px',color:'#6b7280',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowQuota(function(v){return !v;});}},showQuota?'定数を隠す':'定数を設定')
       ),
-      showQuota&&e('div',{style:{padding:'0 14px 12px'}},
-        e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'8px'}},'各曜日の目標出勤人数を設定'),
-        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'4px',marginBottom:'10px'}},
+      showQuota&&e('div',{style:{marginBottom:'10px'}},
+        e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'6px'}},'各曜日の目標出勤人数'),
+        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'3px'}},
           dayLabels.map(function(d,i){
             return e('div',{key:i,style:{textAlign:'center'}},
-              e('div',{style:{fontSize:'10px',color:i===0?'#fca5a5':i===6?'#60a5fa':'#6b7280',marginBottom:'3px'}},d),
+              e('div',{style:{fontSize:'10px',color:i===0?'#fca5a5':i===6?'#60a5fa':'#6b7280',marginBottom:'2px'}},d),
               e('input',{type:'number',style:{width:'100%',background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'4px',color:'#e5e7eb',fontSize:'12px',padding:'4px 2px',textAlign:'center',outline:'none'},value:quotaMap[i]||'',placeholder:'0',onChange:function(ev){var v=ev.target.value;setQuotaMap(function(m){var nm=Object.assign({},m);nm[i]=v;return nm;});}})
             );
           })
+        )
+      ),
+      e('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'12px'}},
+        e('thead',null,
+          e('tr',null,
+            e('th',{style:{padding:'4px 2px',textAlign:'left',color:'#6b7280',fontWeight:600,fontSize:'11px'}},''),
+            dayLabels.map(function(d,i){return e('th',{key:i,style:{padding:'4px 2px',textAlign:'center',color:i===0?'#fca5a5':i===6?'#60a5fa':'#9ca3af',fontWeight:600,fontSize:'11px'}},d);})
+          )
         ),
-        e('div',{style:{overflowX:'auto'}},
-          e('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11px'}},
-            e('thead',null,e('tr',null,
-              e('th',{style:{padding:'4px 8px',textAlign:'left',color:'#6b7280',borderBottom:'1px solid #1e2035'}},'曜日'),
-              e('th',{style:{padding:'4px 8px',textAlign:'center',color:'#6b7280',borderBottom:'1px solid #1e2035'}},'定数'),
-              e('th',{style:{padding:'4px 8px',textAlign:'center',color:'#6b7280',borderBottom:'1px solid #1e2035'}},'予定'),
-              e('th',{style:{padding:'4px 8px',textAlign:'center',color:'#6b7280',borderBottom:'1px solid #1e2035'}},'差異')
-            )),
-            e('tbody',null,weekdayDiff.map(function(item,i){
+        e('tbody',null,
+          e('tr',null,
+            e('td',{style:{padding:'4px 4px',color:'#9ca3af',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}},'定数'),
+            weekdayDiff.map(function(item,i){return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:'#9ca3af'}},item.quota||'-');})
+          ),
+          e('tr',null,
+            e('td',{style:{padding:'4px 4px',color:'#9ca3af',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}},'予定'),
+            weekdayDiff.map(function(item,i){return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:'#e5e7eb'}},item.actual+'人');})
+          ),
+          e('tr',null,
+            e('td',{style:{padding:'4px 4px',color:'#9ca3af',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}},'差異'),
+            weekdayDiff.map(function(item,i){
               var diffColor=item.diff===null?'#6b7280':item.diff>=0?'#34d399':'#fca5a5';
-              return e('tr',{key:i},
-                e('td',{style:{padding:'4px 8px',color:i===0?'#fca5a5':i===6?'#60a5fa':'#9ca3af',fontWeight:600}},item.day),
-                e('td',{style:{padding:'4px 8px',textAlign:'center',color:'#9ca3af'}},item.quota||'-'),
-                e('td',{style:{padding:'4px 8px',textAlign:'center',color:'#e5e7eb'}},item.actual+'人'),
-                e('td',{style:{padding:'4px 8px',textAlign:'center',color:diffColor,fontWeight:600}},item.diff===null?'-':(item.diff>0?'+':'')+item.diff)
-              );
-            }))
+              return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:diffColor,fontWeight:600}},item.diff===null?'-':(item.diff>0?'+':'')+item.diff);
+            })
           )
         )
       )
     ),
-    // 検索
-    e('div',{style:{position:'relative',marginBottom:'12px'}},
-      e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'15px',pointerEvents:'none'}},'🔍'),
-      e('input',{style:{...S.input,paddingLeft:'38px',marginBottom:0},placeholder:'名前で検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})
+    // フォルダフィルタ
+    e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',paddingBottom:'2px'}},
+      e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(selShiftFolder==='all'?'#e8b86d':'#374151'),background:selShiftFolder==='all'?'#e8b86d22':'transparent',color:selShiftFolder==='all'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:selShiftFolder==='all'?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder('all');}},'全員'),
+      (p.data.folders||[]).map(function(f){
+        var active=selShiftFolder===f.id;
+        return e('button',{key:f.id,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder(f.id);}},f.name);
+      })
     ),
     // 週/月切替
     e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}},
@@ -1468,7 +1549,7 @@ function InputPage(p){
     e('label',{style:S.label},'日付'),e('input',{type:'date',style:S.input,value:form.date,onChange:function(ev){handleDateChange(ev.target.value);}}),
     tab==='daily'&&e(Fragment,null,
       existing&&e('div',{style:S.badge},'この日付のデータは上書きされます'),
-      e('div',{style:S.infoBanner},e('span',{style:{color:'#fb923c',fontWeight:700}},'📅 '+(now.getMonth()+1)+'月の出勤日数'),e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'18px',marginLeft:'8px'}},autoWorkDays+'日'),e('span',{style:{color:'#6b7280',fontSize:'11px',marginLeft:'4px'}},'（自動集計）')),
+      e('div',{style:S.infoBanner},e('span',{style:{color:'#fb923c',fontWeight:700}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:13,height:13,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2},e('rect',{x:3,y:4,width:18,height:18,rx:2}),e('line',{x1:16,y1:2,x2:16,y2:6}),e('line',{x1:8,y1:2,x2:8,y2:6}),e('line',{x1:3,y1:10,x2:21,y2:10})),(now.getMonth()+1)+'月の出勤日数')),e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'18px',marginLeft:'8px'}},autoWorkDays+'日'),e('span',{style:{color:'#6b7280',fontSize:'11px',marginLeft:'4px'}},'（自動集計）')),
       [{key:'sales',label:'売上 (円)',ph:'例: 250000'},{key:'companions',label:'同伴数',ph:'例: 2'},{key:'nominations',label:'指名組数',ph:'例: 8'},{key:'floorCount',label:'場内組数',ph:'例: 3'}].map(function(f){return e('div',{key:f.key},e('label',{style:S.label},f.label),e('input',{type:'number',style:S.input,placeholder:f.ph,value:form[f.key],onChange:function(ev){setF(f.key,ev.target.value);}}));})
     ),
     tab==='guest'&&e('div',null,
@@ -1534,9 +1615,9 @@ function ChartPage(p){
         map[key].sales+=Number(r.sales||0);map[key].companions+=Number(r.companions||0);
         map[key].nominations+=Number(r.nominations||0);map[key].workDays+=1;map[key].floorCount+=Number(r.floorCount||0);
       });
-      // 12ヶ月全部埋める
+      // 12ヶ月全部埋める（データなし月はnull）
       var list=[];
-      for(var mi=1;mi<=12;mi++){var mk=selYear+'-'+pad(mi);list.push(map[mk]||{key:mk,sales:0,companions:0,nominations:0,workDays:0,floorCount:0});}
+      for(var mi=1;mi<=12;mi++){var mk=selYear+'-'+pad(mi);list.push(map[mk]||{key:mk,sales:null,companions:null,nominations:null,workDays:0,floorCount:null});}
       return list;
     }
     return aggregate(p.data.records,p.castId,mode==='daily'?'daily':'yearly');
@@ -1627,7 +1708,7 @@ function ChartPage(p){
       selectedKey&&e('div',{style:S.custPanel},
         e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}},
           e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},'📋 '+(mode==='daily'?fmtDate(selectedKey):mode==='monthly'?selectedKey.replace('-','年')+'月':selectedKey+'年')+' の来店顧客'),
-          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'18px',cursor:'pointer'},onClick:function(){setSelKey(null);}},'✕')
+          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'18px',cursor:'pointer'},onClick:function(){setSelKey(null);}},'✗')
         ),
         popCustomers.length===0?e('div',{style:{color:'#6b7280',fontSize:'13px',textAlign:'center',padding:'16px 0'}},'来店顧客の記録がありません'):
         popCustomers.map(function(c){var tc=typeColor(c.type);return e('div',{key:c.id,style:S.popRow},e('div',{style:{display:'flex',alignItems:'center',gap:'8px',flex:1,minWidth:0}},e('span',{style:Object.assign({},S.typeBadge,{background:tc.bg,color:tc.fg,borderColor:tc.border})},c.type),e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'13px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.name)),e('div',{style:{display:'flex',gap:'12px',flexShrink:0,fontSize:'12px'}},c.sales>0&&e('span',{style:{color:'#e8b86d',fontWeight:600}},yen(c.sales)),c.bottleNeck&&e('span',{style:{color:'#9ca3af'}},'🍾 '+c.bottleNeck)));})
@@ -1690,7 +1771,7 @@ function CustomerPage(p){
   function saveEdit(ev,id){ev.stopPropagation();var updated=all.map(function(c){return c.id===id?Object.assign({},c,editForm,{sales:Number(editForm.sales||0)}):c;});p.persist(Object.assign({},p.data,{customers:Object.assign({},p.data.customers,{[p.castId]:updated})}));setEditId(null);p.notify('更新しました');}
   return e('div',null,
     e('div',{style:S.pageTitle},e('h2',{style:S.h2},'顧客管理'),e('div',{style:{color:'#6b7280',fontSize:'12px'}},all.length+'件登録')),
-    e('div',{style:{position:'relative',marginBottom:'8px'}},e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'15px',pointerEvents:'none'}},'🔍'),e('input',{style:Object.assign({},S.input,{paddingLeft:'38px',marginBottom:0}),placeholder:'名前・ボトル・備考・日付で検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})),
+    e('div',{style:{position:'relative',marginBottom:'8px'}},e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'15px',pointerEvents:'none'}},e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round'},e('circle',{cx:11,cy:11,r:8}),e('line',{x1:21,y1:21,x2:16.65,y2:16.65}))),e('input',{style:Object.assign({},S.input,{paddingLeft:'38px',marginBottom:0}),placeholder:'名前・ボトル・備考・日付で検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})),
     query&&e('div',{style:{color:'#6b7280',fontSize:'12px',marginBottom:'12px'}},filtered.length+'件ヒット ',e('button',{style:{background:'transparent',border:'none',color:'#4b5563',cursor:'pointer',fontSize:'12px'},onClick:function(){setQuery('');}},'✕ クリア')),
     filtered.length===0?e('div',{style:S.empty},e('div',{style:{color:'#6b7280'}},query?'該当なし':'顧客データがありません')):
     filtered.map(function(c){
@@ -1894,7 +1975,7 @@ function VisitPage(p){
       e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderTopLeftRadius:'20px',borderTopRightRadius:'20px',padding:'24px',width:'100%',maxWidth:'520px',maxHeight:'85vh',overflowY:'auto'},onClick:function(ev){ev.stopPropagation();}},
         e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'20px'}},
           e('div',{style:{fontWeight:700,color:'#e8b86d',fontSize:'16px'}},editVisit?'来店予定を編集':'来店予定を追加　'+fmtDayLabel(form.date)),
-          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'20px',cursor:'pointer'},onClick:function(){setShowForm(false);}}, '✕')
+          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'20px',cursor:'pointer'},onClick:function(){setShowForm(false);}}, '✗')
         ),
         e('label',{style:S.label},'日付'),
         e('input',{type:'date',style:S.input,value:form.date,onChange:function(ev){setF('date',ev.target.value);}}),
@@ -1943,7 +2024,7 @@ function TargetModal(p){
   }
   var monthList=getMonthList();
   return e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
-    e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},'🎯 月別目標売上'),
+    e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:13,height:13,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2},e('circle',{cx:12,cy:12,r:10}),e('circle',{cx:12,cy:12,r:6}),e('circle',{cx:12,cy:12,r:2})),'月別目標売上')),
     monthList.map(function(mk){
       var mt=getMonthlyTarget(castObj,mk);
       var parts=mk.split('-');var label=parts[0]+'年'+Number(parts[1])+'月';
@@ -1954,7 +2035,7 @@ function TargetModal(p){
           ?e(Fragment,null,
             e('input',{type:'number',style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#e5e7eb',fontSize:'13px',padding:'4px 8px',flex:1,outline:'none'},value:targetInput,autoFocus:true,onChange:function(ev){setTargetInput(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')saveTarget(mk);}}),
             e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'6px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,padding:'4px 10px',cursor:'pointer'},onClick:function(){saveTarget(mk);}},'保存'),
-            e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditTarget(null);}},'✕')
+            e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditTarget(null);}},'✗')
           )
           :e(Fragment,null,
             e('span',{style:{color:mt>0?'#e5e7eb':'#4b5563',fontSize:'13px',flex:1}},mt>0?yen(mt):'未設定'),
@@ -2108,7 +2189,7 @@ function CastViewerPage(){
     ),
     // タブ
     e('div',{style:{display:'flex',borderBottom:'2px solid #1e2035',marginBottom:'16px'}},
-      [['summary','📊 サマリー'],['chart','📈 グラフ'],['customers','👥 顧客']].map(function(item){
+      [['summary','サマリー'],['chart','グラフ'],['customers','顧客']].map(function(item){
         var active=tab===item[0];
         return e('button',{key:item[0],style:{flex:1,padding:'10px 4px',fontSize:'13px',fontWeight:600,border:'none',background:'transparent',cursor:'pointer',color:active?'#e8b86d':'#6b7280',borderBottom:active?'2px solid #e8b86d':'2px solid transparent',marginBottom:'-2px'},onClick:function(){setTab(item[0]);}},item[1]);
       })
@@ -2204,7 +2285,7 @@ function CastViewerPage(){
       selChartKey&&e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'14px',marginBottom:'10px'}},
         e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'10px'}},
           e('div',{style:{color:'#e8b86d',fontWeight:700}},(function(){var d=chartData.find(function(x){return x.key===selChartKey;});return d?d.label:'';})()),
-          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setSelChartKey(null);}},'✕')
+          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setSelChartKey(null);}},'✗')
         ),
         e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',marginBottom:'12px'}},
           (function(){
@@ -2241,7 +2322,7 @@ function CastViewerPage(){
     // ── 顧客 ──
     tab==='customers'&&e('div',null,
       e('div',{style:{position:'relative',marginBottom:'12px'}},
-        e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',pointerEvents:'none'}},'🔍'),
+        e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',pointerEvents:'none'}},e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round'},e('circle',{cx:11,cy:11,r:8}),e('line',{x1:21,y1:21,x2:16.65,y2:16.65}))),
         e('input',{style:{background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#e5e7eb',fontSize:'16px',padding:'10px 14px 10px 38px',width:'100%',outline:'none'},placeholder:'名前・種別で検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})
       ),
       e('div',{style:{color:'#6b7280',fontSize:'12px',marginBottom:'8px'}},filteredCust.length+'件'),
@@ -2354,7 +2435,7 @@ function App(){
         :e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
           e('button',{style:{...S.homeBtn,fontSize:'12px',padding:'6px 12px'},onClick:goBack},'‹ 戻る'),
           e('button',{style:{background:'transparent',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#6b7280',fontSize:'11px',padding:'6px 10px',cursor:'pointer',display:'flex',alignItems:'center',gap:'4px'},onClick:goHome},
-            e('span',{style:{fontSize:'13px'}},'🏠'),e('span',null,'ホーム')
+            e('span',{style:{fontSize:'13px'}},e('svg',{width:13,height:13,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'}),e('polyline',{points:'9 22 9 12 15 12 15 22'}))),e('span',null,'ホーム')
           )
         ),
       isHomeLayer
@@ -2385,7 +2466,7 @@ function App(){
             e('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',stroke:'#a78bfa',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M12 2L2 7l10 5 10-5-10-5z'}),e('path',{d:'M2 17l10 5 10-5'}),e('path',{d:'M2 12l10 5 10-5'})),
             e('span',{style:{color:'#a78bfa',fontWeight:700,fontSize:'16px'}},'AI分析')
           ),
-          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'20px',cursor:'pointer'},onClick:function(){setShowGlobalAI(false);}},'✕')
+          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'20px',cursor:'pointer'},onClick:function(){setShowGlobalAI(false);}},'✗')
         ),
         e('div',{style:{color:'#6b7280',fontSize:'13px',marginBottom:'16px'}},'分析内容は今後設定予定です。現在はチームの売上状況を分析します。'),
         !globalAIResult&&!globalAILoading&&e('button',{style:{...S.btnPrimary,width:'100%',padding:'13px',background:'linear-gradient(135deg,#7c3aed,#a78bfa)'},onClick:function(){
@@ -2785,7 +2866,7 @@ function AttendancePage(p){
     subPage==='main'&&e('div',null,
       e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
         e('button',{style:{background:'#e8b86d22',border:'1px solid #e8b86d',borderRadius:'8px',padding:'6px 14px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setShowAddModal(true);setAddSearch('');setAddCast(null);setAddTime('');setAddStatus('出勤');}},'+ 追加出勤'),
-        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 10px',color:'#9ca3af',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowTimeSetting(true);}},'⚙ 設定')
+        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 10px',color:'#9ca3af',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowTimeSetting(true);}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('circle',{cx:12,cy:12,r:3}),e('path',{d:'M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14'})),'設定'))
       ),
       manageCasts.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'今日のシフトに登録されているキャストがいません'),
       manageCasts.map(function(item){
@@ -2822,10 +2903,10 @@ function AttendancePage(p){
     subPage==='board'&&e('div',null,
       e('div',{style:{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:'16px'}},
         e('div',{style:{display:'flex',gap:'8px'}},
-          e('button',{style:{background:editMode?'#e8b86d22':'transparent',border:'1px solid '+(editMode?'#e8b86d':'#374151'),borderRadius:'8px',padding:'6px 10px',color:editMode?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditMode(!editMode);}},editMode?'✕ 編集中':'✏ 編集'),
+          e('button',{style:{background:editMode?'#e8b86d22':'transparent',border:'1px solid '+(editMode?'#e8b86d':'#374151'),borderRadius:'8px',padding:'6px 10px',color:editMode?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditMode(!editMode);}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},editMode?e('path',{d:'M18 6 6 18M6 6l12 12'}):e('path',{d:'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z'})),editMode?'編集中':'編集')),
           e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#6b7280',fontSize:'12px',cursor:'pointer'},
             onClick:function(){if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).get().then(function(doc){if(doc.exists){var d=doc.data();setAttStatus(d.status||{});setScheduledTime(d.scheduledTime||{});setExtraCasts(d.extraCasts||[]);}});}
-          },'↻ 更新')
+          },e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})),'更新'))
         )
       ),
       boardData.douhan.length>0&&e('div',null,e('div',{style:secStyle},'同伴'),boardData.douhan.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#a78bfa'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));})),
