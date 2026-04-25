@@ -182,8 +182,9 @@ function HomeScreen(p){
   var now=new Date();
   var tm=now.getFullYear()+'-'+pad(now.getMonth()+1);
   var totalSales=p.data.casts.reduce(function(sum,c){return sum+(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm;}).reduce(function(s,r){return s+Number(r.sales||0);},0);},0);
-  var total=p.data.casts.length;
-  var dead=p.data.casts.filter(function(c){return c.inactive;}).length;
+  var regularCasts=p.data.casts.filter(function(c){return !c.isDispatch;});
+  var total=regularCasts.length;
+  var dead=regularCasts.filter(function(c){return c.inactive;}).length;
   var alive=total-dead;
   var todayMD=(now.getMonth()+1)+'/'+now.getDate();
   var bdCasts=p.data.casts.filter(function(c){
@@ -497,7 +498,7 @@ function FolderDetail(p){
         return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px 16px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'12px'}},
           e('div',{style:{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:700,color:'#0d0d1a',flexShrink:0,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();});}},c.name[0]),
           e('div',{style:{flex:1,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();})}},
-            e('div',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'14px'}},c.name),
+            e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},e('div',{style:{fontWeight:700,color:c.isDispatch?'#a78bfa':'#f3f4f6',fontSize:'14px'}},c.name),c.isDispatch&&e('span',{style:{background:'#a78bfa22',color:'#a78bfa',border:'1px solid #a78bfa44',borderRadius:'4px',padding:'1px 5px',fontSize:'10px',fontWeight:700}},'派遣')),
             e('div',{style:{display:'flex',gap:'12px',marginTop:'4px'}},
               e('span',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700}},yen(sales)),
               cpct!==null&&e('span',{style:{color:cpct>=100?'#34d399':cpct>=70?'#fbbf24':'#9ca3af',fontSize:'12px'}},cpct+'%達成')
@@ -970,6 +971,7 @@ function CastListPage(p){
   var s5=useState('');var newFolder=s5[0];var setNewFolder=s5[1];
   var s6=useState('');var newShift=s6[0];var setNewShift=s6[1];
   var s_af=useState({});var addForm=s_af[0];var setAddForm=s_af[1];
+  var s_disp=useState(null);var addType=s_disp[0];var setAddType=s_disp[1]; // null=未選択,'regular'=在籍,'dispatch'=派遣
   var s7=useState(null);var editCast=s7[0];var setEditCast=s7[1];
   var s8=useState({});var editForm=s8[0];var setEditForm=s8[1];
   var s9=useState('name');var sortBy=s9[0];var setSortBy=s9[1];
@@ -1002,11 +1004,17 @@ function CastListPage(p){
 
   function addCast(){
     var name=newName.trim();if(!name)return;
-    if(p.data.casts.find(function(c){return c.name===name;})){p.notify('同じ名前が既に存在します','error');return;}
+    var isDispatch=addType==='dispatch';
+    var finalName=isDispatch?'派遣'+name:name;
+    if(p.data.casts.find(function(c){return c.name===finalName;})){p.notify('同じ名前が既に存在します','error');return;}
     var id=Date.now().toString();
-    var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);var initFid=newFolder||(p.data.folders.find(function(f){return f.name==='新入店';})||{}).id||'';var newCast={id:id,name:name,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',folderHistory:[{folderId:initFid,from:initMK}]};
+    var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
+    // 派遣の場合は「派遣」フォルダ、なければ作成
+    var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
+    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):newFolder||(p.data.folders.find(function(f){return f.name==='新入店';})||{}).id||'';
+    var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
     var newFolders=(p.data.folders||[]).map(function(f){
-      var shouldAdd=newFolder?f.id===newFolder:f.name==='新入店';
+      var shouldAdd=isDispatch?f.id===initFid:newFolder?f.id===newFolder:f.name==='新入店';
       if(shouldAdd)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});
       return f;
     });
@@ -1082,7 +1090,7 @@ function CastListPage(p){
         e('div',{style:{display:'flex',gap:'8px'}},
           !isEditing&&e('button',{style:S.btnEdit,onClick:function(){
             var cf=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(detail);});
-            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||''});
+            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||'',isDispatch:cast.isDispatch||false});
           }}, '編集'),
           e('button',{style:S.btnDanger,onClick:function(){deleteCastItem(cast.id,cast.name);}}, '削除')
         )
@@ -1095,6 +1103,18 @@ function CastListPage(p){
         ),
         isEditing
           ?e('div',null,
+            e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'12px',padding:'10px 12px',background:editForm.isDispatch?'#a78bfa11':'#60a5fa11',borderRadius:'8px',border:'1px solid '+(editForm.isDispatch?'#a78bfa33':'#60a5fa33')}},
+              e('span',{style:{flex:1,fontSize:'13px',color:editForm.isDispatch?'#a78bfa':'#60a5fa',fontWeight:700}},editForm.isDispatch?'派遣キャスト':'在籍キャスト'),
+              e('button',{style:{background:'transparent',border:'1px solid '+(editForm.isDispatch?'#60a5fa':'#a78bfa'),borderRadius:'6px',padding:'4px 10px',color:editForm.isDispatch?'#60a5fa':'#a78bfa',fontSize:'11px',cursor:'pointer'},
+                onClick:function(){
+                  var nowDispatch=!editForm.isDispatch;
+                  var newName2=editForm.name||'';
+                  if(nowDispatch&&!newName2.startsWith('派遣'))newName2='派遣'+newName2;
+                  if(!nowDispatch&&newName2.startsWith('派遣'))newName2=newName2.slice(2);
+                  setEditForm(function(f){return Object.assign({},f,{isDispatch:nowDispatch,name:newName2});});
+                }
+              },editForm.isDispatch?'在籍に変更':'派遣に変更')
+            ),
             [['name','キャスト名','text'],['birthday','誕生日','date'],['realName','本名','text'],['hometown','出身地','text'],['height','身長 (cm)','number'],['contractShift','契約シフト','text']].map(function(f){
               return e('div',{key:f[0]},
                 e('label',{style:S.label},f[1]),
@@ -1131,9 +1151,25 @@ function CastListPage(p){
   return e('div',null,
     e('div',{style:S.pageTitle},
       e('h1',{style:S.h1},'キャスト一覧'),
-      e('button',{style:S.btnPrimary,onClick:function(){setShowAdd(!showAdd);}},showAdd?'キャンセル':'+ キャスト登録')
+      e('button',{style:S.btnPrimary,onClick:function(){setShowAdd(!showAdd);if(showAdd){setAddType(null);setNewName('');setAddForm({});setNewFolder('');setNewShift('');}}},showAdd?'キャンセル':'+ キャスト登録')
     ),
     showAdd&&e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
+      !addType&&e('div',null,
+        e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'16px',textAlign:'center'}},'登録タイプを選択'),
+        e('div',{style:{display:'flex',gap:'12px'}},
+          e('button',{style:{flex:1,background:'#60a5fa18',border:'2px solid #60a5fa',borderRadius:'12px',padding:'20px 12px',color:'#60a5fa',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){setAddType('regular');}},
+            e('div',null,'在籍'),e('div',{style:{fontSize:'11px',fontWeight:400,marginTop:'4px',color:'#9ca3af'}},'通常キャスト')
+          ),
+          e('button',{style:{flex:1,background:'#a78bfa18',border:'2px solid #a78bfa',borderRadius:'12px',padding:'20px 12px',color:'#a78bfa',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){setAddType('dispatch');}},
+            e('div',null,'派遣'),e('div',{style:{fontSize:'11px',fontWeight:400,marginTop:'4px',color:'#9ca3af'}},'名前頭に「派遣」付く')
+          )
+        )
+      ),
+      addType&&e('div',null,
+        e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}},
+          e('span',{style:{background:addType==='dispatch'?'#a78bfa22':'#60a5fa22',color:addType==='dispatch'?'#a78bfa':'#60a5fa',border:'1px solid '+(addType==='dispatch'?'#a78bfa':'#60a5fa'),borderRadius:'20px',padding:'2px 10px',fontSize:'12px',fontWeight:700}},addType==='dispatch'?'派遣':'在籍'),
+          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setAddType(null);}},'変更')
+        ),
       e('label',{style:S.label},'キャスト名 *'),
       e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
       e('label',{style:S.label},'所属フォルダ'),
@@ -1157,7 +1193,7 @@ function CastListPage(p){
         e('button',{style:S.btnGhost,onClick:function(){setShowAdd(false);setAddForm({});}}, 'キャンセル'),
         e('button',{style:S.btnPrimary,onClick:addCast},'追加')
       )
-    ),
+    )),
     // 検索
     e('div',{style:{position:'relative',marginBottom:'10px'}},
       e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'15px',pointerEvents:'none'}},e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round'},e('circle',{cx:11,cy:11,r:8}),e('line',{x1:21,y1:21,x2:16.65,y2:16.65}))),
@@ -1177,9 +1213,9 @@ function CastListPage(p){
       return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'14px 16px',marginBottom:'8px',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px'},onClick:function(){setDetail(c.id);}},
         e('div',{style:{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:700,color:'#0d0d1a',flexShrink:0}},c.name[0]),
         e('div',{style:{flex:1}},
-          e('div',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'14px'}},c.name),
+          e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},e('div',{style:{fontWeight:700,color:c.isDispatch?'#a78bfa':'#f3f4f6',fontSize:'14px'}},c.name),c.isDispatch&&e('span',{style:{background:'#a78bfa22',color:'#a78bfa',border:'1px solid #a78bfa44',borderRadius:'4px',padding:'1px 5px',fontSize:'10px',fontWeight:700}},'派遣')),
           e('div',{style:{color:'#6b7280',fontSize:'11px',marginTop:'2px',display:'flex',gap:'8px',flexWrap:'wrap'}},
-            folderName&&e('span',{style:{color:'#a78bfa'}},'📁 '+folderName),
+            folderName&&e('span',{style:{color:'#a78bfa'}},folderName),
             age!==null&&e('span',{},age+'歳'),
             c.height&&e('span',{},c.height+'cm'),
             c.hometown&&e('span',{},c.hometown)
@@ -1958,7 +1994,7 @@ function VisitPage(p){
                 v.seat&&e('span',{},'💺 '+v.seat),
                 v.bottleNeck&&e('span',{},'🍾 '+v.bottleNeck),
                 v.bottle&&e('span',{},'🥂 '+v.bottle),
-                v.lastVisit&&e('span',{},'前回: '+fmtDate(v.lastVisit))
+                v.lastVisit&&e('span',{},'前回: '+(v.lastVisit||'-'))
               ),
               v.note&&e('div',{style:{fontSize:'12px',color:'#6b7280',marginTop:'3px'}},v.note)
             ),
@@ -1992,7 +2028,7 @@ function VisitPage(p){
         ),
         e('label',{style:S.label},'ネック名'),e('input',{type:'text',style:S.input,placeholder:'例: 山崎12年',value:form.bottleNeck,onChange:function(ev){setF('bottleNeck',ev.target.value);}}),
         e('label',{style:S.label},'ボトル'),e('input',{type:'text',style:S.input,placeholder:'例: ドンペリ白',value:form.bottle,onChange:function(ev){setF('bottle',ev.target.value);}}),
-        e('label',{style:S.label},'前回来店日'),e('input',{type:'date',style:S.input,value:form.lastVisit,onChange:function(ev){setF('lastVisit',ev.target.value);}}),
+        e('label',{style:S.label},'前回来店日'),e('input',{type:'text',style:S.input,placeholder:'例: 4/20、先週など',value:form.lastVisit,onChange:function(ev){setF('lastVisit',ev.target.value);}}),
         e('label',{style:S.label},'その他メモ'),e('textarea',{style:{...S.input,minHeight:'60px',resize:'vertical',fontFamily:'inherit'},placeholder:'メモ',value:form.note,onChange:function(ev){setF('note',ev.target.value);}}),
         e('button',{style:{...S.btnPrimary,width:'100%',padding:'14px',fontSize:'15px'},onClick:saveVisit},'保存する')
       )
@@ -2377,11 +2413,17 @@ function App(){
   function goHome(){setNavStack(['home']);setSubBack(null);}
   function goBack(){
     if(subBack){
-      var result=subBack();
-      if(result&&typeof result==='function')result();
+      var sbFn=subBack();
+      var popStack=true;
+      if(typeof sbFn==='function'){
+        var sbResult=sbFn();
+        // falseを返した場合はnavStackをpopしない（同ページ内の戻り）
+        if(sbResult===false)popStack=false;
+      } else if(sbFn===false){
+        popStack=false;
+      }
       setSubBack(null);
-      // resultがfalseの場合はnavStackをpopしない（同ページ内の戻り）
-      if(result!==false){
+      if(popStack){
         setNavStack(function(st){return st.length>1?st.slice(0,-1):['home'];});
       }
       return;
