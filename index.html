@@ -2679,32 +2679,44 @@ function AttendancePage(p){
   }
   function getAtt(castId){return attStatus[castId]||{status:'未通過',time:''};}
 
+  function updateAbsences(castId,status,time,currentAbsenceData,currentConfirmTypes){
+    // 当欠・遅刻の記録を更新する共通関数
+    var nad=Object.assign({},currentAbsenceData);
+    if(!nad[todayStr])nad[todayStr]={absences:[]};
+    var absences=nad[todayStr].absences.filter(function(a){
+      // 対象キャストの当欠・遅刻を一旦除外（再計算）
+      return a.castId!==castId;
+    });
+    // 当欠: ボードで当欠と表示 かつ 元々保留ではない
+    if(status==='当欠'){
+      var shiftType=null;
+      (manageCasts||[]).forEach(function(item){if(item.cast.id===castId)shiftType=item.type;});
+      // 元々保留（pending）のキャストの✕は当欠にしない
+      if(shiftType!=='pending'){
+        absences.push({castId:castId,type:'当欠',time:time||''});
+      }
+    }
+    // 遅刻: 出勤 かつ 予定時間より遅い
+    if(status==='出勤'&&time){
+      var sched=scheduledTime[castId];
+      if(sched){
+        var toMin=function(t){var p2=t.split(':');var h=parseInt(p2[0]);var m=parseInt(p2[1]);if(h<timeSetting.startHour)h+=24;return h*60+m;};
+        var schedMin=toMin(sched);var actualMin=toMin(time);
+        if(actualMin>schedMin){
+          absences.push({castId:castId,type:'遅刻',time:time});
+        }
+      }
+    }
+    nad[todayStr].absences=absences;
+    return nad;
+  }
+
   function setStatus(castId,status,time){
     var ns=Object.assign({},attStatus);
     ns[castId]={status:status,time:time||''};
-    // 遅刻判定: 出勤ステータスで、予定時間より遅い場合
-    var sched=scheduledTime[castId];
-    if(status==='出勤'&&sched&&time){
-      var schedMin=parseInt(sched.split(':')[0])*60+parseInt(sched.split(':')[1]);
-      var actualMin=parseInt(time.split(':')[0])*60+parseInt(time.split(':')[1]);
-      if(actualMin>schedMin){
-        // 遅刻記録
-        var nad=Object.assign({},absenceData);
-        if(!nad[todayStr])nad[todayStr]={absences:[]};
-        var ex=nad[todayStr].absences.filter(function(a){return!(a.castId===castId&&a.type==='遅刻');});
-        ex.push({castId:castId,type:'遅刻',time:time});
-        nad[todayStr].absences=ex;
-        setAbsenceData(nad);saveSettings(timeSetting,nad);
-      }
-    }
-    if(status==='当欠'){
-      var nad2=Object.assign({},absenceData);
-      if(!nad2[todayStr])nad2[todayStr]={absences:[]};
-      var ex2=nad2[todayStr].absences.filter(function(a){return!(a.castId===castId&&a.type==='当欠');});
-      ex2.push({castId:castId,type:'当欠',time:time||''});
-      nad2[todayStr].absences=ex2;
-      setAbsenceData(nad2);saveSettings(timeSetting,nad2);
-    }
+    // 当欠・遅刻の記録を更新
+    var nad=updateAbsences(castId,status,time,absenceData,confirmTypes);
+    setAbsenceData(nad);saveSettings(timeSetting,nad);
     saveAll(ns,null,null);
   }
 
@@ -3148,8 +3160,14 @@ function AttendancePage(p){
                         saveAll(ns,nst,null,nct);
                       }else{
                         nct[c.id]='absent';delete nst[c.id];
-                        var ns2=Object.assign({},attStatus);var n=new Date();ns2[c.id]={status:'当欠',time:pad(n.getHours())+':'+pad(n.getMinutes())};
-                        saveAll(ns2,nst,null,nct);
+                        setConfirmTypes(nct);setScheduledTime(nst);
+                        if(p.setAttData)p.setAttData(Object.assign({},p.attData||{},{confirmTypes:nct,scheduledTime:nst}));
+                        if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set(Object.assign({},{status:attStatus,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct}));
+                        // 保留以外は当欠として記録
+                        if(item.type!=='pending'){
+                          var n2=new Date();
+                          setStatus(c.id,'当欠',pad(n2.getHours())+':'+pad(n2.getMinutes()));
+                        }
                       }
                     }
                   },'✕')
