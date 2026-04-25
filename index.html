@@ -2956,33 +2956,45 @@ function AttendancePage(p){
         e('button',{style:{background:'#e8b86d22',border:'1px solid #e8b86d',borderRadius:'8px',padding:'6px 14px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setShowAddModal(true);setAddSearch('');setAddCast(null);setAddTime('');setAddStatus('出勤');}},'+ 追加出勤'),
         e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 10px',color:'#9ca3af',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowTimeSetting(true);}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('circle',{cx:12,cy:12,r:3}),e('path',{d:'M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14'})),'設定'))
       ),
-      manageCasts.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'今日のシフトに登録されているキャストがいません'),
-      manageCasts.map(function(item){
-        var c=item.cast;var att=getAtt(c.id);var isGrayed=att.status!=='未通過';
-        var sched=scheduledTime[c.id]||'';
-        var lbl={douhan:'同伴',work:'出勤',pending:'保留',extra:'追加'}[item.type]||'';
-        var lblColor={douhan:'#a78bfa',work:'#60a5fa',pending:'#fbbf24',extra:'#34d399'}[item.type]||'#6b7280';
-        return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'10px 12px',marginBottom:'6px'}},
-          // 名前行
-          e('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'8px'}},
-            e('span',{style:{fontSize:'10px',color:lblColor,fontWeight:700,minWidth:'24px'}},lbl),
-            e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:isGrayed?'#4b5563':'#f3f4f6'}},c.name),
-            // 出勤時間表示のみ
-            att.time&&e('span',{style:{fontSize:'11px',color:'#6b7280',minWidth:'40px',textAlign:'right'}},att.time)
-          ),
-          // ステータスボタン行
-          e('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
-            ['未通過','通過','出勤','同伴','当欠'].map(function(st){
-              var col=attColors[st];var isActive=att.status===st;
-              return e('button',{key:st,style:{padding:'4px 8px',borderRadius:'6px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'11px',fontWeight:isActive?700:400,cursor:'pointer'},
-                onClick:function(){
-                  if(st==='出勤'||st==='同伴'||st==='当欠'){var n=new Date();setTimeModal({castId:c.id,status:st,statusLabel:st,castName:c.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
-                  else setStatus(c.id,st,'');
-                }},st);
-            })
-          )
+      (function(){
+        // 出確で〇にしたキャストのみ表示（status!=='未通過'のキャスト）
+        var confirmed=manageCasts.filter(function(item){
+          var att=getAtt(item.cast.id);
+          return att.status!=='未通過';
+        });
+        if(confirmed.length===0){
+          return e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'出確ページで確定したキャストが表示されます');
+        }
+        // 同伴グループ・出勤グループ（時間早い順）・保留グループ
+        var douhanList=confirmed.filter(function(x){var a=getAtt(x.cast.id);return a.status==='同伴';}).sort(function(a,b){return(getAtt(a.cast.id).time||'99:99').localeCompare(getAtt(b.cast.id).time||'99:99');});
+        var workList=confirmed.filter(function(x){var a=getAtt(x.cast.id);return a.status==='出勤';}).sort(function(a,b){return(getAtt(a.cast.id).time||'99:99').localeCompare(getAtt(b.cast.id).time||'99:99');});
+        var pendingList=confirmed.filter(function(x){var a=getAtt(x.cast.id);return a.status==='保留'||a.status==='通過'||a.status==='当欠';});
+        var secStyle2={color:'#e8b86d',fontWeight:700,fontSize:'12px',padding:'4px 0',marginTop:'10px',marginBottom:'4px',borderBottom:'1px solid #e8b86d33'};
+        function renderCastRow(item){
+          var c=item.cast;var att=getAtt(c.id);
+          return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'10px 12px',marginBottom:'6px'}},
+            e('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'8px'}},
+              e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},c.name),
+              att.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},att.time)
+            ),
+            e('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
+              ['未通過','通過','出勤','同伴','当欠'].map(function(st){
+                var col=attColors[st];var isActive=att.status===st;
+                return e('button',{key:st,style:{padding:'4px 8px',borderRadius:'6px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'11px',fontWeight:isActive?700:400,cursor:'pointer'},
+                  onClick:function(){
+                    if(st==='出勤'||st==='同伴'||st==='当欠'){var n=new Date();setTimeModal({castId:c.id,status:st,statusLabel:st,castName:c.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
+                    else setStatus(c.id,st,'');
+                  }},st);
+              })
+            )
+          );
+        }
+        return e('div',null,
+          douhanList.length>0&&e('div',null,e('div',{style:secStyle2},'同伴 ('+douhanList.length+')'),douhanList.map(renderCastRow)),
+          workList.length>0&&e('div',null,e('div',{style:secStyle2},'出勤 ('+workList.length+')'),workList.map(renderCastRow)),
+          pendingList.length>0&&e('div',null,e('div',{style:secStyle2},'その他 ('+pendingList.length+')'),pendingList.map(renderCastRow))
         );
-      })
+      })()
     ),
 
     // ── ボードタブ ──
