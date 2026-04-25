@@ -2718,9 +2718,9 @@ function AttendancePage(p){
     (p.data.casts||[]).forEach(function(c){
       var sh=(shifts[c.id]||{})[todayStr];
       if(!sh)return;
-      if(sh.status==='douhan')result.douhan.push({cast:c,shiftTime:sh.time||''});
-      else if(sh.status==='work')result.work.push({cast:c,shiftTime:sh.time||''});
-      else if(sh.status==='pending')result.pending.push({cast:c,shiftTime:sh.time||''});
+      if(sh.status==='douhan')result.douhan.push({cast:c,shiftTime:sh.time||'',type:'douhan'});
+      else if(sh.status==='work')result.work.push({cast:c,shiftTime:sh.time||'',type:'work'});
+      else if(sh.status==='pending')result.pending.push({cast:c,shiftTime:sh.time||'',type:'pending'});
     });
     return result;
   },[p.data.shifts,p.data.casts]);
@@ -2944,8 +2944,8 @@ function AttendancePage(p){
             (function(){
               var slots=getSlots();
               // 00:00と00:30を先頭に追加
-              var tailSlots=[{label:'00:00'},{label:'00:30'}];
-              return slots.concat(tailSlots).map(function(slot){
+              // 00:00/00:30はgetSlots()に含まれるので追加不要
+              return slots.map(function(slot){
                 var isSelected=addTime===slot.label;
                 return e('button',{key:slot.label,style:{padding:'5px 10px',borderRadius:'6px',border:'1px solid '+(isSelected?'#e8b86d':'#2d2d4e'),background:isSelected?'#e8b86d22':'#0d0d1a',color:isSelected?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer',fontWeight:isSelected?700:400},
                   onClick:function(){setAddTime(slot.label);}},slot.label);
