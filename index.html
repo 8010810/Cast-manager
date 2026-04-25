@@ -2652,6 +2652,8 @@ function AttendancePage(p){
   var s17=useState(String(30));var settingIntv=s17[0];var setSettingIntv=s17[1];
   // 追加出勤キャスト（シフト外）
   var s18=useState(p.attData?p.attData.extraCasts:[]);var extraCasts=s18[0];var setExtraCasts=s18[1];
+  // confirmTypes: {castId: 'douhan'|'work'|'pending'|'absent'} 出確での選択タイプ
+  var s19=useState(p.attData?p.attData.confirmTypes||{}:{});var confirmTypes=s19[0];var setConfirmTypes=s19[1];
 
   useEffect(function(){
     if(!p.uid)return;
@@ -2668,12 +2670,12 @@ function AttendancePage(p){
     if(!p.uid)return;
     db.collection('users').doc(p.uid).collection('attendance').doc('settings').set({timeSetting:ts,absenceData:ad});
   }
-  function saveAll(ns,nst,nec){
-    var status=ns||attStatus;var schTime=nst||scheduledTime;var ec=nec||extraCasts;
-    setAttStatus(status);setScheduledTime(schTime);setExtraCasts(ec);
-    if(p.setAttData)p.setAttData({status:status,scheduledTime:schTime,extraCasts:ec});
+  function saveAll(ns,nst,nec,nct){
+    var status=ns||attStatus;var schTime=nst||scheduledTime;var ec=nec||extraCasts;var ct=nct||confirmTypes;
+    setAttStatus(status);setScheduledTime(schTime);setExtraCasts(ec);setConfirmTypes(ct);
+    if(p.setAttData)p.setAttData({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
     if(!p.uid)return;
-    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec});
+    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
   }
   function getAtt(castId){return attStatus[castId]||{status:'未通過',time:''};}
 
@@ -2987,8 +2989,8 @@ function AttendancePage(p){
       (function(){
         // 出確で〇にしたキャストのみ表示（status!=='未通過'のキャスト）
         var confirmed=manageCasts.filter(function(item){
-          // scheduledTimeがある（出確で○済み）または当欠のキャスト
-          return !!scheduledTime[item.cast.id]||getAtt(item.cast.id).status==='当欠';
+          // confirmTypesがあるまたは当欠
+          return !!confirmTypes[item.cast.id]||getAtt(item.cast.id).status==='当欠';
         });
         if(confirmed.length===0){
           return e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'出確ページで○を入力したキャストが表示されます');
@@ -2997,9 +2999,10 @@ function AttendancePage(p){
         // シフトのtype（同伴/出勤/保留）で分類、scheduledTimeでソート
         var absentList=confirmed.filter(function(x){return getAtt(x.cast.id).status==='当欠';});
         var absentIds=new Set(absentList.map(function(x){return x.cast.id;}));
-        var douhanList=confirmed.filter(function(x){return x.type==='douhan'&&!absentIds.has(x.cast.id);}).sort(function(a,b){return(scheduledTime[a.cast.id]||'99:99').localeCompare(scheduledTime[b.cast.id]||'99:99');});
-        var workList=confirmed.filter(function(x){return(x.type==='work'||x.type==='extra')&&!absentIds.has(x.cast.id);}).sort(function(a,b){return(scheduledTime[a.cast.id]||'99:99').localeCompare(scheduledTime[b.cast.id]||'99:99');});
-        var pendingList=confirmed.filter(function(x){return x.type==='pending'&&!absentIds.has(x.cast.id);});
+        // confirmTypesベースで分類（出確での選択を優先）
+        var douhanList=confirmed.filter(function(x){return confirmTypes[x.cast.id]==='douhan'&&!absentIds.has(x.cast.id);}).sort(function(a,b){return(scheduledTime[a.cast.id]||'99:99').localeCompare(scheduledTime[b.cast.id]||'99:99');});
+        var workList=confirmed.filter(function(x){return confirmTypes[x.cast.id]==='work'&&!absentIds.has(x.cast.id);}).sort(function(a,b){return(scheduledTime[a.cast.id]||'99:99').localeCompare(scheduledTime[b.cast.id]||'99:99');});
+        var pendingList=confirmed.filter(function(x){return confirmTypes[x.cast.id]==='pending'&&!absentIds.has(x.cast.id);});
         var secStyle2={color:'#e8b86d',fontWeight:700,fontSize:'12px',padding:'4px 0',marginTop:'10px',marginBottom:'4px',borderBottom:'1px solid #e8b86d33'};
         function renderCastRow(item){
           var c=item.cast;var att=getAtt(c.id);
@@ -3083,55 +3086,71 @@ function AttendancePage(p){
               var att=getAtt(c.id);
               var lbl={douhan:'同伴',work:'出勤',pending:'保留'}[item.type]||'';
               var lblColor={douhan:'#a78bfa',work:'#60a5fa',pending:'#fbbf24'}[item.type]||'#6b7280';
-              var isDone=att.status!=='未通過';
+              var isDone=!!confirmTypes[c.id];
               // 出勤時間スロット生成
               var slots=getSlots();
               var selTime=scheduledTime[c.id]||'';
-              var confirmStatus=att.status==='当欠'?'absent':selTime?'confirmed':'none'; // none/confirmed/pending/absent
+              var confirmStatus=confirmTypes[c.id]||'none'; // none/confirmed/pending/absent
               // △(保留)済みか確認
-              var isPending=att.status==='保留';
-              var borderColor=confirmStatus==='absent'?'#f87171':isPending?'#fbbf24':confirmStatus==='confirmed'?'#60a5fa':'#1e2035';
+              var isPending=confirmTypes[c.id]==='pending';
+              var ct=confirmTypes[c.id];var borderColor=ct==='absent'?'#f87171':ct==='pending'?'#fbbf24':ct==='work'?'#60a5fa':ct==='douhan'?'#a78bfa':'#1e2035';
               return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid '+borderColor,borderRadius:'10px',padding:'10px 12px',marginBottom:'6px'}},
                 // 1行目: 目印・名前・○△✕
                 e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:selTime||confirmStatus==='none'?'8px':'0'}},
                   // 目印（同伴/出勤/保留）
                   e('span',{style:{background:lblColor+'22',color:lblColor,border:'1px solid '+lblColor+'66',borderRadius:'6px',padding:'2px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}},lbl),
-                  e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:confirmStatus==='absent'||isPending?'#4b5563':'#f3f4f6'}},c.name),
+                  e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:isDone&&confirmStatus!=='absent'?'#f3f4f6':isDone?'#4b5563':'#f3f4f6'}},c.name),
                   // 同ボタン（同伴）
-                  e('button',{style:{background:att.status==='同伴'?'#a78bfa33':'transparent',border:'2px solid '+(att.status==='同伴'?'#a78bfa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:att.status==='同伴'?'#a78bfa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'11px',fontWeight:700},
+                  e('button',{style:{background:confirmTypes[c.id]==='douhan'?'#a78bfa33':'transparent',border:'2px solid '+(confirmTypes[c.id]==='douhan'?'#a78bfa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:confirmTypes[c.id]==='douhan'?'#a78bfa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'11px',fontWeight:700},
                     onClick:function(){
-                      var t=scheduledTime[c.id]||selTime||'';
-                      if(!t){var n=new Date();t=pad(n.getHours())+':'+pad(n.getMinutes());}
-                      var nst=Object.assign({},scheduledTime);nst[c.id]=t;
-                      var ns=Object.assign({},attStatus);ns[c.id]={status:'同伴',time:t};
-                      saveAll(ns,nst,null);
+                      var t=selTime||scheduledTime[c.id]||'';
+                      var nst=Object.assign({},scheduledTime);if(t)nst[c.id]=t;
+                      var nct=Object.assign({},confirmTypes);
+                      if(confirmTypes[c.id]==='douhan'){delete nct[c.id];if(nst[c.id]&&!selTime)delete nst[c.id];}
+                      else nct[c.id]='douhan';
+                      // status は未通過のまま
+                      var ns=Object.assign({},attStatus);if(ns[c.id]&&ns[c.id].status==='当欠')ns[c.id]={status:'未通過',time:''};
+                      saveAll(ns,nst,null,nct);
                     }
                   },'同'),
                   // ○ボタン（出勤）
-                  e('button',{style:{background:selTime&&att.status!=='同伴'&&!isPending&&confirmStatus!=='absent'?'#60a5fa33':'transparent',border:'2px solid '+(selTime&&att.status!=='同伴'&&!isPending&&confirmStatus!=='absent'?'#60a5fa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:selTime&&att.status!=='同伴'&&!isPending&&confirmStatus!=='absent'?'#60a5fa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'16px',fontWeight:700},
+                  e('button',{style:{background:confirmTypes[c.id]==='work'?'#60a5fa33':'transparent',border:'2px solid '+(confirmTypes[c.id]==='work'?'#60a5fa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:confirmTypes[c.id]==='work'?'#60a5fa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'16px',fontWeight:700},
                     onClick:function(){
                       var t=selTime||scheduledTime[c.id]||'';
-                      var nst=Object.assign({},scheduledTime);nst[c.id]=t||nst[c.id];
-                      if(att.status==='同伴'||att.status==='当欠'){
-                        var ns=Object.assign({},attStatus);ns[c.id]={status:'未通過',time:''};
-                        saveAll(ns,nst,null);
-                      } else {
-                        saveAll(attStatus,nst,null);
-                      }
+                      var nst=Object.assign({},scheduledTime);if(t)nst[c.id]=t;
+                      var nct=Object.assign({},confirmTypes);
+                      if(confirmTypes[c.id]==='work'){delete nct[c.id];if(nst[c.id]&&!selTime)delete nst[c.id];}
+                      else nct[c.id]='work';
+                      var ns=Object.assign({},attStatus);if(ns[c.id]&&ns[c.id].status==='当欠')ns[c.id]={status:'未通過',time:''};
+                      saveAll(ns,nst,null,nct);
                     }
                   },'○'),
                   // △ボタン（保留）
-                  e('button',{style:{background:isPending?'#fbbf2433':'transparent',border:'2px solid '+(isPending?'#fbbf24':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:isPending?'#fbbf24':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'14px',fontWeight:700},
+                  e('button',{style:{background:confirmTypes[c.id]==='pending'?'#fbbf2433':'transparent',border:'2px solid '+(confirmTypes[c.id]==='pending'?'#fbbf24':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:confirmTypes[c.id]==='pending'?'#fbbf24':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'14px',fontWeight:700},
                     onClick:function(){
-                      setStatus(c.id,isPending?'未通過':'保留','');
+                      var t=selTime||scheduledTime[c.id]||'';
+                      var nst=Object.assign({},scheduledTime);if(t)nst[c.id]=t;
+                      var nct=Object.assign({},confirmTypes);
+                      if(confirmTypes[c.id]==='pending'){delete nct[c.id];if(nst[c.id]&&!selTime)delete nst[c.id];}
+                      else nct[c.id]='pending';
+                      var ns=Object.assign({},attStatus);if(ns[c.id]&&ns[c.id].status==='当欠')ns[c.id]={status:'未通過',time:''};
+                      saveAll(ns,nst,null,nct);
                     }
                   },'△'),
                   // ✕ボタン（当欠）
-                  e('button',{style:{background:confirmStatus==='absent'?'#f8717133':'transparent',border:'2px solid '+(confirmStatus==='absent'?'#f87171':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:confirmStatus==='absent'?'#f87171':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'16px',fontWeight:700},
+                  e('button',{style:{background:confirmTypes[c.id]==='absent'?'#f8717133':'transparent',border:'2px solid '+(confirmTypes[c.id]==='absent'?'#f87171':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:confirmTypes[c.id]==='absent'?'#f87171':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'16px',fontWeight:700},
                     onClick:function(){
-                      var n=new Date();
-                      if(confirmStatus==='absent'){setStatus(c.id,'未通過','');}
-                      else{setStatus(c.id,'当欠',pad(n.getHours())+':'+pad(n.getMinutes()));}
+                      var nct=Object.assign({},confirmTypes);
+                      var nst=Object.assign({},scheduledTime);
+                      if(confirmTypes[c.id]==='absent'){
+                        delete nct[c.id];delete nst[c.id];
+                        var ns=Object.assign({},attStatus);if(ns[c.id])ns[c.id]={status:'未通過',time:''};
+                        saveAll(ns,nst,null,nct);
+                      }else{
+                        nct[c.id]='absent';delete nst[c.id];
+                        var ns2=Object.assign({},attStatus);var n=new Date();ns2[c.id]={status:'当欠',time:pad(n.getHours())+':'+pad(n.getMinutes())};
+                        saveAll(ns2,nst,null,nct);
+                      }
                     }
                   },'✕')
                 ),
