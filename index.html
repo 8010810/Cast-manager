@@ -2907,7 +2907,19 @@ function AttendancePage(p){
         e('div',{style:modalTitle},getCastName(editTarget.castId)+' 時間編集'),
         e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle}),
         e('div',{style:btnRow},
-          e('button',{style:btnOk,onClick:function(){var ns=Object.assign({},attStatus);if(ns[editTarget.castId])ns[editTarget.castId]=Object.assign({},ns[editTarget.castId],{time:editTime});saveAll(ns,null,null);setEditTarget(null);setEditMode(false);}},'保存'),
+          e('button',{style:btnOk,onClick:function(){
+              var castId=editTarget.castId;
+              var ns=Object.assign({},attStatus);
+              if(ns[castId])ns[castId]=Object.assign({},ns[castId],{time:editTime});
+              // 遅刻・当欠を再計算（編集後の時間で）
+              var currentStatus=ns[castId]?ns[castId].status:'未通過';
+              var nad=updateAbsences(castId,currentStatus,editTime,absenceData,confirmTypes);
+              setAbsenceData(nad);saveSettings(timeSetting,nad);
+              setAttStatus(ns);setExtraCasts(extraCasts);
+              if(p.setAttData)p.setAttData({status:ns,scheduledTime:scheduledTime,extraCasts:extraCasts,confirmTypes:confirmTypes});
+              if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:ns,scheduledTime:scheduledTime,extraCasts:extraCasts,confirmTypes:confirmTypes});
+              setEditTarget(null);setEditMode(false);
+            }},'保存'),
           e('button',{style:btnCancel,onClick:function(){setEditTarget(null);}},'キャンセル')
         )
       )
@@ -3224,7 +3236,7 @@ function AttendancePage(p){
           return e('div',{key:item.castId,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'12px',marginBottom:'6px'}},
             e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'6px'}},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},getCastName(item.castId)),e('span',{style:{fontWeight:700,fontSize:'16px',color:'#f87171'}},item[absTab]+'回')),
             e('div',{style:{display:'flex',flexWrap:'wrap',gap:'4px'}},item.dates.filter(function(d){return d.type===absTab;}).map(function(d){return e('div',{key:d.date+d.type,style:{background:'#0d0d1a',borderRadius:'6px',padding:'3px 8px',fontSize:'11px',color:'#9ca3af'}},d.date.slice(5)+(d.time?' '+d.time:''));}))
-          );
+          )
         }))
     )
   );
