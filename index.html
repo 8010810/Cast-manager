@@ -2849,10 +2849,14 @@ function AttendancePage(p){
         list.push({cast:cast,type:'extra',shiftTime:'',isExtra:true,extraStatus:ec.status,extraTime:ec.time});
       }
     });
-    // 出勤予定時間でソート
+    // 同伴→出勤（時間早い順）→保留の順
+    var ORDER2={douhan:0,work:1,pending:2,extra:1};
     list.sort(function(a,b){
-      var ta=scheduledTime[a.cast.id]||'99:99';
-      var tb=scheduledTime[b.cast.id]||'99:99';
+      var oa=ORDER2[a.type]||1;var ob=ORDER2[b.type]||1;
+      if(oa!==ob)return oa-ob;
+      // 同じグループ内は出勤時間でソート
+      var ta=getAtt(a.cast.id).time||'99:99';
+      var tb=getAtt(b.cast.id).time||'99:99';
       return ta.localeCompare(tb);
     });
     return list;
@@ -2940,8 +2944,8 @@ function AttendancePage(p){
 
     // サブナビ
     e('div',{style:{display:'flex',gap:'4px',marginBottom:'16px',background:'#12122a',borderRadius:'10px',padding:'4px'}},
-      ['管理','ボード','当欠・遅刻'].map(function(label,i){
-        var keys=['main','board','absence'];var active=subPage===keys[i];
+      ['出確','管理','ボード','当欠・遅刻'].map(function(label,i){
+        var keys=['confirm','main','board','absence'];var active=subPage===keys[i];
         return e('button',{key:label,style:{flex:1,padding:'8px',borderRadius:'8px',border:'none',background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',cursor:'pointer',fontSize:'12px',fontWeight:active?700:400},onClick:function(){setSubPage(keys[i]);}},label);
       })
     ),
@@ -2963,9 +2967,7 @@ function AttendancePage(p){
           e('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'8px'}},
             e('span',{style:{fontSize:'10px',color:lblColor,fontWeight:700,minWidth:'24px'}},lbl),
             e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:isGrayed?'#4b5563':'#f3f4f6'}},c.name),
-            // 出勤予定時間入力
-            e('input',{type:'time',value:sched,onChange:function(ev){setScheduled(c.id,ev.target.value);},
-              style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#9ca3af',padding:'3px 6px',fontSize:'12px',width:'90px'}}),
+            // 出勤時間表示のみ
             att.time&&e('span',{style:{fontSize:'11px',color:'#6b7280',minWidth:'40px',textAlign:'right'}},att.time)
           ),
           // ステータスボタン行
@@ -2984,6 +2986,62 @@ function AttendancePage(p){
     ),
 
     // ── ボードタブ ──
+    subPage==='confirm'&&(function(){
+      // 今日のシフト（同伴・出勤・保留）をフォルダ別に表示
+      var folders=p.data.folders||[];
+      var shifts=p.data.shifts||{};
+      var todayAllCasts=todayCasts.douhan.concat(todayCasts.work).concat(todayCasts.pending);
+      // 出確ステータス: confirmStatus {castId: {time:'HH:MM', confirmed:true/false}}
+      return e('div',null,
+        todayAllCasts.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'今日のシフトに登録されているキャストがいません'),
+        folders.map(function(folder){
+          var folderCasts=todayAllCasts.filter(function(item){
+            return(folder.castIds||[]).includes(item.cast.id);
+          });
+          if(folderCasts.length===0)return null;
+          return e('div',{key:folder.id,style:{marginBottom:'16px'}},
+            e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px',padding:'6px 0',marginBottom:'6px',borderBottom:'1px solid #e8b86d33'}},folder.name),
+            folderCasts.map(function(item){
+              var c=item.cast;
+              var att=getAtt(c.id);
+              var lbl={douhan:'同伴',work:'出勤',pending:'保留'}[item.type]||'';
+              var lblColor={douhan:'#a78bfa',work:'#60a5fa',pending:'#fbbf24'}[item.type]||'#6b7280';
+              var isDone=att.status!=='未通過';
+              return e('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:'8px',padding:'8px 10px',background:'#12122a',borderRadius:'8px',marginBottom:'4px',opacity:isDone?0.5:1}},
+                e('span',{style:{fontSize:'10px',color:lblColor,fontWeight:700,minWidth:'24px'}},lbl),
+                e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:isDone?'#4b5563':'#f3f4f6'}},c.name),
+                att.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af',minWidth:'40px'}},att.time),
+                // 時間入力（コンパクト）
+                e('input',{type:'time',
+                  style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#9ca3af',padding:'3px 6px',fontSize:'12px',width:'86px'},
+                  onChange:function(ev){setScheduled(c.id,ev.target.value);},
+                  value:scheduledTime[c.id]||'',
+                  placeholder:'--:--'
+                }),
+                // ○ボタン（出勤確定）
+                e('button',{
+                  style:{background:att.status==='出勤'?'#60a5fa22':'transparent',border:'2px solid '+(att.status==='出勤'?'#60a5fa':'#374151'),borderRadius:'50%',width:'32px',height:'32px',color:att.status==='出勤'?'#60a5fa':'#6b7280',cursor:'pointer',fontSize:'14px',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0},
+                  onClick:function(){
+                    var t=scheduledTime[c.id]||'';
+                    if(!t){var n=new Date();t=pad(n.getHours())+':'+pad(n.getMinutes());}
+                    setStatus(c.id,item.type==='douhan'?'同伴':'出勤',t);
+                  }
+                },e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:3,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'20 6 9 17 4 12'}))),
+                // ✕ボタン（当欠）
+                e('button',{
+                  style:{background:att.status==='当欠'?'#f8717122':'transparent',border:'2px solid '+(att.status==='当欠'?'#f87171':'#374151'),borderRadius:'50%',width:'32px',height:'32px',color:att.status==='当欠'?'#f87171':'#6b7280',cursor:'pointer',fontSize:'14px',fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0},
+                  onClick:function(){
+                    var n=new Date();
+                    setStatus(c.id,'当欠',pad(n.getHours())+':'+pad(n.getMinutes()));
+                  }
+                },e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:3,strokeLinecap:'round',strokeLinejoin:'round'},e('line',{x1:18,y1:6,x2:6,y2:18}),e('line',{x1:6,y1:6,x2:18,y2:18})))
+              );
+            })
+          );
+        })
+      );
+    })(),
+
     subPage==='board'&&e('div',null,
       e('div',{style:{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:'16px'}},
         e('div',{style:{display:'flex',gap:'8px'}},
