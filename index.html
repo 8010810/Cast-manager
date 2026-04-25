@@ -11,7 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/recharts/2.9.0/Recharts.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
-var firebaseConfig={apiKey:"AIzaSyBGxD2CQ-N-0mZYRZbkC5yVsDA4DdGKqeA",authDomain:"cast-manager-b0ae2.firebaseapp.com",projectId:"cast-manager-b0ae2",storageBucket:"cast-manager-b0ae2.firebasestorage.app",messagingSenderId:"111946332168",appId:"1:111946332168:web:a2cfc1de3cf519a46439bd"};
+var firebaseConfig={apiKey:"AIzaSyBGxD2CQ-N-0mZYRZbkC5yVsDA4DdGKqeA",authDomain:"cast-manager-b0ae2.firebaseapp.com",projectId:"cast-manager-b0ae2",storageBucket:"cast-manager-b0ae2.firebasestorage.app",messagingSenderId:"11194632168",appId:"1:111946332168:web:a2cfc1de3cf519a46439bd"};
 firebase.initializeApp(firebaseConfig);var auth=firebase.auth();var db=firebase.firestore();
 function signInWithGoogle(){var provider=new firebase.auth.GoogleAuthProvider();return auth.signInWithPopup(provider);}
 function fbSignOut(){return auth.signOut();}
@@ -32,7 +32,7 @@ var HAS_CHARTS=!!(ComposedChart&&ResponsiveContainer);
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 var pad=function(n){return String(n).padStart(2,'0');};
-var todayStr=function(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+var todayStr=function(){var d=new Date();if(d.getHours()<3)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
 var yen=function(n){return n==null?'--':'¥'+Number(n).toLocaleString();};
 var fmtDate=function(s){if(!s)return'';var p=s.split('-');return p[0]+'/'+p[1]+'/'+p[2];};
 var uid=function(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);};
@@ -1237,7 +1237,7 @@ var SHIFT_STATUSES=[
 ];
 
 function ShiftPage(p){
-  var now=new Date();
+  var now=new Date();if(now.getHours()<3)now.setDate(now.getDate()-1);
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
   var s2=useState('week');var viewMode=s2[0];var setViewMode=s2[1];
   var s3=useState('');var query=s3[0];var setQuery=s3[1];
@@ -1923,7 +1923,7 @@ function AIPage(p){
 
 // ─── 来店予定ページ ────────────────────────────────────────────────────────────
 function VisitPage(p){
-  var now=new Date();
+  var now=new Date();if(now.getHours()<3)now.setDate(now.getDate()-1);
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
   var s2=useState(null);var selectedDate=s2[0];var setSelectedDate=s2[1];
   var s3=useState(false);var showForm=s3[0];var setShowForm=s3[1];
@@ -2624,7 +2624,8 @@ function AttendancePage(p){
   var useEffect=React.useEffect;
   var useMemo=React.useMemo;
   var now=new Date();
-  var todayStr=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+  var adjNow=new Date(now);if(adjNow.getHours()<3)adjNow.setDate(adjNow.getDate()-1);
+  var todayStr=adjNow.getFullYear()+'-'+pad(adjNow.getMonth()+1)+'-'+pad(adjNow.getDate());
 
   var s0=useState('main');var subPage=s0[0];var setSubPage=s0[1];
   var s1=useState({});var attStatus=s1[0];var setAttStatus=s1[1];
