@@ -1018,8 +1018,15 @@ function CastListPage(p){
       if(shouldAdd)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});
       return f;
     });
-    p.persist({...p.data,casts:[...p.data.casts,newCast],records:{...p.data.records,[id]:[]},customers:{...p.data.customers,[id]:[]},folders:newFolders});
-    setNewName('');setNewFolder('');setNewShift('');setAddForm({});setShowAdd(false);p.notify(name+' を追加しました');
+    var finalFolders=newFolders;
+    var finalCast=newCast;
+    if(isDispatch&&!dispatchFolder){
+      var dfId='dispatch_'+Date.now().toString();
+      finalCast=Object.assign({},newCast,{folderHistory:[{folderId:dfId,from:initMK}]});
+      finalFolders=[...newFolders,{id:dfId,name:'派遣',castIds:[id]}];
+    }
+    p.persist({...p.data,casts:[...p.data.casts,finalCast],records:{...p.data.records,[id]:[]},customers:{...p.data.customers,[id]:[]},folders:finalFolders});
+    setNewName('');setNewFolder('');setNewShift('');setAddForm({});setShowAdd(false);setAddType(null);p.notify(finalName+' を追加しました');
   }
 
   function saveEdit(id){
