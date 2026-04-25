@@ -2448,6 +2448,7 @@ function App(){
   var s_of=useState(null);var appOpenFolder=s_of[0];var setAppOpenFolder=s_of[1];
   var s_air=useState('');var globalAIResult=s_air[0];var setGlobalAIResult=s_air[1];
   var s_ail=useState(false);var globalAILoading=s_ail[0];var setGlobalAILoading=s_ail[1];
+  var s_att=useState({status:{},scheduledTime:{},extraCasts:[]});var attData=s_att[0];var setAttData=s_att[1];
 
   var layer=navStack[navStack.length-1]||'home';
 
@@ -2584,7 +2585,7 @@ function App(){
       layer==='sales'&&e(SalesPage,{data:data,persist:persist,notify:notify,onOpenCast:openCast}),
       layer==='castlist'&&e(CastListPage,{data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
       layer==='shift'&&e(ShiftPage,{data:data,persist:persist,notify:notify}),
-      layer==='attendance'&&e(AttendancePage,{data:data,persist:persist,notify:notify,uid:user?user.uid:''}),
+      layer==='attendance'&&e(AttendancePage,{data:data,persist:persist,notify:notify,uid:user?user.uid:'',attData:attData,setAttData:setAttData}),
       layer==='visit'&&e(VisitPage,{data:data,persist:persist,notify:notify}),
       isCastLayer&&selectedCast&&e(Fragment,null,
         castPage==='input'&&e(InputPage,{castId:selectedCast,data:data,persist:persist,notify:notify}),
@@ -2628,9 +2629,9 @@ function AttendancePage(p){
   var todayStr=adjNow.getFullYear()+'-'+pad(adjNow.getMonth()+1)+'-'+pad(adjNow.getDate());
 
   var s0=useState('main');var subPage=s0[0];var setSubPage=s0[1];
-  var s1=useState({});var attStatus=s1[0];var setAttStatus=s1[1];
+  var s1=useState(p.attData?p.attData.status:{});var attStatus=s1[0];var setAttStatus=s1[1];
   // scheduledTime: {castId: 'HH:MM'} 出勤予定時間
-  var s1b=useState({});var scheduledTime=s1b[0];var setScheduledTime=s1b[1];
+  var s1b=useState(p.attData?p.attData.scheduledTime:{});var scheduledTime=s1b[0];var setScheduledTime=s1b[1];
   var s2=useState({startHour:20,interval:30});var timeSetting=s2[0];var setTimeSetting=s2[1];
   var s3=useState(false);var showTimeSetting=s3[0];var setShowTimeSetting=s3[1];
   var s5=useState(false);var editMode=s5[0];var setEditMode=s5[1];
@@ -2650,7 +2651,7 @@ function AttendancePage(p){
   var s16=useState(String(20));var settingHour=s16[0];var setSettingHour=s16[1];
   var s17=useState(String(30));var settingIntv=s17[0];var setSettingIntv=s17[1];
   // 追加出勤キャスト（シフト外）
-  var s18=useState([]);var extraCasts=s18[0];var setExtraCasts=s18[1];
+  var s18=useState(p.attData?p.attData.extraCasts:[]);var extraCasts=s18[0];var setExtraCasts=s18[1];
 
   useEffect(function(){
     if(!p.uid)return;
@@ -2670,6 +2671,7 @@ function AttendancePage(p){
   function saveAll(ns,nst,nec){
     var status=ns||attStatus;var schTime=nst||scheduledTime;var ec=nec||extraCasts;
     setAttStatus(status);setScheduledTime(schTime);setExtraCasts(ec);
+    if(p.setAttData)p.setAttData({status:status,scheduledTime:schTime,extraCasts:ec});
     if(!p.uid)return;
     db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec});
   }
@@ -2738,12 +2740,14 @@ function AttendancePage(p){
 
   function getSlots(){
     var slots=[];var startMin=timeSetting.startHour*60;
-    // 翌3時まで（180分=3時間）をカバー
-    var maxMin=startMin+27*60; // 最大27スロット分
+    // 00:30まで（翌日の30分=1470分相当）
+    var endMin=startMin+timeSetting.interval; // デフォルト終端
+    // 00:30 = 0*60+30 = 30, 深夜扱いで1440+30=1470
+    var stopMin=1440+30; // 00:30の絶対値
     for(var i=0;i<48;i++){
       var sm=startMin+i*timeSetting.interval;
-      if(sm>=maxMin)break;
-      var dispMin=sm%1440; // 24時間内に正規化（表示用）
+      if(sm>stopMin)break;
+      var dispMin=sm%1440;
       slots.push({label:pad(Math.floor(dispMin/60)%24)+':'+pad(dispMin%60),startMin:sm,endMin:sm+timeSetting.interval});
     }
     return slots;
@@ -3002,11 +3006,11 @@ function AttendancePage(p){
           var timeLabel=scheduledTime[c.id]||att.time||'';
           return e('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:'6px',padding:'7px 10px',background:'#12122a',borderRadius:'8px',marginBottom:'4px'}},
             e('span',{style:{fontWeight:700,fontSize:'13px',color:'#f3f4f6',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.name),
-            ['未通過','通過','出勤','同伴'].map(function(st){
+            ['未通過','通過','出勤','同伴','当欠'].map(function(st){
               var col=attColors[st];var isActive=att.status===st;
               return e('button',{key:st,style:{padding:'3px 6px',borderRadius:'5px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'10px',fontWeight:isActive?700:400,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0},
                 onClick:function(){
-                  if(st==='出勤'||st==='同伴'||st==='当欠'){var n=new Date();setTimeModal({castId:c.id,status:st,statusLabel:st,castName:c.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
+                  if(st==='出勤'||st==='同伴'){var n=new Date();setTimeModal({castId:c.id,status:st,statusLabel:st,castName:c.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
                   else setStatus(c.id,st,'');
                 }},st);
             })
@@ -3040,7 +3044,7 @@ function AttendancePage(p){
             })()
           ),
           pendingList.length>0&&e('div',null,e('div',{style:secStyle2},'保留 ('+pendingList.length+')'),pendingList.map(renderCastRow)),
-          absentList.length>0&&e('div',null,e('div',{style:Object.assign({},secStyle2,{color:'#f87171',borderBottomColor:'#f8717133'})},'当欠 ('+absentList.length+')'),absentList.map(renderCastRow))
+          
         );
       })()
     ),
@@ -3093,7 +3097,6 @@ function AttendancePage(p){
                   // 目印（同伴/出勤/保留）
                   e('span',{style:{background:lblColor+'22',color:lblColor,border:'1px solid '+lblColor+'66',borderRadius:'6px',padding:'2px 7px',fontSize:'11px',fontWeight:700,flexShrink:0}},lbl),
                   e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:confirmStatus==='absent'||isPending?'#4b5563':'#f3f4f6'}},c.name),
-                  selTime&&e('span',{style:{fontSize:'12px',color:'#60a5fa',fontWeight:700}},selTime),
                   // 同ボタン（同伴）
                   e('button',{style:{background:att.status==='同伴'?'#a78bfa33':'transparent',border:'2px solid '+(att.status==='同伴'?'#a78bfa':'#374151'),borderRadius:'50%',width:'30px',height:'30px',color:att.status==='同伴'?'#a78bfa':'#6b7280',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:'11px',fontWeight:700},
                     onClick:function(){
