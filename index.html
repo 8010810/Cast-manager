@@ -2921,7 +2921,7 @@ function AttendancePage(p){
         ),
         addCast&&e('div',{style:{color:'#34d399',fontSize:'12px',marginBottom:'12px'}},'選択: '+addCast.name),
         e('div',{style:{display:'flex',gap:'8px',marginBottom:'12px'}},
-          ['出勤','同伴'].map(function(st){
+          ['出勤','同伴','保留'].map(function(st){
             var col=attColors[st];var active=addStatus===st;
             return e('button',{key:st,style:{flex:1,background:active?col.bg:'transparent',color:active?col.color:'#6b7280',border:'1px solid '+(active?col.border:'#374151'),borderRadius:'8px',padding:'8px',cursor:'pointer',fontWeight:700},onClick:function(){setAddStatus(st);}},st);
           })
@@ -2932,8 +2932,8 @@ function AttendancePage(p){
             (function(){
               var slots=getSlots();
               // 00:00と00:30を先頭に追加
-              var extraSlots=[{label:'00:00'},{label:'00:30'}];
-              return extraSlots.concat(slots).map(function(slot){
+              var tailSlots=[{label:'00:00'},{label:'00:30'}];
+              return slots.concat(tailSlots).map(function(slot){
                 var isSelected=addTime===slot.label;
                 return e('button',{key:slot.label,style:{padding:'5px 10px',borderRadius:'6px',border:'1px solid '+(isSelected?'#e8b86d':'#2d2d4e'),background:isSelected?'#e8b86d22':'#0d0d1a',color:isSelected?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer',fontWeight:isSelected?700:400},
                   onClick:function(){setAddTime(slot.label);}},slot.label);
@@ -2991,26 +2991,46 @@ function AttendancePage(p){
         var secStyle2={color:'#e8b86d',fontWeight:700,fontSize:'12px',padding:'4px 0',marginTop:'10px',marginBottom:'4px',borderBottom:'1px solid #e8b86d33'};
         function renderCastRow(item){
           var c=item.cast;var att=getAtt(c.id);
-          return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'10px 12px',marginBottom:'6px'}},
-            e('div',{style:{display:'flex',alignItems:'center',gap:'6px',marginBottom:'8px'}},
-              e('span',{style:{flex:1,fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},c.name),
-              e('span',{style:{fontSize:'12px',color:'#9ca3af'}},(scheduledTime[c.id]||att.time||''))
-            ),
-            e('div',{style:{display:'flex',gap:'4px',flexWrap:'wrap'}},
-              ['未通過','通過','出勤','同伴','当欠'].map(function(st){
-                var col=attColors[st];var isActive=att.status===st;
-                return e('button',{key:st,style:{padding:'4px 8px',borderRadius:'6px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'11px',fontWeight:isActive?700:400,cursor:'pointer'},
-                  onClick:function(){
-                    if(st==='出勤'||st==='同伴'||st==='当欠'){var n=new Date();setTimeModal({castId:c.id,status:st,statusLabel:st,castName:c.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
-                    else setStatus(c.id,st,'');
-                  }},st);
-              })
-            )
+          var timeLabel=scheduledTime[c.id]||att.time||'';
+          return e('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:'6px',padding:'7px 10px',background:'#12122a',borderRadius:'8px',marginBottom:'4px'}},
+            e('span',{style:{fontWeight:700,fontSize:'13px',color:'#f3f4f6',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.name),
+            ['未通過','通過','出勤','同伴','当欠'].map(function(st){
+              var col=attColors[st];var isActive=att.status===st;
+              return e('button',{key:st,style:{padding:'3px 6px',borderRadius:'5px',border:'1px solid '+(isActive?col.border:'#374151'),background:isActive?col.bg:'transparent',color:isActive?col.color:'#6b7280',fontSize:'10px',fontWeight:isActive?700:400,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0},
+                onClick:function(){
+                  if(st==='出勤'||st==='同伴'||st==='当欠'){var n=new Date();setTimeModal({castId:c.id,status:st,statusLabel:st,castName:c.name,defaultTime:pad(n.getHours())+':'+pad(n.getMinutes())});}
+                  else setStatus(c.id,st,'');
+                }},st);
+            })
           );
         }
         return e('div',null,
           douhanList.length>0&&e('div',null,e('div',{style:secStyle2},'同伴 ('+douhanList.length+')'),douhanList.map(renderCastRow)),
-          workList.length>0&&e('div',null,e('div',{style:secStyle2},'出勤予定 ('+workList.length+')'),workList.map(renderCastRow)),
+          workList.length>0&&e('div',null,
+            e('div',{style:secStyle2},'出勤予定 ('+workList.length+')'),
+            (function(){
+              // 時間でグルーピングして見出し表示
+              var timeGroups={};var timeOrder=[];
+              workList.forEach(function(item){
+                var t=scheduledTime[item.cast.id]||'--:--';
+                if(!timeGroups[t]){timeGroups[t]=[];timeOrder.push(t);}
+                timeGroups[t].push(item);
+              });
+              // 00:00/00:30を末尾に
+              timeOrder.sort(function(a,b){
+                var aa=a==='--:--'?'99:99':a;var bb=b==='--:--'?'99:99':b;
+                var ai=parseInt(aa.replace(':',''));var bi=parseInt(bb.replace(':',''));
+                if(ai<300)ai+=2400;if(bi<300)bi+=2400;
+                return ai-bi;
+              });
+              return e('div',null,timeOrder.map(function(t){
+                return e('div',{key:t},
+                  e('div',{style:{color:'#4b5563',fontSize:'11px',fontWeight:700,padding:'4px 0 2px',marginTop:'6px',borderBottom:'1px solid #1e2035'}},t),
+                  timeGroups[t].map(renderCastRow)
+                );
+              }));
+            })()
+          ),
           pendingList.length>0&&e('div',null,e('div',{style:secStyle2},'保留 ('+pendingList.length+')'),pendingList.map(renderCastRow)),
           absentList.length>0&&e('div',null,e('div',{style:Object.assign({},secStyle2,{color:'#f87171',borderBottomColor:'#f8717133'})},'当欠 ('+absentList.length+')'),absentList.map(renderCastRow))
         );
