@@ -2502,7 +2502,38 @@ function App(){
         setData(null);setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});setLoading(false);
       }
     });
-    return function(){unsubAuth();if(unsubMain)unsubMain();if(unsubAtt)unsubAtt();};
+    // iOS Safari対策: 画面表示復帰時に再接続
+    function handleVisibility(){
+      if(document.visibilityState==='visible'){
+        var cu=auth.currentUser;
+        if(!cu)return;
+        // メインデータを再取得
+        if(unsubMain){unsubMain();}
+        unsubMain=db.collection('users').doc(cu.uid).collection('data').doc('main').onSnapshot(function(doc){
+          if(doc.exists){
+            var d=doc.data();
+            var nd={casts:d.casts||[],records:d.records||{},customers:d.customers||{},folders:d.folders||[],shifts:d.shifts||{},visits:d.visits||[],quota:d.quota||{}};
+            if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+            setData(nd);
+          }
+          setLoading(false);
+        },function(){});
+        // 勤怠データを再取得
+        if(unsubAtt){unsubAtt();}
+        var now3=new Date();if(now3.getHours()<3)now3.setDate(now3.getDate()-1);
+        var ts2=now3.getFullYear()+'-'+pad(now3.getMonth()+1)+'-'+pad(now3.getDate());
+        unsubAtt=db.collection('users').doc(cu.uid).collection('attendance').doc(ts2).onSnapshot(function(doc){
+          if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+        },function(){});
+      }
+    }
+    document.addEventListener('visibilitychange',handleVisibility);
+    return function(){
+      unsubAuth();
+      if(unsubMain)unsubMain();
+      if(unsubAtt)unsubAtt();
+      document.removeEventListener('visibilitychange',handleVisibility);
+    };
   },[]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
