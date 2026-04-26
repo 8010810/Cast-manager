@@ -2491,13 +2491,14 @@ function App(){
             setData(nd);
           }
           setLoading(false);
-        },function(){setLoading(false);});
+        },function(err){console.error('Main snapshot error:',err);setLoading(false);});
         // 勤怠データをリアルタイム同期
         var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
         var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
         unsubAtt=db.collection('users').doc(u.uid).collection('attendance').doc(ts).onSnapshot(function(doc){
           if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-        },function(){});
+          else{console.log('Att doc not found:',ts);}
+        },function(err){console.error('Att snapshot error:',err);});
       }else{
         setData(null);setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});setLoading(false);
       }
