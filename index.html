@@ -756,6 +756,7 @@ function SalesPage(p){
   }
 
   // サブナビ
+  var pageTitle=e('div',{style:S.pageTitle},e('h1',{style:S.h1},'売上管理'));
   var subNav=e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}},
     (function(){
       var ni={
@@ -771,7 +772,7 @@ function SalesPage(p){
 
   // ── 売上進捗ページ ──
   if(subPage==='top') return e('div',null,
-    subNav,
+    pageTitle,subNav,
     e('div',{style:{background:'linear-gradient(135deg,#1a1a3e,#12122a)',border:'1px solid #2d2d4e',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
       e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},(now.getMonth()+1)+'月 売上進捗'),
       e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px',marginBottom:totalTargetNow>0?'12px':'0'}},
@@ -850,7 +851,7 @@ function SalesPage(p){
 
   // ── 月別目標ページ ──
   if(subPage==='target') return e('div',null,
-    subNav,
+    pageTitle,subNav,
     e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px',marginBottom:'16px'}},
       e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}},
         e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('circle',{cx:12,cy:12,r:10}),e('circle',{cx:12,cy:12,r:6}),e('circle',{cx:12,cy:12,r:2})),
@@ -2475,17 +2476,35 @@ function App(){
   }
 
     useEffect(function(){
-    var unsubAtt=null;
+    var unsubMain=null;var unsubAtt=null;
     var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);
+      if(unsubMain){unsubMain();unsubMain=null;}
       if(unsubAtt){unsubAtt();unsubAtt=null;}
       if(u){
         setLoading(true);
-        loadFromDB(u.uid).then(function(d){
-          var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-          if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-          setData(nd);setLoading(false);
-        }).catch(function(){setLoading(false);});
+        // メインデータをリアルタイム同期（初回はsetLoading(false)を呼ぶ）
+        var mainRef=db.collection('users').doc(u.uid).collection('data').doc('main');
+        var firstLoad=true;
+        unsubMain=mainRef.onSnapshot(function(doc){
+          if(doc.exists){
+            var d=doc.data();
+            var nd={casts:d.casts||[],records:d.records||{},customers:d.customers||{},folders:d.folders||[],shifts:d.shifts||{},visits:d.visits||[],quota:d.quota||{}};
+            if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+            setData(nd);
+          }else{
+            setData({casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}});
+          }
+          if(firstLoad){firstLoad=false;setLoading(false);}
+        },function(err){
+          // エラー時はget()でフォールバック
+          loadFromDB(u.uid).then(function(d){
+            var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+            if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+            setData(nd);
+          }).catch(function(){});
+          setLoading(false);
+        });
         // 勤怠データをリアルタイム同期
         var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
         var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
@@ -2496,17 +2515,7 @@ function App(){
         setData(null);setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});setLoading(false);
       }
     });
-    function handleVisibility(){
-      if(document.visibilityState!=='visible')return;
-      var cu=auth.currentUser;if(!cu)return;
-      loadFromDB(cu.uid).then(function(d){
-        var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-        if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-        setData(nd);
-      }).catch(function(){});
-    }
-    document.addEventListener('visibilitychange',handleVisibility);
-    return function(){unsubAuth();if(unsubAtt)unsubAtt();document.removeEventListener('visibilitychange',handleVisibility);};
+    return function(){unsubAuth();if(unsubMain)unsubMain();if(unsubAtt)unsubAtt();};
   },[]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
@@ -2913,6 +2922,7 @@ function AttendancePage(p){
   },[todayCasts,extraCasts,scheduledTime,p.data.casts]);
 
   return e('div',{style:{paddingBottom:'80px'}},
+    e('div',{style:S.pageTitle},e('h1',{style:S.h1},'勤怠管理')),
 
     // 時間入力モーダル
     timeModal&&e('div',{style:modalBg},
