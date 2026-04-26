@@ -2726,15 +2726,16 @@ function AttendancePage(p){
     if(!nad[todayStr])nad[todayStr]={absences:[]};
     var absences=nad[todayStr].absences.filter(function(a){return a.castId!==castId;});
 
-    // 当欠: ボードの当欠欄に入っているキャスト かつ 元々保留(pending)でない
+    // 当欠判定
     if(status==='当欠'){
       var shiftType=null;
       (manageCasts||[]).forEach(function(item){if(item.cast.id===castId)shiftType=item.type;});
-      // boardDataのabsentに含まれているかで判定
-      var inBoardAbsent=boardData&&boardData.absent&&boardData.absent.some(function(x){return x.cast.id===castId;});
-      // boardDataがまだ計算されていない場合(初回)はstatus基準で判定
-      var isAbsent=inBoardAbsent!==undefined?inBoardAbsent:(status==='当欠');
-      if(isAbsent&&shiftType!=='pending'){
+      // 出確で○または同を押した = confirmTypesがwork/douhan
+      var ct=currentConfirmTypes&&currentConfirmTypes[castId];
+      var wasConfirmed=ct==='work'||ct==='douhan';
+      // 除外: 元々保留(pending) かつ 出確で○/同を押していない場合のみ
+      var exclude=shiftType==='pending'&&!wasConfirmed;
+      if(!exclude){
         absences.push({castId:castId,type:'当欠',time:time||''});
       }
     }
