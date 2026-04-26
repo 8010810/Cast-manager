@@ -2699,6 +2699,14 @@ function AttendancePage(p){
       .then(function(doc){if(doc.exists){var d=doc.data();var s=d.status||{};var st=d.scheduledTime||{};var ec=d.extraCasts||[];var ct=d.confirmTypes||{};setAttStatus(s);setScheduledTime(st);setExtraCasts(ec);setConfirmTypes(ct);if(p.setAttData)p.setAttData({status:s,scheduledTime:st,extraCasts:ec,confirmTypes:ct});}}).catch(function(){});
   },[p.uid]);
 
+  // p.attDataが外から更新された時にローカルstateを同期
+  useEffect(function(){
+    if(!p.attData)return;
+    setAttStatus(p.attData.status||{});
+    setScheduledTime(p.attData.scheduledTime||{});
+    setExtraCasts(p.attData.extraCasts||[]);
+    setConfirmTypes(p.attData.confirmTypes||{});
+  },[p.attData]);
   useEffect(function(){if(timeModal)setModalTime(timeModal.defaultTime||'');},[timeModal]);
   useEffect(function(){if(editTarget)setEditTime(editTarget.time||'');},[editTarget]);
 
