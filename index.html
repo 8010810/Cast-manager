@@ -2506,22 +2506,20 @@ function App(){
 
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
-  function refreshData(){
+  function refreshData(showToast){
     if(!user)return;
-    // メインデータ更新
     loadFromDB(user.uid).then(function(d){
       var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
       if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
       setData(nd);
     }).catch(function(){});
-    // 勤怠データ更新
     var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
     var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
     db.collection('users').doc(user.uid).collection('attendance').doc(ts).get()
       .then(function(doc){
         if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
       }).catch(function(){});
-    notify('更新しました','success');
+    if(showToast)notify('更新しました','success');
   }
   function persist(next){setData(next);if(user)saveToDB(user.uid,next);}
   function openCast(id,backFn){
@@ -2617,12 +2615,12 @@ function App(){
     // メインコンテンツ
     e('main',{style:S.main},
       isHomeLayer&&e(HomeScreen,{data:data,onNavigate:navigate}),
-      layer==='mycast'&&e(MyCastPage,{onRefresh:refreshData,data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
-      layer==='sales'&&e(SalesPage,{onRefresh:refreshData,data:data,persist:persist,notify:notify,onOpenCast:openCast}),
-      layer==='castlist'&&e(CastListPage,{onRefresh:refreshData,data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
-      layer==='shift'&&e(ShiftPage,{onRefresh:refreshData,data:data,persist:persist,notify:notify}),
-      layer==='attendance'&&e(AttendancePage,{onRefresh:refreshData,data:data,persist:persist,notify:notify,uid:user?user.uid:'',attData:attData,setAttData:setAttData}),
-      layer==='visit'&&e(VisitPage,{onRefresh:refreshData,data:data,persist:persist,notify:notify}),
+      layer==='mycast'&&e(MyCastPage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
+      layer==='sales'&&e(SalesPage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
+      layer==='castlist'&&e(CastListPage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
+      layer==='shift'&&e(ShiftPage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
+      layer==='attendance'&&e(AttendancePage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',attData:attData,setAttData:setAttData}),
+      layer==='visit'&&e(VisitPage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
       isCastLayer&&selectedCast&&e(Fragment,null,
         castPage==='input'&&e(InputPage,{castId:selectedCast,data:data,persist:persist,notify:notify}),
         castPage==='chart'&&e(ChartPage,{castId:selectedCast,data:data}),
@@ -2829,11 +2827,16 @@ function AttendancePage(p){
         var tMin=tm?parseInt(tm.split(':')[0])*60+parseInt(tm.split(':')[1]):null;
         if(tMin!=null&&tMin<timeSetting.startHour*60)tMin+=1440;
         var slot=null;
-        // 切り上げ: 19:31〜20:00 → 20:00スロット、20:01〜20:30 → 20:30スロット
-        // つまりstartMin < tMin <= endMin のスロットに入れる（endMinのスロット）
-        if(tMin!=null)for(var i=0;i<slots.length;i++){
-          if(tMin>slots[i].startMin&&tMin<=slots[i].endMin){slot=slots[i];break;}
-          if(tMin===slots[i].startMin){slot=slots[i];break;} // ちょうどはそのスロット
+        // 切り上げ: 19:58 → 20:00スロット（intervalで切り上げ）
+        if(tMin!=null){
+          var intv=timeSetting.interval||30;
+          var startBase=timeSetting.startHour*60;
+          // startBaseからの経過分を切り上げ
+          var elapsed=tMin-startBase;
+          var ceilSlotIdx=Math.ceil(elapsed/intv); // 何番目のスロットか（0始まり）
+          if(elapsed<=0)ceilSlotIdx=0;
+          if(ceilSlotIdx<slots.length)slot=slots[ceilSlotIdx];
+          else slot=slots[slots.length-1];
         }
         if(!slot&&slots.length>0)slot=slots[slots.length-1];
         var sl=slot?slot.label:'--:--';
