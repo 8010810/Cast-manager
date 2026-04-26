@@ -22,6 +22,30 @@ function saveToDB(uid,data){return db.collection('users').doc(uid).collection('d
 // CAST MANAGER - 全面リニューアル版
 // ═══════════════════════════════════════════════════════════════════════════
 (function(){
+// グローバルアニメーション定義
+(function injectStyles(){
+  var style=document.createElement('style');
+  style.textContent=[
+    '@keyframes fadeSlideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}',
+    '@keyframes fadeIn{from{opacity:0}to{opacity:1}}',
+    '@keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}',
+    '@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}',
+    '@keyframes slideInRight{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}',
+    '@keyframes slideInLeft{from{opacity:0;transform:translateX(-24px)}to{opacity:1;transform:translateX(0)}}',
+    '@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}',
+    '@keyframes toastIn{from{opacity:0;transform:translateY(-20px) scale(0.95)}to{opacity:1;transform:translateY(0) scale(1)}}',
+    '@keyframes toastOut{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-20px) scale(0.95)}}',
+    '* {-webkit-tap-highlight-color:transparent;}',
+    'button{transition:transform 0.12s cubic-bezier(0.25,0.46,0.45,0.94),opacity 0.12s,background 0.18s,border-color 0.18s,box-shadow 0.18s;}',
+    'button:active{transform:scale(0.93)!important;}',
+    '.page-enter{animation:fadeSlideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both;}',
+    '.modal-enter{animation:scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both;}',
+    '.card-hover{transition:transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.2s;}',
+    '.card-hover:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.4);}',
+    '.list-item{animation:fadeSlideUp 0.3s cubic-bezier(0.25,0.46,0.45,0.94) both;}',
+  ].join('');
+  document.head.appendChild(style);
+})();
 var useState=React.useState,useEffect=React.useEffect,useMemo=React.useMemo,useCallback=React.useCallback;
 var e=React.createElement,Fragment=React.Fragment;
 var _RC=window.Recharts||{};
@@ -131,7 +155,7 @@ var S={
   h1:{fontSize:'20px',fontWeight:700,color:'#f3f4f6',margin:0},
   h2:{fontSize:'17px',fontWeight:700,color:'#f3f4f6',margin:'0 0 16px'},
   // ホーム画面カード
-  homeCard:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'24px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px',minHeight:'120px',transition:'border-color 0.2s'},
+  homeCard:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'24px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',transition:'transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.2s,border-color 0.2s',gap:'12px',minHeight:'120px',transition:'border-color 0.2s'},
 };
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
@@ -273,7 +297,7 @@ function HomeScreen(p){
     // ページナビゲーション
     e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'12px'}},
       pages.map(function(pg){
-        return e('div',{key:pg.key,style:S.homeCard,onClick:function(){p.onNavigate(pg.key);}},
+        return e('div',{key:pg.key,className:'card-hover',style:Object.assign({},S.homeCard,{animation:'fadeSlideUp 0.4s cubic-bezier(0.25,0.46,0.45,0.94) both',animationDelay:(pages.indexOf(pg)*0.06)+'s'}),onClick:function(){p.onNavigate(pg.key);}},
           e('div',{style:{display:'flex',alignItems:'center',justifyContent:'center'}},pageIcons[pg.key]),
           e('div',{style:{textAlign:'center'}},
             e('div',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'15px'}},pg.label),
@@ -587,7 +611,7 @@ function MyCastPage(p){
     return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:p.data,onOpenCast:p.onOpenCast,notify:p.notify,uid:p.uid,onSetSubBack:p.onSetSubBack,onRestoreFolder:function(){setOpenFolder(openFolder);}});
   }
 
-  return e('div',null,
+  return e('div',{className:'page-enter'},
     e('div',{style:S.pageTitle},
       e('h1',{style:S.h1},'MG実績'),
       e('div',{style:{display:'flex',gap:'8px'}},
@@ -615,7 +639,7 @@ function MyCastPage(p){
       ?e('div',{style:S.empty},e('div',{style:{fontSize:'40px',marginBottom:'12px'}},'📁'),e('div',{style:{color:'#6b7280'}},'フォルダを追加してください'))
       :folders.map(function(folder){
         var fCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
-        return e('div',{key:folder.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',marginBottom:'10px',overflow:'hidden'}},
+        return e('div',{key:folder.id,className:'card-hover',style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',marginBottom:'10px',overflow:'hidden'}},
           e('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',cursor:'pointer'},onClick:function(){setOpenFolder(folder.id);}},
             e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
             editFolderId===folder.id
@@ -757,7 +781,7 @@ function SalesPage(p){
   }
 
   // サブナビ
-  var pageTitle=e('div',{style:S.pageTitle},e('h1',{style:S.h1},'売上管理'),e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))));
+  var pageTitle=e('div',{style:Object.assign({},S.pageTitle,{animation:'fadeSlideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both'})},e('h1',{style:S.h1},'売上管理'),e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))));
   var subNav=e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}},
     (function(){
       var ni={
@@ -1150,7 +1174,7 @@ function CastListPage(p){
     );
   }
 
-  return e('div',null,
+  return e('div',{className:'page-enter'},
     e('div',{style:S.pageTitle},
       e('h1',{style:S.h1},'キャスト一覧'),
       e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))),
@@ -1400,7 +1424,7 @@ function ShiftPage(p){
     );
   }
 
-  return e('div',null,
+  return e('div',{className:'page-enter'},
     // タイトル
     e('div',{style:{...S.pageTitle,marginBottom:'12px'}},
       e('h1',{style:S.h1},'シフト管理'),e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})))
@@ -2967,12 +2991,12 @@ function AttendancePage(p){
     return list;
   },[todayCasts,extraCasts,scheduledTime,p.data.casts]);
 
-  return e('div',{style:{paddingBottom:'80px'}},
+  return e('div',{className:'page-enter',style:{paddingBottom:'80px'}},
     e('div',{style:S.pageTitle},e('h1',{style:S.h1},'勤怠管理'),e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})))),
 
     // 時間入力モーダル
     timeModal&&e('div',{style:modalBg},
-      e('div',{style:modalBox},
+      e('div',{style:Object.assign({},modalBox,{animation:'scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both'})},
         e('div',{style:modalTitle},timeModal.castName+' - '+timeModal.statusLabel),
         e('input',{type:'time',value:modalTime,onChange:function(ev){setModalTime(ev.target.value);},style:timeInputStyle}),
         e('div',{style:btnRow},
@@ -2983,7 +3007,7 @@ function AttendancePage(p){
     ),
     // 編集モーダル
     editTarget&&e('div',{style:modalBg},
-      e('div',{style:modalBox},
+      e('div',{style:Object.assign({},modalBox,{animation:'scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both'})},
         e('div',{style:modalTitle},getCastName(editTarget.castId)+' 時間編集'),
         e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle}),
         e('div',{style:btnRow},
@@ -3005,7 +3029,7 @@ function AttendancePage(p){
     ),
     // 時間設定モーダル
     showTimeSetting&&e('div',{style:modalBg},
-      e('div',{style:modalBox},
+      e('div',{style:Object.assign({},modalBox,{animation:'scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both'})},
         e('div',{style:modalTitle},'出勤時間設定'),
         e('div',{style:{marginBottom:'16px'}},
           e('div',{style:{color:'#9ca3af',fontSize:'12px',marginBottom:'6px'}},'開始時間'),
