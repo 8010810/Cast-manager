@@ -2867,12 +2867,12 @@ function AttendancePage(p){
         else bySlot.push({label:sl,startMin:slot?slot.startMin:0,casts:[{cast:c,time:tm}]});
         return;
       }
-      // 未通過: 保留は除外、出勤予定時間が直近スロット内のみ
-      if(st==='未通過'&&!item.isExtra){
-        // シフトのステータスが保留なら表示しない
+      // 未通過: 保留は除外、出勤予定時間が直近スロット内のみ（追加出勤も含む）
+      if(st==='未通過'){
+        // シフトのステータスが保留 かつ 追加出勤でないなら表示しない
         var shifts=p.data.shifts||{};
         var sh=(shifts[c.id]||{})[todayStr];
-        if(sh&&sh.status==='pending')return;
+        if(sh&&sh.status==='pending'&&!item.isExtra)return;
         var sched=scheduledTime[c.id]||item.shiftTime;
         if(!sched){return;}
         var sm2=parseInt(sched.split(':')[0])*60+parseInt(sched.split(':')[1]);
