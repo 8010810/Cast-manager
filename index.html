@@ -2722,36 +2722,57 @@ function AttendancePage(p){
   function getAtt(castId){return attStatus[castId]||{status:'未通過',time:''};}
 
   function updateAbsences(castId,status,time,currentAbsenceData,currentConfirmTypes){
-    // 当欠・遅刻の記録を更新する共通関数
     var nad=Object.assign({},currentAbsenceData);
     if(!nad[todayStr])nad[todayStr]={absences:[]};
-    var absences=nad[todayStr].absences.filter(function(a){
-      // 対象キャストの当欠・遅刻を一旦除外（再計算）
-      return a.castId!==castId;
-    });
-    // 当欠: ボードで当欠と表示 かつ 元々保留ではない
+    var absences=nad[todayStr].absences.filter(function(a){return a.castId!==castId;});
+
+    // 当欠: ボードの当欠欄に入っているキャスト かつ 元々保留(pending)でない
     if(status==='当欠'){
       var shiftType=null;
       (manageCasts||[]).forEach(function(item){if(item.cast.id===castId)shiftType=item.type;});
-      // 元々保留（pending）のキャストの✕は当欠にしない
-      if(shiftType!=='pending'){
+      // boardDataのabsentに含まれているかで判定
+      var inBoardAbsent=boardData&&boardData.absent&&boardData.absent.some(function(x){return x.cast.id===castId;});
+      // boardDataがまだ計算されていない場合(初回)はstatus基準で判定
+      var isAbsent=inBoardAbsent!==undefined?inBoardAbsent:(status==='当欠');
+      if(isAbsent&&shiftType!=='pending'){
         absences.push({castId:castId,type:'当欠',time:time||''});
       }
     }
-    // 遅刻: 出勤 かつ 予定時間より遅い
+
+    // 遅刻: ボードのスロット基準で比較（切り上げ後のスロット > 予定スロット）
     if(status==='出勤'&&time){
       var sched=scheduledTime[castId];
       if(sched){
-        var toMin=function(t){var p2=t.split(':');var h=parseInt(p2[0]);var m=parseInt(p2[1]);if(h<timeSetting.startHour)h+=24;return h*60+m;};
-        var schedMin=toMin(sched);var actualMin=toMin(time);
-        if(actualMin>schedMin){
+        var slots=getSlots();
+        var intv=timeSetting.interval||30;
+        var startBase=timeSetting.startHour*60;
+        var toAbsMin=function(t){
+          var p2=t.split(':');var h=parseInt(p2[0]);var m=parseInt(p2[1]);
+          var mn=h*60+m;
+          if(mn<3*60)mn+=1440; // 深夜補正
+          return mn;
+        };
+        var getSlotMin=function(t){
+          var mn=toAbsMin(t);
+          var elapsed=mn-startBase;
+          if(elapsed<=0)return startBase;
+          var idx=Math.ceil(elapsed/intv);
+          if(idx<slots.length)return slots[idx].startMin;
+          return slots[slots.length-1].startMin;
+        };
+        var schedSlot=getSlotMin(sched);
+        var actualSlot=getSlotMin(time);
+        // ボードスロットが予定スロットより後なら遅刻
+        if(actualSlot>schedSlot){
           absences.push({castId:castId,type:'遅刻',time:time});
         }
       }
     }
+
     nad[todayStr].absences=absences;
     return nad;
   }
+
 
   function setStatus(castId,status,time){
     var ns=Object.assign({},attStatus);
