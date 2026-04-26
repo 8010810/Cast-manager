@@ -2475,22 +2475,34 @@ function App(){
   }
 
   useEffect(function(){
-    var unsubscribe=auth.onAuthStateChanged(function(u){
+    var unsubMain=null;var unsubAtt=null;var unsubAttSettings=null;
+    var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);
-      if(u){setLoading(true);loadFromDB(u.uid).then(function(d){
-        var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[]},d);
-        if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-        setData(nd);
-        // 勤怠データをFirebaseからロード
+      // 前のリスナーをクリア
+      if(unsubMain)unsubMain();if(unsubAtt)unsubAtt();if(unsubAttSettings)unsubAttSettings();
+      if(u){
+        setLoading(true);
+        // メインデータをリアルタイム同期
+        unsubMain=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
+          if(doc.exists){
+            var d=doc.data();
+            var nd={casts:d.casts||[],records:d.records||{},customers:d.customers||{},folders:d.folders||[],shifts:d.shifts||{},visits:d.visits||[],quota:d.quota||{}};
+            if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+            setData(nd);
+          }
+          setLoading(false);
+        },function(){setLoading(false);});
+        // 勤怠データをリアルタイム同期
         var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
         var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
-        db.collection('users').doc(u.uid).collection('attendance').doc(ts).get().then(function(doc){
+        unsubAtt=db.collection('users').doc(u.uid).collection('attendance').doc(ts).onSnapshot(function(doc){
           if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-        }).catch(function(){});
-        setLoading(false);
-      });}else{setData(null);setLoading(false);}
+        },function(){});
+      }else{
+        setData(null);setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});setLoading(false);
+      }
     });
-    return unsubscribe;
+    return function(){unsubAuth();if(unsubMain)unsubMain();if(unsubAtt)unsubAtt();};
   },[]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
