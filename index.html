@@ -2829,7 +2829,12 @@ function AttendancePage(p){
         var tMin=tm?parseInt(tm.split(':')[0])*60+parseInt(tm.split(':')[1]):null;
         if(tMin!=null&&tMin<timeSetting.startHour*60)tMin+=1440;
         var slot=null;
-        if(tMin!=null)for(var i=0;i<slots.length;i++){if(tMin>=slots[i].startMin&&tMin<slots[i].endMin){slot=slots[i];break;}}
+        // 切り上げ: 19:31〜20:00 → 20:00スロット、20:01〜20:30 → 20:30スロット
+        // つまりstartMin < tMin <= endMin のスロットに入れる（endMinのスロット）
+        if(tMin!=null)for(var i=0;i<slots.length;i++){
+          if(tMin>slots[i].startMin&&tMin<=slots[i].endMin){slot=slots[i];break;}
+          if(tMin===slots[i].startMin){slot=slots[i];break;} // ちょうどはそのスロット
+        }
         if(!slot&&slots.length>0)slot=slots[slots.length-1];
         var sl=slot?slot.label:'--:--';
         var ex=bySlot.find(function(s){return s.label===sl;});
