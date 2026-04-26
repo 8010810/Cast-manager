@@ -2725,8 +2725,11 @@ function AttendancePage(p){
     var status=ns||attStatus;var schTime=nst||scheduledTime;var ec=nec||extraCasts;var ct=nct||confirmTypes;
     setAttStatus(status);setScheduledTime(schTime);setExtraCasts(ec);setConfirmTypes(ct);
     if(p.setAttData)p.setAttData({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
-    if(!p.uid)return;
-    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
+    console.log('[saveAll] uid=',p.uid,'todayStr=',todayStr);
+    if(!p.uid){console.warn('[saveAll] NO UID - skipping Firebase save');return;}
+    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct})
+      .then(function(){console.log('[saveAll] saved OK');})
+      .catch(function(e){console.error('[saveAll] save error:',e);});
   }
   function getAtt(castId){return attStatus[castId]||{status:'未通過',time:''};}
 
@@ -2941,6 +2944,24 @@ function AttendancePage(p){
   },[todayCasts,extraCasts,scheduledTime,p.data.casts]);
 
   return e('div',{style:{paddingBottom:'80px'}},
+    // デバッグパネル
+    e('div',{style:{background:'#1a1a00',border:'1px solid #fbbf24',borderRadius:'8px',padding:'8px',marginBottom:'8px',fontSize:'11px',color:'#fbbf24',wordBreak:'break-all'}},
+      e('div',null,'UID: '+(p.uid?p.uid.slice(0,8)+'...':'なし')),
+      e('div',null,'今日: '+todayStr),
+      e('div',null,'scheduled: '+Object.keys(scheduledTime).length+'件 / confirmTypes: '+Object.keys(confirmTypes).length+'件'),
+      e('button',{style:{marginTop:'6px',background:'#333',color:'#fff',border:'none',borderRadius:'4px',padding:'4px 10px',cursor:'pointer',fontSize:'11px'},onClick:function(){
+        if(!p.uid){alert('UIDなし');return;}
+        db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).get()
+          .then(function(doc){
+            if(doc.exists){
+              var d=doc.data();
+              alert('保存OK\nscheduled: '+Object.keys(d.scheduledTime||{}).length+'件\nconfirm: '+Object.keys(d.confirmTypes||{}).length+'件');
+            }else{
+              alert('Firebaseにデータなし\n保存されていません');
+            }
+          }).catch(function(err){alert('エラー: '+err.message);});
+      }},'📋 Firebase確認')
+    ),
     // 時間入力モーダル
     timeModal&&e('div',{style:modalBg},
       e('div',{style:modalBox},
