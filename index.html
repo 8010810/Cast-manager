@@ -2863,6 +2863,9 @@ function AttendancePage(p){
     bySlot.sort(function(a,b){return a.startMin-b.startMin;});
     bySlot.forEach(function(sl){sl.casts.sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});});
     passing.sort(function(a,b){return(a.time||'').localeCompare(b.time||'');});
+    // 派遣を末尾に
+    douhan.sort(function(a,b){var ad=a.cast.isDispatch?1:0;var bd=b.cast.isDispatch?1:0;return ad-bd;});
+    bySlot.forEach(function(slot){slot.casts.sort(function(a,b){var ad=a.cast.isDispatch?1:0;var bd=b.cast.isDispatch?1:0;return ad-bd;});});
     return{douhan:douhan,bySlot:bySlot,passing:passing,absent:absent,notPassed:notPassed};
   },[attStatus,allTodayCasts,timeSetting,scheduledTime,p.data.shifts]);
 
@@ -3037,12 +3040,15 @@ function AttendancePage(p){
           e('button',{style:btnOk,onClick:function(){
             if(!addCast)return;
             var nec=extraCasts.filter(function(x){return x.castId!==addCast.id;});
-            nec.push({castId:addCast.id,status:addStatus,time:addTime});
+            nec.push({castId:addCast.id,status:addStatus,time:addTime,fromManage:true});
             setExtraCasts(nec);
-            // scheduledTimeに時間保存（管理ページに未通過として追加）
+            // 管理ページ用: scheduledTime + confirmTypes設定
             var nst=Object.assign({},scheduledTime);
             nst[addCast.id]=addTime;
-            saveAll(attStatus,nst,nec);
+            var nct=Object.assign({},confirmTypes);
+            var ct2=addStatus==='同伴'?'douhan':addStatus==='保留'?'pending':'work';
+            nct[addCast.id]=ct2;
+            saveAll(attStatus,nst,nec,nct);
             setShowAddModal(false);setAddSearch('');setAddCast(null);setAddTime('');
           }},'追加'),
           e('button',{style:btnCancel,onClick:function(){setShowAddModal(false);setAddSearch('');setAddCast(null);}},'キャンセル')
@@ -3141,6 +3147,7 @@ function AttendancePage(p){
       // extraCastsも追加
       var extraShiftIds=new Set(todayAllCasts.map(function(x){return x.cast.id;}));
       extraCasts.forEach(function(ec){
+        if(ec.fromManage)return; // 管理ページから追加は出確ページに表示しない
         var cast=(p.data.casts||[]).find(function(c){return c.id===ec.castId;});
         if(cast&&!extraShiftIds.has(ec.castId)){
           var type2=ec.status==='同伴'?'douhan':ec.status==='保留'?'pending':'work';
