@@ -1,7 +1,9 @@
 <!doctype html><html lang="ja"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>CAST MANAGER</title>
-<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#0d0d1a;color:#e5e7eb;font-family:'Hiragino Sans',sans-serif;min-height:100vh}input,textarea,button,select{font-family:inherit}input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}select{background:#12122a;color:#e5e7eb;border:1px solid #2d2d4e;border-radius:8px;padding:10px 14px;width:100%;margin-bottom:12px;outline:none;font-size:14px}table{border-spacing:0}@keyframes spin{to{transform:rotate(360deg)}}</style>
+<style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#0d0d1a;color:#e5e7eb;font-family:'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif;min-height:100vh}input,textarea,button,select{font-family:inherit}input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}select{background:#12122a;color:#e5e7eb;border:1px solid #2d2d4e;border-radius:8px;padding:10px 14px;width:100%;margin-bottom:12px;outline:none;font-size:14px}table{border-spacing:0}@keyframes spin{to{transform:rotate(360deg)}}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head><body>
-<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e8b86d;font-size:14px">読み込み中...</div></div>
+<div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e8b86d;font-size:14px;font-family:'Cormorant Garamond',serif;letter-spacing:0.2em">LOADING...</div></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -24,8 +26,14 @@ function saveToDB(uid,data){return db.collection('users').doc(uid).collection('d
 (function(){
 // グローバルアニメーション定義
 (function injectStyles(){
+  // 高級フォント読み込み
+  var link=document.createElement('link');
+  link.rel='stylesheet';
+  link.href='https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Noto+Serif+JP:wght@300;400;500;600&family=Zen+Kaku+Gothic+New:wght@300;400;500&display=swap';
+  document.head.appendChild(link);
   var style=document.createElement('style');
   style.textContent=[
+    'body{background:radial-gradient(ellipse at 20% 50%,#12122a 0%,#0a0a18 60%,#070710 100%)!important;}',
     '@keyframes fadeSlideUp{from{opacity:0}to{opacity:1}}',
     '@keyframes fadeIn{from{opacity:0}to{opacity:1}}',
     '@keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}',
@@ -113,9 +121,9 @@ var blankGuest=function(){return{_id:uid(),type:'指名',name:'',sales:'',bottle
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 var S={
-  root:{minHeight:'100vh',background:'#0d0d1a',color:'#e5e7eb',fontFamily:"'Noto Sans JP','Hiragino Sans',sans-serif",position:'relative',overflowX:'hidden'},
-  header:{position:'sticky',top:0,zIndex:100,background:'rgba(13,13,26,0.95)',backdropFilter:'blur(12px)',borderBottom:'1px solid #1e2035',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',gap:'12px'},
-  tabBar:{position:'sticky',top:'57px',zIndex:99,background:'rgba(13,13,26,0.95)',backdropFilter:'blur(12px)',borderBottom:'2px solid #1e2035',display:'flex',alignItems:'stretch'},
+  root:{minHeight:'100vh',background:'#0d0d1a',color:'#e5e7eb',fontFamily:"'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif",position:'relative',overflowX:'hidden'},
+  header:{position:'sticky',top:0,zIndex:100,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',gap:'12px'},
+  tabBar:{position:'sticky',top:'57px',zIndex:99,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.12)',display:'flex',alignItems:'stretch'},
   main:{padding:'18px 16px',maxWidth:'900px',margin:'0 auto',position:'relative',zIndex:1},
   logo:{display:'flex',alignItems:'center',gap:'8px'},
   logoIcon:{color:'#e8b86d',fontSize:'18px'},
@@ -139,7 +147,7 @@ var S={
   empty:{textAlign:'center',padding:'60px 0',color:'#374151'},
   chartWrap:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'12px 8px 8px',marginBottom:'12px'},
   modeBtn:{background:'transparent',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#9ca3af',fontSize:'13px',padding:'7px 12px',cursor:'pointer',fontWeight:500},
-  modeActive:{background:'#1e2035',border:'1px solid #e8b86d44',borderRadius:'8px',color:'#e8b86d',fontSize:'13px',padding:'7px 12px',cursor:'pointer',fontWeight:700},
+  modeActive:{background:'linear-gradient(135deg,rgba(232,184,109,0.15),rgba(232,184,109,0.08))',border:'1px solid rgba(232,184,109,0.4)',borderRadius:'8px',color:'#e8b86d',fontSize:'13px',padding:'7px 12px',cursor:'pointer',fontWeight:700},
   metricToggle:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'12px'},
   metricBtn:{border:'1px solid',borderRadius:'20px',fontSize:'12px',padding:'5px 12px',cursor:'pointer',fontWeight:500},
   summaryTable:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px',marginTop:'8px'},
@@ -151,11 +159,11 @@ var S={
   toast:{position:'fixed',top:'68px',left:'50%',transform:'translateX(-50%)',color:'#fff',fontSize:'13px',fontWeight:600,padding:'10px 20px',borderRadius:'8px',zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,.4)',whiteSpace:'nowrap'},
   typeBadge:{fontSize:'11px',fontWeight:700,padding:'3px 8px',borderRadius:'4px',border:'1px solid',flexShrink:0},
   addForm:{display:'flex',gap:'10px',marginBottom:'20px',alignItems:'center'},
-  pageTitle:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'18px',flexWrap:'wrap',gap:'10px'},
-  h1:{fontSize:'20px',fontWeight:700,color:'#f3f4f6',margin:0},
-  h2:{fontSize:'17px',fontWeight:700,color:'#f3f4f6',margin:'0 0 16px'},
+  pageTitle:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'18px',flexWrap:'wrap',gap:'10px',paddingBottom:'14px',borderBottom:'1px solid rgba(232,184,109,0.2)'},
+  h1:{fontSize:'20px',fontWeight:400,color:'#f3f4f6',margin:0,fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",letterSpacing:'0.1em'},
+  h2:{fontSize:'17px',fontWeight:400,color:'#f3f4f6',margin:'0 0 16px',fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",letterSpacing:'0.06em'},
   // ホーム画面カード
-  homeCard:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'24px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',transition:'transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.2s,border-color 0.2s',gap:'12px',minHeight:'120px',transition:'border-color 0.2s'},
+  homeCard:{background:'linear-gradient(145deg,#141428,#0f0f22)',border:'1px solid rgba(232,184,109,0.15)',borderRadius:'16px',padding:'24px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px',minHeight:'120px',boxShadow:'0 2px 20px rgba(0,0,0,0.4)',transition:'transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.2s,border-color 0.2s'},
 };
 
 // ─── Login Screen ─────────────────────────────────────────────────────────────
@@ -180,7 +188,10 @@ function LoginScreen(){
   return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}},
     e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'36px 28px',maxWidth:'360px',width:'100%',textAlign:'center'}},
       e('div',{style:{fontSize:'32px',marginBottom:'8px'}},'✦'),
-      e('h1',{style:{fontSize:'22px',fontWeight:700,color:'#e8b86d',letterSpacing:'3px',marginBottom:'4px'}},'CAST MANAGER'),
+      e('div',{style:{textAlign:'center',marginBottom:'4px'}},
+        e('h1',{style:{fontSize:'26px',fontWeight:300,fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",letterSpacing:'0.3em',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a,#e8b86d)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',margin:0}},'CAST MANAGER'),
+        e('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,rgba(232,184,109,0.6),transparent)',margin:'8px auto 0',width:'80%'}})
+      ),
       e('p',{style:{color:'#6b7280',fontSize:'12px',marginBottom:'28px'}},'黒服マネージャー専用 キャスト売上管理'),
       e('div',{style:{display:'flex',marginBottom:'20px',borderRadius:'8px',overflow:'hidden',border:'1px solid #1e2035'}},
         e('button',{onClick:function(){setMode('login');setErr('');},style:{flex:1,padding:'9px',fontSize:'13px',fontWeight:600,border:'none',cursor:'pointer',background:mode==='login'?'#1e2035':'transparent',color:mode==='login'?'#e8b86d':'#6b7280'}},'ログイン'),
@@ -639,7 +650,7 @@ function MyCastPage(p){
       ?e('div',{style:S.empty},e('div',{style:{fontSize:'40px',marginBottom:'12px'}},'📁'),e('div',{style:{color:'#6b7280'}},'フォルダを追加してください'))
       :folders.map(function(folder){
         var fCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
-        return e('div',{key:folder.id,className:'card-hover',style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',marginBottom:'10px',overflow:'hidden'}},
+        return e('div',{key:folder.id,className:'luxury-card card-hover',style:{background:'linear-gradient(145deg,#12122a,#0f0f20)',border:'1px solid rgba(232,184,109,0.12)',borderRadius:'12px',marginBottom:'10px',overflow:'hidden'}},
           e('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',cursor:'pointer'},onClick:function(){setOpenFolder(folder.id);}},
             e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
             editFolderId===folder.id
@@ -2574,7 +2585,10 @@ function App(){
     // ヘッダー
     e('header',{style:S.header},
       isHomeLayer
-        ?e('div',{style:S.logo},e('span',{style:S.logoIcon},'✦'),e('span',{style:S.logoText},'CAST MANAGER'))
+        ?e('div',{style:S.logo},
+          e('span',{style:{...S.logoIcon,color:'#e8b86d'}},'✦'),
+          e('span',{style:{...S.logoText,fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",fontWeight:400,letterSpacing:'0.18em',fontSize:'14px',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}},'CAST MANAGER')
+        )
         :e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
           e('button',{style:{...S.homeBtn,fontSize:'12px',padding:'6px 12px'},onClick:goBack},'‹ 戻る'),
           e('button',{style:{background:'transparent',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#6b7280',fontSize:'11px',padding:'6px 10px',cursor:'pointer',display:'flex',alignItems:'center',gap:'4px'},onClick:goHome},
