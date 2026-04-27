@@ -38,7 +38,7 @@ function saveToDB(uid,data){return db.collection('users').doc(uid).collection('d
   var style=document.createElement('style');
   style.textContent=[
     'body{background:radial-gradient(ellipse at 20% 50%,#12122a 0%,#0a0a18 60%,#070710 100%)!important;}',
-    '@keyframes fadeSlideUp{from{opacity:0}to{opacity:1}}',
+    '@keyframes fadeSlideUp{from{opacity:0}to{opacity:1}}','@keyframes pageFadeIn{0%{opacity:0}100%{opacity:1}}',
     '@keyframes fadeIn{from{opacity:0}to{opacity:1}}',
     '@keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}',
     '@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}',
@@ -50,7 +50,7 @@ function saveToDB(uid,data){return db.collection('users').doc(uid).collection('d
     '* {-webkit-tap-highlight-color:transparent;}',
     'button{transition:transform 0.12s cubic-bezier(0.25,0.46,0.45,0.94),opacity 0.12s,background 0.18s,border-color 0.18s,box-shadow 0.18s;}',
     'button:active{transform:scale(0.96);}',
-    '.page-enter{animation:fadeSlideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both;}',
+    '.page-enter{animation:pageFadeIn 0.6s ease both;}',
     '.modal-enter{animation:scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both;}',
     '.card-hover{transition:transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.2s;}',
     '.card-hover:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,0.4);}',
@@ -811,7 +811,7 @@ function SalesPage(p){
   );
 
   // ── 売上進捗ページ ──
-  if(subPage==='top') return e('div',null,
+  if(subPage==='top') return e('div',{className:'page-enter'},
     pageTitle,subNav,
     e('div',{style:{background:'linear-gradient(135deg,#1a1a3e,#12122a)',border:'1px solid #2d2d4e',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
       e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},(now.getMonth()+1)+'月 売上進捗'),
@@ -890,7 +890,7 @@ function SalesPage(p){
   );
 
   // ── 月別目標ページ ──
-  if(subPage==='target') return e('div',null,
+  if(subPage==='target') return e('div',{className:'page-enter'},
     pageTitle,subNav,
     e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px',marginBottom:'16px'}},
       e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}},
@@ -1662,7 +1662,7 @@ function InputPage(p){
     p.notify('保存しました');
   }
   var now=new Date();var autoWorkDays=calcWorkDays(p.data.records,p.castId,now.getFullYear()+'-'+pad(now.getMonth()+1));
-  return e('div',{style:{maxWidth:'520px',margin:'0 auto'}},
+  return e('div',{className:'page-enter',style:{maxWidth:'520px',margin:'0 auto'}},
     e('div',{style:{display:'flex',marginBottom:'20px',borderRadius:'10px',overflow:'hidden',border:'1px solid #1e2035'}},
       [['daily','📋 日次データ'],['guest','👥 来店顧客']].map(function(item){return e('button',{key:item[0],onClick:function(){setTab(item[0]);},style:{flex:1,padding:'11px 0',fontSize:'14px',fontWeight:600,border:'none',cursor:'pointer',background:tab===item[0]?'#1e2035':'transparent',color:tab===item[0]?'#e8b86d':'#6b7280',borderRight:item[0]==='daily'?'1px solid #1e2035':'none'}},item[1]);})
     ),
@@ -1790,7 +1790,7 @@ function ChartPage(p){
 
   if(!HAS_CHARTS)return e('div',null,e('h2',{style:S.h2},'データなし'));
 
-  return e('div',null,
+  return e('div',{className:'page-enter'},
     e('div',{style:S.pageTitle},e('h2',{style:S.h2},'グラフ'),
       e('div',{style:{display:'flex',gap:'6px'}},
         ['daily','monthly','yearly'].map(function(m){return e('button',{key:m,style:mode===m?S.modeActive:S.modeBtn,onClick:function(){setMode(m);setSelKey(null);}},m==='daily'?'日別':m==='monthly'?'月別':'年別');})
