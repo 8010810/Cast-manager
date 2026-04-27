@@ -796,7 +796,7 @@ function SalesPage(p){
   }
 
   // サブナビ
-  var pageTitle=e('div',{style:Object.assign({},S.pageTitle,{animation:'fadeSlideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both'})},e('h1',{style:S.h1},'売上管理'),e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))));
+  var pageTitle=e('div',{style:S.pageTitle},e('h1',{style:S.h1},'売上管理'),e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))));
   var subNav=e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}},
     (function(){
       var ni={
@@ -2667,7 +2667,7 @@ function App(){
       layer==='shift'&&e(ShiftPage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
       layer==='attendance'&&e(AttendancePage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',attData:attData,setAttData:setAttData}),
       layer==='visit'&&e(VisitPage,{onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
-      isCastLayer&&selectedCast&&e('div',{key:selectedCast+'_'+castPage+'_'+navStack.length,style:{animation:'pageFadeIn 1.4s ease both'}},
+      isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
         castPage==='input'&&e(InputPage,{castId:selectedCast,data:data,persist:persist,notify:notify}),
         castPage==='chart'&&e(ChartPage,{castId:selectedCast,data:data}),
         castPage==='list'&&e(ListPage,{castId:selectedCast,data:data,persist:persist,notify:notify}),
