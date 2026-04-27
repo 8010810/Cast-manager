@@ -797,7 +797,7 @@ function SalesPage(p){
 
   // サブナビ
   var pageTitle=e('div',{style:Object.assign({},S.pageTitle,{animation:'fadeSlideUp 0.35s cubic-bezier(0.25,0.46,0.45,0.94) both'})},e('h1',{style:S.h1},'売上管理'),e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))));
-  var subNav=e('div',{key:subPage,style:{display:'flex',gap:'8px',marginBottom:'16px',animation:'pageFadeIn 1.4s ease both'}},
+  var subNav=e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px'}},
     (function(){
       var ni={
         top:e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('line',{x1:18,y1:20,x2:18,y2:10}),e('line',{x1:12,y1:20,x2:12,y2:4}),e('line',{x1:6,y1:20,x2:6,y2:14}),e('line',{x1:2,y1:20,x2:22,y2:20})),
@@ -942,7 +942,7 @@ function SalesPage(p){
       return e('button',{style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,0.4)':'#2d2d4e'),borderRadius:'8px',color:active?'#e8b86d':'#9ca3af',fontSize:'11px',padding:'5px 10px',cursor:'pointer',fontWeight:active?700:400},onClick:onClick},label);
     }
 
-    return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
+    return e('div',null,
       e('div',{style:S.pageTitle},e('h1',{style:S.h1},'売上管理')),
       subNav,
       e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px'}},
@@ -3351,17 +3351,18 @@ function AttendancePage(p){
       boardData.douhan.length===0&&boardData.bySlot.length===0&&boardData.passing.length===0&&boardData.notPassed.length===0&&boardData.absent.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'表示するデータがありません')
     ),
 
+
     // ── 当欠・遅刻タブ ──
     subPage==='absence'&&e('div',{key:'absence',style:{animation:'pageFadeIn 1.4s ease both'}},
       e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px',alignItems:'center'}},
-        e('select',{value:absMonth,onChange:function(ev){setAbsMonth(ev.target.value);},style:{flex:1,background:'#12122a',color:'#e5e7eb',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px',fontSize:'13px',marginBottom:0}},
-          (function(){var opts=[];for(var i=0;i<12;i++){var d=new Date(now.getFullYear(),now.getMonth()-i,1);var m=d.getFullYear()+'-'+pad(d.getMonth()+1);opts.push(e('option',{key:m,value:m},m));}return opts;})())
+        e('select',{value:absMonth,onChange:function(ev){setAbsMonth(ev.target.value);},style:{flex:1,background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px 12px',color:'#e5e7eb',outline:'none',fontSize:'13px'}},
+          (function(){var opts=[];for(var i=0;i<12;i++){var d=new Date(now.getFullYear(),now.getMonth()-i,1);var m=d.getFullYear()+'-'+pad(d.getMonth()+1);opts.push(e('option',{key:m,value:m},m));}return opts;})()
         ),
         ['当欠','遅刻'].map(function(t){return e('button',{key:t,style:{padding:'6px 12px',borderRadius:'8px',border:'1px solid '+(absTab===t?'#e8b86d':'#374151'),background:absTab===t?'#e8b86d22':'transparent',color:absTab===t?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setAbsTab(t);}},t);})
       ),
-      e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'12px',marginBottom:'16px'}},
+      e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'12px',marginBottom:'12px'}},
         e('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',marginBottom:'6px'}},['日','月','火','水','木','金','土'].map(function(d,i){return e('div',{key:d,style:{textAlign:'center',fontSize:'10px',color:i===0?'#f87171':i===6?'#60a5fa':'#6b7280',padding:'2px'}},d);})),
-        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px'}},(function(){var cells=[];var fw=calDates.length>0?calDates[0].weekday:0;for(var i=0;i<fw;i++)cells.push(e('div',{key:'b'+i}));calDates.forEach(function(day){cells.push(e('div',{key:day.date,style:{textAlign:'center',padding:'4px 2px',borderRadius:'6px',background:day.count>0?'#f8717122':'transparent'}},e('div',{style:{fontSize:'11px',color:day.count>0?'#f87171':'#6b7280'}},day.day),day.count>0&&e('div',{style:{fontSize:'9px',color:'#f87171',fontWeight:700}},day.count)));});return cells;})())
+        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px'}},(function(){var cells=[];var fw=new Date(absYear,absMonthN-1,1).getDay();var dm=new Date(absYear,absMonthN,0).getDate();for(var i=0;i<fw;i++){cells.push(e('div',{key:'e'+i}));}for(var d2=1;d2<=dm;d2++){var ds=absYear+'-'+pad(absMonthN)+'-'+pad(d2);var absItems=absDateMap[ds]||{};var ac=absItems['当欠']||0;var lc=absItems['遅刻']||0;var hasAbs=ac>0||lc>0;cells.push(e('div',{key:ds,style:{textAlign:'center',fontSize:'10px',padding:'3px 1px',borderRadius:'3px',background:hasAbs?'rgba(232,184,109,0.15)':'transparent',color:hasAbs?'#e8b86d':'#6b7280',minHeight:'22px',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'1px'}},e('span',null,d2),hasAbs&&e('span',{style:{fontSize:'8px',lineHeight:1}},ac>0&&lc>0?'当遅':ac>0?'当':'遅')));}return cells;})())
       ),
       e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px',marginBottom:'10px'}},absMonth+'　'+absTab+'一覧'),
       absenceSummary.filter(function(x){return x[absTab]>0;}).length===0
@@ -3373,6 +3374,7 @@ function AttendancePage(p){
           )
         }))
     )
+  );
 }
 
 
