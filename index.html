@@ -942,7 +942,8 @@ function SalesPage(p){
       return e('button',{style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,0.4)':'#2d2d4e'),borderRadius:'8px',color:active?'#e8b86d':'#9ca3af',fontSize:'11px',padding:'5px 10px',cursor:'pointer',fontWeight:active?700:400},onClick:onClick},label);
     }
 
-    return e('div',null,
+    return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
+      e('div',{style:S.pageTitle},e('h1',{style:S.h1},'ランキング')),
       subNav,
       e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px'}},
         e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}},
@@ -1557,7 +1558,7 @@ function ShiftPage(p){
     ),
     // シフト表
     p.data.casts.length===0?e('div',{style:S.empty},e('div',{style:{color:'#6b7280'}},'キャストを登録してください')):
-    e('div',{style:{overflowX:'auto',marginBottom:'16px'}},
+    e('div',{key:selShiftFolder,style:{overflowX:'auto',marginBottom:'16px',animation:'pageFadeIn 1.4s ease both'}},
       e('table',{style:{width:'100%',borderCollapse:'collapse',minWidth:viewMode==='week'?'480px':'720px'}},
         e('thead',null,
           e('tr',null,
@@ -2022,7 +2023,7 @@ function VisitPage(p){
   for(var i=0;i<firstDay;i++)calCells.push(null);
   for(var d=1;d<=daysInMonth;d++)calCells.push(d);
 
-  return e('div',null,
+  return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
     e('div',{style:S.pageTitle},
       e('h1',{style:S.h1},'来店予定'),
       e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))),
@@ -3132,7 +3133,7 @@ function AttendancePage(p){
     ),
 
     // ── 管理タブ ──
-    subPage==='main'&&e('div',null,
+    subPage==='main'&&e('div',{key:'main',style:{animation:'pageFadeIn 1.4s ease both'}},
       e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'12px'}},
         e('button',{style:{background:'#e8b86d22',border:'1px solid #e8b86d',borderRadius:'8px',padding:'6px 14px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setShowAddModal(true);setAddSearch('');setAddCast(null);setAddTime('');setAddStatus('出勤');}},'+ 追加出勤'),
         e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 10px',color:'#9ca3af',fontSize:'11px',cursor:'pointer'},onClick:function(){setShowTimeSetting(true);}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('circle',{cx:12,cy:12,r:3}),e('path',{d:'M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14'})),'設定'))
@@ -3206,7 +3207,7 @@ function AttendancePage(p){
     ),
 
     // ── ボードタブ ──
-    subPage==='confirm'&&(function(){
+    subPage==='confirm'&&e('div',{key:'confirm',style:{animation:'pageFadeIn 1.4s ease both'}},(function(){
       // 今日のシフト（同伴・出勤・保留）をフォルダ別に表示
       var folders=p.data.folders||[];
       var shifts=p.data.shifts||{};
@@ -3335,7 +3336,7 @@ function AttendancePage(p){
       );
     })(),
 
-    subPage==='board'&&e('div',null,
+    subPage==='board'&&e('div',{key:'board',style:{animation:'pageFadeIn 1.4s ease both'}},
       e('div',{style:{display:'flex',justifyContent:'flex-end',alignItems:'center',marginBottom:'16px'}},
         e('div',{style:{display:'flex',gap:'8px'}},
           e('button',{style:{background:editMode?'#e8b86d22':'transparent',border:'1px solid '+(editMode?'#e8b86d':'#374151'),borderRadius:'8px',padding:'6px 10px',color:editMode?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditMode(!editMode);}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},editMode?e('path',{d:'M18 6 6 18M6 6l12 12'}):e('path',{d:'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z'})),editMode?'編集中':'編集'))
@@ -3350,10 +3351,10 @@ function AttendancePage(p){
     ),
 
     // ── 当欠・遅刻タブ ──
-    subPage==='absence'&&e('div',null,
+    subPage==='absence'&&e('div',{key:'absence',style:{animation:'pageFadeIn 1.4s ease both'}},
       e('div',{style:{display:'flex',gap:'8px',marginBottom:'16px',alignItems:'center'}},
         e('select',{value:absMonth,onChange:function(ev){setAbsMonth(ev.target.value);},style:{flex:1,background:'#12122a',color:'#e5e7eb',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px',fontSize:'13px',marginBottom:0}},
-          (function(){var opts=[];for(var i=0;i<12;i++){var d=new Date(now.getFullYear(),now.getMonth()-i,1);var m=d.getFullYear()+'-'+pad(d.getMonth()+1);opts.push(e('option',{key:m,value:m},m));}return opts;})()
+          (function(){var opts=[];for(var i=0;i<12;i++){var d=new Date(now.getFullYear(),now.getMonth()-i,1);var m=d.getFullYear()+'-'+pad(d.getMonth()+1);opts.push(e('option',{key:m,value:m},m));}return opts;})())
         ),
         ['当欠','遅刻'].map(function(t){return e('button',{key:t,style:{padding:'6px 12px',borderRadius:'8px',border:'1px solid '+(absTab===t?'#e8b86d':'#374151'),background:absTab===t?'#e8b86d22':'transparent',color:absTab===t?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setAbsTab(t);}},t);})
       ),
