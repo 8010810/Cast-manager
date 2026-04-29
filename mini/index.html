@@ -180,13 +180,16 @@ function LoginScreen(){
 
   function handleGoogle(){setLoading(true);setErr('');signInWithGoogle().catch(function(){setErr('Googleログインに失敗しました');setLoading(false);});}
   function handleLine(){
-    var clientId=window.__LINE_CHANNEL_ID__||'';
-    if(!clientId){setErr('LINE設定が見つかりません');return;}
-    var redirectUri='https://cast-manager-mini.vercel.app/api/line-auth';
+    setLoading(true);
+    fetch('/api/line-config').then(function(r){return r.json();}).then(function(cfg){
+      var clientId=cfg.channelId||'';
+      if(!clientId){setErr('LINE設定が見つかりません');setLoading(false);return;}
+      var redirectUri='https://cast-manager-mini.vercel.app/api/line-auth';
     var state=Math.random().toString(36).slice(2);
     sessionStorage.setItem('line_state',state);
     var url='https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id='+clientId+'&redirect_uri='+encodeURIComponent(redirectUri)+'&state='+state+'&scope=profile%20openid';
     window.location.href=url;
+    }).catch(function(){setErr('LINE設定の取得に失敗しました');setLoading(false);});
   }
   // LINE OAuthコールバック処理
   useEffect(function(){
