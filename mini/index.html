@@ -1901,17 +1901,11 @@ function MiniApp(){
     header,toastEl,
     e('div',{style:{paddingTop:'0'}},
       layer==='mycast'&&(function(){
-        var selFolder=appOpenFolder;
-        if(selFolder){
-          var folder=(data.folders||[]).find(function(f){return f.id===selFolder;});
-          if(!folder)return null;
-          var folderCasts=(data.casts||[]).filter(function(c){return (folder.castIds||[]).includes(c.id);});
-          return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:data,onOpenCast:openCast,notify:notify,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){setAppOpenFolder(selFolder);},persist:persist});
-        }
-        // フォルダが未選択の場合は最初のフォルダを自動選択
-        var firstFolder=(data.folders||[])[0];
-        if(firstFolder){setAppOpenFolder(firstFolder.id);}
-        return null;
+        // 常に最初のフォルダの中身を表示（フォルダ一覧不要）
+        var folder=(data.folders||[])[0];
+        if(!folder)return e('div',{style:{padding:'32px',textAlign:'center',color:'#6b7280'}},'フォルダがありません');
+        var folderCasts=(data.casts||[]).filter(function(c){return (folder.castIds||[]).includes(c.id);});
+        return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:data,onOpenCast:openCast,notify:notify,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){},persist:persist});
       })(),
       layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps)),
