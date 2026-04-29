@@ -214,6 +214,636 @@ function LoginScreen(){
   );
 }
 
+function FolderMKDetail(p){
+  if(!p.selFolderMK)return null;
+  var mkKey=p.chartYear+'-'+pad(Number(p.selFolderMK.replace('月','')));
+  var castSales=(p.data.casts||[]).filter(function(c){
+    if(c.folderHistory&&c.folderHistory.length>0)return getCastFolderAt(c,mkKey)===p.folder.id;
+    return(p.folder.castIds||[]).includes(c.id);
+  }).map(function(c){
+    var rows=((p.data.records||{})[c.id]||[]).filter(function(r){return r.date.slice(0,7)===mkKey;});
+    return{name:c.name,sales:rows.reduce(function(s,r){return s+Number(r.sales||0);},0)};
+  }).filter(function(x){return x.sales>0;}).sort(function(a,b){return b.sales-a.sales;});
+  var maxS=castSales.length>0?castSales[0].sales:1;
+  return e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d33',borderRadius:'12px',padding:'14px',marginBottom:'16px'}},
+    e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
+      e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},p.selFolderMK+'　キャスト別売上'),
+      e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer',fontSize:'16px'},onClick:function(){p.setSelFolderMK(null);}},'✗')
+    ),
+    castSales.length===0
+      ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'4px 0'}},'データなし')
+      :e('div',null,castSales.map(function(item,i){
+        return e('div',{key:item.name,style:{marginBottom:'8px'}},
+          e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'3px'}},
+            e('span',{style:{width:'18px',fontSize:'12px',textAlign:'center'}},e('span',{style:{fontWeight:700,color:i===0?'#f59e0b':i===1?'#9ca3af':i===2?'#b45309':'#6b7280'}},i===0?'1':i===1?'2':i===2?'3':String(i+1))),
+            e('span',{style:{flex:1,fontSize:'13px',fontWeight:700,color:'#f3f4f6'}},item.name),
+            e('span',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px'}},yen(item.sales))
+          ),
+          e('div',{style:{background:'#0d0d1a',borderRadius:'99px',height:'4px',overflow:'hidden'}},
+            e('div',{style:{background:'linear-gradient(90deg,#e8b86d,#a78bfa)',height:'100%',width:Math.round(item.sales/maxS*100)+'%',borderRadius:'99px'}})
+          )
+        );
+      }))
+  );
+}
+
+function FolderDetail(p){
+  var now=new Date();
+  var tm=now.getFullYear()+'-'+pad(now.getMonth()+1);
+  var s1=useState(null);var qrCast=s1[0];var setQrCast=s1[1];
+
+  var fcAllYears=useMemo(function(){
+    var ys=new Set();
+    p.folderCasts.forEach(function(c){(p.data.records[c.id]||[]).forEach(function(r){ys.add(r.date.slice(0,4));});});
+    ys.add(String(now.getFullYear()));
+    return Array.from(ys).sort(function(a,b){return b.localeCompare(a);});
+  },[p.folderCasts,p.data.records]);
+
+  var s2=useState(String(now.getFullYear()));var fcYear=s2[0];var setFcYear=s2[1];
+  var s10=useState(null);var selFolderMK=s10[0];var setSelFolderMK=s10[1];
+
+  var monthlyData=useMemo(function(){
+    var list=[];
+    // folderHistoryを持つキャストはその月の所属フォルダで集計
+    var allCasts=p.data.casts;
+    for(var mi=1;mi<=12;mi++){
+      var mk2=fcYear+'-'+pad(mi);
+      var totalS=0;var totalT=0;
+      // この月にこのフォルダに所属していたキャストを収集
+      var castsInFolder=allCasts.filter(function(c){
+        if(c.folderHistory&&c.folderHistory.length>0){
+          // 履歴あり: その月の所属フォルダIDを確認
+          return getCastFolderAt(c,mk2)===p.folder.id;
+        }
+        // 履歴なし: 現在のフォルダメンバーかどうか
+        return(p.folder.castIds||[]).includes(c.id);
+      });
+      castsInFolder.forEach(function(c){
+        var rows=(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===mk2;});
+        totalS+=rows.reduce(function(s,r){return s+Number(r.sales||0);},0);
+        totalT+=getMonthlyTarget(c,mk2);
+      });
+      list.push({month:mi+'月',sales:totalS,target:totalT>0?totalT:null});
+    }
+    return list;
+  },[p.folderCasts,p.data,p.folder,fcYear]);
+
+  var castsThisMonth=p.data.casts.filter(function(c){
+    if(c.folderHistory&&c.folderHistory.length>0)return getCastFolderAt(c,tm)===p.folder.id;
+    return(p.folder.castIds||[]).includes(c.id);
+  });
+  var thisMonthS=castsThisMonth.reduce(function(sum,c){return sum+(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm;}).reduce(function(s,r){return s+Number(r.sales||0);},0);},0);
+  var thisMonthT=castsThisMonth.reduce(function(sum,c){return sum+getMonthlyTarget(c,tm);},0);
+  var pct=thisMonthT>0?Math.round(thisMonthS/thisMonthT*100):0;
+
+  function FTooltip(tp){
+    if(!tp.active||!tp.payload||!tp.payload.length)return null;
+    return e('div',{style:{background:'#1a1a2e',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'10px 14px',fontSize:'12px'}},
+      e('div',{style:{color:'#9ca3af',marginBottom:'6px'}},tp.label),
+      tp.payload.filter(function(pp){return pp.value!=null;}).map(function(pp){return e('div',{key:pp.dataKey,style:{color:pp.color,marginBottom:'2px'}},pp.dataKey==='sales'?'売上: ':'目標: ',e('b',null,yen(pp.value)));})
+    );
+  }
+
+  function QRModal(){
+    var cast=p.data.casts.find(function(c){return c.id===qrCast;});
+    if(!cast)return null;
+    var url=window.location.origin+'/cast-view.html?id='+qrCast+'&uid='+(p.uid||'');
+    var qrRef=React.useRef(null);
+    React.useEffect(function(){
+      if(qrRef.current&&window.QRCode){
+        qrRef.current.innerHTML='';
+        try{new window.QRCode(qrRef.current,{text:url,width:200,height:200,colorDark:'#e8b86d',colorLight:'#12122a'});}catch(ex){}
+      }
+    },[url]);
+    return e('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'},onClick:function(){setQrCast(null);}},
+      e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'28px',maxWidth:'320px',width:'100%',textAlign:'center'},onClick:function(ev){ev.stopPropagation();}},
+        e('div',{style:{fontWeight:700,color:'#e8b86d',fontSize:'16px',marginBottom:'4px'}},cast.name),
+        e('div',{style:{color:'#6b7280',fontSize:'12px',marginBottom:'16px'}},'QRを読み込むとグラフ・顧客データを閲覧できます'),
+        window.QRCode
+          ?e('div',{ref:qrRef,style:{display:'flex',justifyContent:'center',marginBottom:'16px'}})
+          :e('div',{style:{background:'#0d0d1a',borderRadius:'8px',padding:'20px',marginBottom:'16px',color:'#6b7280',fontSize:'12px'}},'QRライブラリ読み込み中...'),
+        e('div',{style:{background:'#0d0d1a',borderRadius:'6px',padding:'8px',marginBottom:'12px',fontSize:'10px',color:'#4b5563',wordBreak:'break-all',userSelect:'all'}},url),
+        e('button',{style:{...S.btnPrimary,width:'100%',marginBottom:'8px'},onClick:function(){navigator.clipboard&&navigator.clipboard.writeText(url).then(function(){p.notify('URLをコピーしました');});}},'URLをコピー'),
+        e('button',{style:{...S.btnGhost,width:'100%'},onClick:function(){setQrCast(null);}},'閉じる')
+      )
+    );
+  }
+
+  var s_fai=React.useState(false);var showFAI=s_fai[0];var setShowFAI=s_fai[1];
+  var s_fair=React.useState('');var faiResult=s_fair[0];var setFaiResult=s_fair[1];
+  var s_fail=React.useState(false);var faiLoading=s_fail[0];var setFaiLoading=s_fail[1];
+
+  function runFolderAI(){
+    setFaiLoading(true);setFaiResult('');setShowFAI(true);
+    var now2=new Date();var tm2=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+    var lines=p.folderCasts.map(function(c){
+      var rows=(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm2;});
+      var s=rows.reduce(function(a,r){return a+Number(r.sales||0);},0);
+      var t=getMonthlyTarget(c,tm2);
+      return c.name+': '+yen(s)+(t>0?' 目標'+yen(t)+' '+(Math.round(s/t*100))+'%':'');
+    }).join(', ');
+    var prompt=p.folder.name+'フォルダの'+( now2.getMonth()+1)+'月売上: '+lines+' 各キャストへのアドバイスを日本語300文字以内で。';
+    fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})})
+    .then(function(r){return r.json();}).then(function(d){setFaiResult(d.content&&d.content[0]?d.content[0].text:'失敗');setFaiLoading(false);})
+    .catch(function(){setFaiResult('エラー');setFaiLoading(false);});
+  }
+
+  return e(FolderErrorBoundary,null,e('div',null,
+    e('div',{style:S.pageTitle},
+      e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+        e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
+        e('h2',{style:Object.assign({},S.h2,{margin:0})},p.folder.name)
+      ),
+      e('div',{style:{color:'#6b7280',fontSize:'12px'}},p.folderCasts.length+'名')
+    ),
+    showFAI&&e('div',{style:{background:'#12122a',border:'1px solid #a78bfa44',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
+      e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
+        e('span',{style:{color:'#a78bfa',fontWeight:700}},p.folder.name+' AI分析'),
+        e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setShowFAI(false);}},'✗')
+      ),
+      faiLoading?e('div',{style:{color:'#6b7280',fontSize:'13px'}},'分析中...'):e('div',{style:{color:'#e5e7eb',fontSize:'13px',lineHeight:'1.8',whiteSpace:'pre-wrap'}},faiResult)
+    ),
+
+    // グラフ
+    HAS_CHARTS&&p.folderCasts.length>0&&e('div',{style:{marginBottom:'16px'}},
+      e('div',{style:{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}},
+        fcAllYears.map(function(y){return e('button',{key:y,style:{...(fcYear===y?S.modeActive:S.modeBtn),fontSize:'11px',padding:'4px 10px'},onClick:function(){setFcYear(y);}},y+'年');})
+      ),
+      e('div',{style:S.chartWrap},
+        e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 4px',marginBottom:'8px'}},
+          e('div',{style:{color:'#6b7280',fontSize:'11px'}},fcYear+'年 月別'),
+          e('div',{style:{display:'flex',gap:'12px'}},
+            e('div',{style:{textAlign:'right'}},e('div',{style:{color:'#6b7280',fontSize:'10px'}},(now.getMonth()+1)+'月売上'),e('div',{style:{color:'#e8b86d',fontWeight:700}},yen(thisMonthS))),
+            thisMonthT>0&&e('div',{style:{textAlign:'right'}},e('div',{style:{color:'#6b7280',fontSize:'10px'}},'達成率'),e('div',{style:{color:pct>=100?'#34d399':pct>=70?'#fbbf24':'#fca5a5',fontWeight:700}},pct+'%'))
+          )
+        ),
+        e('div',{style:{overflowX:'auto'}},
+          e('div',{style:{minWidth:'480px'}},
+            e(ResponsiveContainer,{width:'100%',height:200},
+              e(ComposedChart,{data:monthlyData,margin:{left:10,right:10,top:4,bottom:4},onClick:function(ev){if(ev&&ev.activeLabel){var d=monthlyData.find(function(x){return x.month===ev.activeLabel;});if(d)setSelFolderMK(function(prev){return prev===d.month?null:d.month;});}}},
+                e(CartesianGrid,{strokeDasharray:'3 3',stroke:'#1e2035'}),
+                e(XAxis,{dataKey:'month',tick:{fill:'#6b7280',fontSize:11}}),
+                e(YAxis,{tickFormatter:function(v){return v>=10000?(v/10000).toFixed(0)+'万':v;},tick:{fill:'#9ca3af',fontSize:11},width:44}),
+                e(Tooltip,{content:e(FTooltip,null)}),
+                e(Bar,{isAnimationActive:false,dataKey:'sales',fill:'#e8b86d',fillOpacity:0.85,radius:[4,4,0,0],name:'sales'}),
+                e(Line,{isAnimationActive:false,type:'monotone',dataKey:'target',stroke:'#34d399',strokeWidth:2,strokeDasharray:'6 3',dot:{r:3,fill:'#34d399'},connectNulls:false,name:'target'})
+              )
+            )
+          )
+        )
+      )
+    ),
+
+    // グラフタップ詳細
+    e(FolderMKDetail,{selFolderMK:selFolderMK,setSelFolderMK:setSelFolderMK,chartYear:fcYear,folder:p.folder,data:p.data}),
+    // キャスト一覧（今月このフォルダに所属しているキャスト）
+    castsThisMonth.length===0
+      ?e('div',{style:S.empty},e('div',{style:{color:'#6b7280'}},'このフォルダにキャストがいません'))
+      :castsThisMonth.map(function(c){
+        var rows=p.data.records[c.id]||[];
+        var thisRows=rows.filter(function(r){return r.date.slice(0,7)===tm;});
+        var sales=thisRows.reduce(function(s,r){return s+Number(r.sales||0);},0);
+        var target=getMonthlyTarget(c,tm);
+        var cpct=target>0?Math.round(sales/target*100):null;
+        return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px 16px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'12px'}},
+          e('div',{style:{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:700,color:'#0d0d1a',flexShrink:0,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();});}},c.name[0]),
+          e('div',{style:{flex:1,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();})}},
+            e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},e('div',{style:{fontWeight:700,color:c.isDispatch?'#a78bfa':'#f3f4f6',fontSize:'14px'}},c.name),c.isDispatch&&e('span',{style:{background:'#a78bfa22',color:'#a78bfa',border:'1px solid #a78bfa44',borderRadius:'4px',padding:'1px 5px',fontSize:'10px',fontWeight:700}},'派遣')),
+            e('div',{style:{display:'flex',gap:'12px',marginTop:'4px'}},
+              e('span',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700}},yen(sales)),
+              cpct!==null&&e('span',{style:{color:cpct>=100?'#34d399':cpct>=70?'#fbbf24':'#9ca3af',fontSize:'12px'}},cpct+'%達成')
+            )
+          ),
+          e('button',{style:{background:'#1e2035',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#9ca3af',fontSize:'12px',padding:'4px 8px',cursor:'pointer'},onClick:function(){setQrCast(c.id);}}, e('span',{style:{display:'flex',alignItems:'center',gap:'3px'}},e('svg',{width:11,height:11,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2},e('rect',{x:3,y:3,width:7,height:7}),e('rect',{x:14,y:3,width:7,height:7}),e('rect',{x:14,y:14,width:7,height:7}),e('rect',{x:3,y:14,width:7,height:7})),'QR'))
+        );
+      }),
+    qrCast&&e(QRModal,null)
+  ));
+}
+
+function MyCastPage(p){
+  var s1=useState(null);var editFolderId=s1[0];var setEditFolderId=s1[1];
+  var s2=useState('');var folderName=s2[0];var setFolderName=s2[1];
+  // openFolderをAppから受け取る（castページから戻った時に復元）
+  var openFolder=p.openFolderProp||null;
+  var setOpenFolder=p.setOpenFolderProp||function(){};
+  var s4=useState(false);var showAddFolder=s4[0];var setShowAddFolder=s4[1];
+  var s_efm=useState(false);var editFolderMode=s_efm[0];var setEditFolderMode=s_efm[1];
+  var s_sel=useState({});var selectedCastIds=s_sel[0];var setSelectedCastIds=s_sel[1];
+  var s_tgt=useState('');var targetFolderId=s_tgt[0];var setTargetFolderId=s_tgt[1];
+
+  var folders=p.data.folders||[];
+
+  // フォルダ開いた時にsubBackを設定
+  React.useEffect(function(){
+    if(!p.isActive)return; // castページ表示中は上書きしない
+    if(p.onSetSubBack){
+      if(openFolder){
+        p.onSetSubBack(function(){setOpenFolder(null);return false;});
+      } else {
+        p.onSetSubBack(null);
+      }
+    }
+  },[openFolder,p.isActive]);
+
+  function moveCastsToFolder(){
+    if(!targetFolderId)return;
+    var ids=Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];});
+    if(ids.length===0)return;
+    var now2=new Date();var curMK=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+    var newCasts=p.data.casts.map(function(c){
+      if(!ids.includes(c.id))return c;
+      // folderHistory更新
+      var existingHist=c.folderHistory||[];
+      var currentFolder=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(c.id);});
+      var currentFolderId=currentFolder?currentFolder.id:null;
+      if(existingHist.length===0&&currentFolderId){
+        var allRecs=(p.data.records[c.id]||[]);
+        var firstMonth=allRecs.length>0?allRecs.slice().sort(function(a,b){return a.date.localeCompare(b.date);})[0].date.slice(0,7):'2020-01';
+        existingHist=[{folderId:currentFolderId,from:firstMonth}];
+      }
+      var hist=existingHist.filter(function(h){return h.from!==curMK;});
+      hist.push({folderId:targetFolderId,from:curMK});
+      return Object.assign({},c,{folderHistory:hist});
+    });
+    var newFolders=(p.data.folders||[]).map(function(f){
+      var newIds=(f.castIds||[]).filter(function(id){return!ids.includes(id);});
+      if(f.id===targetFolderId)newIds=newIds.concat(ids.filter(function(id){return!newIds.includes(id);}));
+      return Object.assign({},f,{castIds:newIds});
+    });
+    p.persist(Object.assign({},p.data,{casts:newCasts,folders:newFolders}));
+    setEditFolderMode(false);setSelectedCastIds({});setTargetFolderId('');
+    p.notify('フォルダを変更しました','success');
+  }
+  function addFolder(){
+    var name=folderName.trim();if(!name)return;
+    var newFolder={id:uid(),name:name,castIds:[]};
+    p.persist(Object.assign({},p.data,{folders:[...folders,newFolder]}));
+    setFolderName('');setShowAddFolder(false);p.notify(name+' フォルダを追加しました');
+  }
+  function deleteFolder(fid,name){
+    if(!confirm(name+' フォルダを削除しますか？'))return;
+    p.persist(Object.assign({},p.data,{folders:folders.filter(function(f){return f.id!==fid;})}));
+  }
+  function saveFolder(fid){
+    p.persist(Object.assign({},p.data,{folders:folders.map(function(f){return f.id===fid?Object.assign({},f,{name:folderName}):f;})}));
+    setEditFolderId(null);p.notify('フォルダ名を変更しました');
+  }
+
+  if(openFolder){
+    var folder=folders.find(function(f){return f.id===openFolder;});
+    if(!folder){setOpenFolder(null);return null;}
+    var folderCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
+    return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:p.data,onOpenCast:p.onOpenCast,notify:p.notify,uid:p.uid,onSetSubBack:p.onSetSubBack,onRestoreFolder:function(){setOpenFolder(openFolder);}});
+  }
+
+  return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
+    e('div',{style:S.pageTitle},
+      e('h1',{style:S.h1},'MG実績'),
+      e('div',{style:{display:'flex',gap:'8px'}},
+        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))),
+        e('button',{style:S.btnPrimary,onClick:function(){setShowAddFolder(!showAddFolder);setEditFolderMode(false);}},showAddFolder?'キャンセル':'+ フォルダ追加'),
+        e('button',{style:{background:editFolderMode?'#e8b86d22':'transparent',border:'1px solid '+(editFolderMode?'#e8b86d':'#4b5563'),borderRadius:'8px',padding:'6px 12px',color:editFolderMode?'#e8b86d':'#9ca3af',fontSize:'12px',fontWeight:700,cursor:'pointer'},
+          onClick:function(){setEditFolderMode(!editFolderMode);setSelectedCastIds({});setShowAddFolder(false);}
+        },editFolderMode?'完了':'編集')
+      )
+    ),
+    editFolderMode&&Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length>0&&e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'12px',marginBottom:'12px'}},
+      e('div',{style:{color:'#e8b86d',fontSize:'12px',fontWeight:700,marginBottom:'8px'}},Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length+'名選択中'),
+      e('select',{value:targetFolderId,onChange:function(ev){setTargetFolderId(ev.target.value);},style:{width:'100%',background:'#12122a',color:'#e5e7eb',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px',fontSize:'13px',marginBottom:'8px'}},
+        e('option',{value:''},'移動先フォルダを選択'),
+        folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
+      ),
+      e('button',{style:{width:'100%',background:'#e8b86d',color:'#0d0d1a',border:'none',borderRadius:'8px',padding:'10px',fontWeight:700,cursor:'pointer',fontSize:'13px'},onClick:moveCastsToFolder},'フォルダを変更')
+    ),
+    
+    showAddFolder&&e('div',{style:S.addForm},
+      e('input',{style:{...S.input,marginBottom:0},placeholder:'フォルダ名を入力',value:folderName,autoFocus:true,onChange:function(ev){setFolderName(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')addFolder();}}),
+      e('button',{style:S.btnPrimary,onClick:addFolder},'追加')
+    ),
+    folders.length===0
+      ?e('div',{style:S.empty},e('div',{style:{fontSize:'40px',marginBottom:'12px'}},'📁'),e('div',{style:{color:'#6b7280'}},'フォルダを追加してください'))
+      :folders.map(function(folder){
+        var fCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
+        return e('div',{key:folder.id,className:'luxury-card card-hover',style:{background:'linear-gradient(145deg,#12122a,#0f0f20)',border:'1px solid rgba(232,184,109,0.12)',borderRadius:'12px',marginBottom:'10px',overflow:'hidden'}},
+          e('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',cursor:'pointer'},onClick:function(){setOpenFolder(folder.id);}},
+            e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
+            editFolderId===folder.id
+              ?e('div',{style:{display:'flex',gap:'8px',flex:1},onClick:function(ev){ev.stopPropagation();}},
+                e('input',{style:{...S.input,marginBottom:0,flex:1,fontSize:'13px',padding:'6px 10px'},value:folderName,autoFocus:true,onChange:function(ev){setFolderName(ev.target.value);}}),
+                e('button',{style:{...S.btnPrimary,padding:'6px 12px',fontSize:'12px'},onClick:function(){saveFolder(folder.id);}},'保存'),
+                e('button',{style:S.btnGhost,onClick:function(){setEditFolderId(null);}},'✗')
+              )
+              :e(Fragment,null,
+                e('div',{style:{flex:1}},
+                  e('div',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'14px'}},folder.name),
+                  e('div',{style:{color:'#6b7280',fontSize:'12px'}},fCasts.length+'名')
+                ),
+                e('button',{style:S.bdEditBtn,onClick:function(ev){ev.stopPropagation();setEditFolderId(folder.id);setFolderName(folder.name);}},'編集'),
+                e('button',{style:{...S.btnDanger,marginLeft:'4px'},onClick:function(ev){ev.stopPropagation();deleteFolder(folder.id,folder.name);}},'削除'),
+                e('span',{style:{color:'#4b5563',fontSize:'14px'}}, '›')
+              )
+          ),
+          editFolderMode&&e('div',{style:{padding:'8px 16px 12px',borderTop:'1px solid #1e2035'}},
+            fCasts.map(function(c){
+              var checked=!!selectedCastIds[c.id];
+              return e('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:'8px',padding:'6px 0',cursor:'pointer'},
+                onClick:function(){var ns=Object.assign({},selectedCastIds);if(ns[c.id])delete ns[c.id];else ns[c.id]=folder.id;setSelectedCastIds(ns);}},
+                e('div',{style:{width:'18px',height:'18px',borderRadius:'4px',border:'2px solid '+(checked?'#e8b86d':'#374151'),background:checked?'#e8b86d':'transparent',display:'flex',alignItems:'center',justifyContent:'center'}},
+                  checked&&e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'#0d0d1a',strokeWidth:3},e('polyline',{points:'20 6 9 17 4 12'}))
+                ),
+                e('span',{style:{fontSize:'13px',color:'#e5e7eb'}},c.name)
+              );
+            })
+          )
+        );
+      })
+  );
+}
+
+
+// ─── 売上管理ページ ────────────────────────────────────────────────────────────
+function CastListPage(p){
+  var s1=useState('');var query=s1[0];var setQuery=s1[1];
+  var s2=useState(null);var detail=s2[0];var setDetail=s2[1];
+  var s3=useState(false);var showAdd=s3[0];var setShowAdd=s3[1];
+  var s4=useState('');var newName=s4[0];var setNewName=s4[1];
+  var s5=useState('');var newFolder=s5[0];var setNewFolder=s5[1];
+  var s6=useState('');var newShift=s6[0];var setNewShift=s6[1];
+  var s_af=useState({});var addForm=s_af[0];var setAddForm=s_af[1];
+  var s_disp=useState(null);var addType=s_disp[0];var setAddType=s_disp[1]; // null=未選択,'regular'=在籍,'dispatch'=派遣
+  var s7=useState(null);var editCast=s7[0];var setEditCast=s7[1];
+  var s8=useState({});var editForm=s8[0];var setEditForm=s8[1];
+  var s9=useState('name');var sortBy=s9[0];var setSortBy=s9[1];
+
+  var folders=p.data.folders||[];
+
+  // detail開いた時にsubBackを設定
+  React.useEffect(function(){
+    if(p.onSetSubBack){
+      if(detail){p.onSetSubBack(function(){return function(){setDetail(null);setEditCast(null);return false;};});}
+      else{p.onSetSubBack(null);}
+    }
+  },[detail]);
+
+  var sorted=useMemo(function(){
+    var list=[...p.data.casts];
+    if(sortBy==='name')list.sort(function(a,b){return a.name.localeCompare(b.name,'ja');});
+    else if(sortBy==='age')list.sort(function(a,b){var aa=calcAge(a.birthday)||999;var bb=calcAge(b.birthday)||999;return aa-bb;});
+    else if(sortBy==='height')list.sort(function(a,b){return Number(b.height||0)-Number(a.height||0);});
+    return list;
+  },[p.data.casts,sortBy]);
+
+  var filtered=useMemo(function(){
+    var q=query.trim().toLowerCase();
+    if(!q)return sorted;
+    return sorted.filter(function(c){
+      return[c.name,c.realName,c.hometown,c.memo,c.contractShift,String(c.height||''),c.birthday?fmtDate(c.birthday):''].join(' ').toLowerCase().includes(q);
+    });
+  },[sorted,query]);
+
+  function addCast(){
+    var name=newName.trim();if(!name)return;
+    var isDispatch=addType==='dispatch';
+    var finalName=isDispatch?'派遣'+name:name;
+    if(p.data.casts.find(function(c){return c.name===finalName;})){p.notify('同じ名前が既に存在します','error');return;}
+    var id=Date.now().toString();
+    var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
+    // 派遣の場合は「派遣」フォルダ、なければ作成
+    var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
+    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):newFolder||(p.data.folders.find(function(f){return f.name==='新入店';})||{}).id||'';
+    var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
+    var newFolders=(p.data.folders||[]).map(function(f){
+      var shouldAdd=isDispatch?f.id===initFid:newFolder?f.id===newFolder:f.name==='新入店';
+      if(shouldAdd)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});
+      return f;
+    });
+    var finalFolders=newFolders;
+    var finalCast=newCast;
+    if(isDispatch&&!dispatchFolder){
+      var dfId='dispatch_'+Date.now().toString();
+      finalCast=Object.assign({},newCast,{folderHistory:[{folderId:dfId,from:initMK}]});
+      finalFolders=[...newFolders,{id:dfId,name:'派遣',castIds:[id]}];
+    }
+    p.persist({...p.data,casts:[...p.data.casts,finalCast],records:{...p.data.records,[id]:[]},customers:{...p.data.customers,[id]:[]},folders:finalFolders});
+    setNewName('');setNewFolder('');setNewShift('');setAddForm({});setShowAdd(false);setAddType(null);p.notify(finalName+' を追加しました');
+  }
+
+  function saveEdit(id){
+    var now2=new Date();
+    var curMK=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+    var updated=p.data.casts.map(function(c){
+      if(c.id!==id)return c;
+      var base=Object.assign({},c,editForm);
+      // フォルダが変わった場合、履歴に記録
+      if(editForm.folderId){
+        var currentFolder=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(id);});
+        var currentFolderId=currentFolder?currentFolder.id:null;
+        if(editForm.folderId!==currentFolderId){
+          var existingHist=c.folderHistory||[];
+          // 既存履歴がない場合、現在のフォルダを「最初から今月前まで」として記録
+          if(existingHist.length===0&&currentFolderId){
+            // 最古の売上レコードの月を初期登録月とする
+            var allRecs=(p.data.records[id]||[]);
+            var firstMonth=allRecs.length>0
+              ?allRecs.slice().sort(function(a,b){return a.date.localeCompare(b.date);})[0].date.slice(0,7)
+              :'2020-01';
+            existingHist=[{folderId:currentFolderId,from:firstMonth}];
+          }
+          // 同月の移動は上書き
+          var hist=existingHist.filter(function(h){return h.from!==curMK;});
+          hist.push({folderId:editForm.folderId,from:curMK});
+          base.folderHistory=hist;
+        }
+      }
+      return base;
+    });
+    var newFolders=(p.data.folders||[]).map(function(f){
+      if(editForm.folderId){
+        var ids=(f.castIds||[]).filter(function(cid){return cid!==id;});
+        if(f.id===editForm.folderId)ids=[...ids,id];
+        return Object.assign({},f,{castIds:ids});
+      }
+      return f;
+    });
+    p.persist(Object.assign({},p.data,{casts:updated,folders:editForm.folderId?newFolders:p.data.folders}));
+    setEditCast(null);p.notify('保存しました');
+  }
+
+  function deleteCastItem(id,name){
+    if(!confirm(name+' を削除しますか？'))return;
+    var casts=p.data.casts.filter(function(c){return c.id!==id;});
+    var records=Object.assign({},p.data.records);delete records[id];
+    var customers=Object.assign({},p.data.customers);delete customers[id];
+    var newFolders=(p.data.folders||[]).map(function(f){return Object.assign({},f,{castIds:(f.castIds||[]).filter(function(cid){return cid!==id;})});});
+    p.persist({...p.data,casts:casts,records:records,customers:customers,folders:newFolders});
+    setDetail(null);p.notify(name+' を削除しました');
+  }
+
+  function getCastFolder(castId){
+    var f=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(castId);});
+    return f?f.name:null;
+  }
+
+  if(detail){
+    var cast=p.data.casts.find(function(c){return c.id===detail;});
+    if(!cast)return null;
+    var age=calcAge(cast.birthday);
+    var isEditing=editCast===detail;
+    var castFolderName=getCastFolder(detail);
+    return e('div',null,
+      e('div',{style:S.pageTitle},
+        e('div',{style:{flex:1}}),
+        e('div',{style:{display:'flex',gap:'8px'}},
+          !isEditing&&e('button',{style:S.btnEdit,onClick:function(){
+            var cf=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(detail);});
+            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||'',isDispatch:cast.isDispatch||false});
+          }}, '編集'),
+          e('button',{style:S.btnDanger,onClick:function(){deleteCastItem(cast.id,cast.name);}}, '削除')
+        )
+      ),
+      e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'24px',marginBottom:'16px'}},
+        e('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:'20px'}},
+          e('div',{style:{width:'80px',height:'80px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'32px',fontWeight:700,color:'#0d0d1a',marginBottom:'12px'}},cast.name[0]),
+          e('div',{style:{fontSize:'20px',fontWeight:700,color:'#f3f4f6'}},cast.name),
+          age!==null&&e('div',{style:{color:'#9ca3af',fontSize:'13px',marginTop:'4px'}},age+'歳')
+        ),
+        isEditing
+          ?e('div',null,
+            e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'12px',padding:'10px 12px',background:editForm.isDispatch?'#a78bfa11':'#60a5fa11',borderRadius:'8px',border:'1px solid '+(editForm.isDispatch?'#a78bfa33':'#60a5fa33')}},
+              e('span',{style:{flex:1,fontSize:'13px',color:editForm.isDispatch?'#a78bfa':'#60a5fa',fontWeight:700}},editForm.isDispatch?'派遣キャスト':'在籍キャスト'),
+              e('button',{style:{background:'transparent',border:'1px solid '+(editForm.isDispatch?'#60a5fa':'#a78bfa'),borderRadius:'6px',padding:'4px 10px',color:editForm.isDispatch?'#60a5fa':'#a78bfa',fontSize:'11px',cursor:'pointer'},
+                onClick:function(){
+                  var nowDispatch=!editForm.isDispatch;
+                  var newName2=editForm.name||'';
+                  if(nowDispatch&&!newName2.startsWith('派遣'))newName2='派遣'+newName2;
+                  if(!nowDispatch&&newName2.startsWith('派遣'))newName2=newName2.slice(2);
+                  setEditForm(function(f){return Object.assign({},f,{isDispatch:nowDispatch,name:newName2});});
+                }
+              },editForm.isDispatch?'在籍に変更':'派遣に変更')
+            ),
+            [['name','キャスト名','text'],['birthday','誕生日','date'],['realName','本名','text'],['hometown','出身地','text'],['height','身長 (cm)','number'],['contractShift','契約シフト','text']].map(function(f){
+              return e('div',{key:f[0]},
+                e('label',{style:S.label},f[1]),
+                e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:f[0]==='height'?'例: 165':'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
+              );
+            }),
+            e('label',{style:S.label},'所属フォルダ'),
+            e('select',{style:{...S.input,appearance:'none'},value:editForm.folderId||'',onChange:function(ev){setEditForm(function(fm){return{...fm,folderId:ev.target.value};})}},
+              e('option',{value:''},'変更しない'),
+              folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
+            ),
+            e('label',{style:S.label},'メモ'),
+            e('textarea',{style:{...S.input,minHeight:'70px',resize:'vertical',fontFamily:'inherit'},value:editForm.memo||'',onChange:function(ev){setEditForm(function(fm){return{...fm,memo:ev.target.value};})},placeholder:'メモ...'}),
+            e('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+              e('button',{style:S.btnGhost,onClick:function(){setEditCast(null);}}, 'キャンセル'),
+              e('button',{style:S.btnPrimary,onClick:function(){saveEdit(detail);}}, '保存')
+            )
+          )
+          :e('div',null,
+            [['誕生日',cast.birthday?fmtDate(cast.birthday)+(age!==null?' ('+age+'歳)':''):'未設定'],
+             ['本名',cast.realName||'未設定'],['出身地',cast.hometown||'未設定'],
+             ['身長',cast.height?cast.height+'cm':'未設定'],
+             ['契約シフト',cast.contractShift||'未設定'],['所属フォルダ',castFolderName||'未設定'],['メモ',cast.memo||'なし']].map(function(row){
+              return e('div',{key:row[0],style:{display:'flex',gap:'8px',marginBottom:'10px',fontSize:'14px'}},
+                e('span',{style:{color:'#6b7280',minWidth:'100px',flexShrink:0}},row[0]),
+                e('span',{style:{color:'#e5e7eb',wordBreak:'break-word'}},row[1])
+              );
+            })
+          )
+      )
+    );
+  }
+
+  return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
+    e('div',{style:S.pageTitle},
+      e('h1',{style:S.h1},'キャスト一覧'),
+      e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))),
+      e('button',{style:S.btnPrimary,onClick:function(){setShowAdd(!showAdd);if(showAdd){setAddType(null);setNewName('');setAddForm({});setNewFolder('');setNewShift('');}}},showAdd?'キャンセル':'+ キャスト登録')
+    ),
+    showAdd&&e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
+      !addType&&e('div',null,
+        e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'16px',textAlign:'center'}},'登録タイプを選択'),
+        e('div',{style:{display:'flex',gap:'12px'}},
+          e('button',{style:{flex:1,background:'#60a5fa18',border:'2px solid #60a5fa',borderRadius:'12px',padding:'20px 12px',color:'#60a5fa',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){setAddType('regular');}},
+            e('div',null,'在籍'),e('div',{style:{fontSize:'11px',fontWeight:400,marginTop:'4px',color:'#9ca3af'}},'通常キャスト')
+          ),
+          e('button',{style:{flex:1,background:'#a78bfa18',border:'2px solid #a78bfa',borderRadius:'12px',padding:'20px 12px',color:'#a78bfa',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){setAddType('dispatch');}},
+            e('div',null,'派遣'),e('div',{style:{fontSize:'11px',fontWeight:400,marginTop:'4px',color:'#9ca3af'}},'名前頭に「派遣」付く')
+          )
+        )
+      ),
+      addType&&e('div',null,
+        e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'14px'}},
+          e('span',{style:{background:addType==='dispatch'?'#a78bfa22':'#60a5fa22',color:addType==='dispatch'?'#a78bfa':'#60a5fa',border:'1px solid '+(addType==='dispatch'?'#a78bfa':'#60a5fa'),borderRadius:'20px',padding:'2px 10px',fontSize:'12px',fontWeight:700}},addType==='dispatch'?'派遣':'在籍'),
+          e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setAddType(null);}},'変更')
+        ),
+      e('label',{style:S.label},'キャスト名 *'),
+      e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
+      e('label',{style:S.label},'所属フォルダ'),
+      e('select',{style:{...S.input,appearance:'none'},value:newFolder,onChange:function(ev){setNewFolder(ev.target.value);}},
+        e('option',{value:''},'新入店（デフォルト）'),
+        folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
+      ),
+      e('label',{style:S.label},'誕生日'),
+      e('input',{type:'date',style:S.input,value:addForm.birthday||'',onChange:function(ev){setAddForm(function(f){return{...f,birthday:ev.target.value};})}}),
+      e('label',{style:S.label},'本名'),
+      e('input',{type:'text',style:S.input,placeholder:'本名（任意）',value:addForm.realName||'',onChange:function(ev){setAddForm(function(f){return{...f,realName:ev.target.value};})}}),
+      e('label',{style:S.label},'出身地'),
+      e('input',{type:'text',style:S.input,placeholder:'例: 東京都',value:addForm.hometown||'',onChange:function(ev){setAddForm(function(f){return{...f,hometown:ev.target.value};})}}),
+      e('label',{style:S.label},'身長 (cm)'),
+      e('input',{type:'number',style:S.input,placeholder:'例: 165',value:addForm.height||'',onChange:function(ev){setAddForm(function(f){return{...f,height:ev.target.value};})}}),
+      e('label',{style:S.label},'契約シフト'),
+      e('input',{type:'text',style:S.input,placeholder:'例: 週5・20:00〜翌4:00',value:newShift,onChange:function(ev){setNewShift(ev.target.value);}}),
+      e('label',{style:S.label},'メモ'),
+      e('textarea',{style:{...S.input,minHeight:'60px',resize:'vertical',fontFamily:'inherit'},placeholder:'メモ（任意）',value:addForm.memo||'',onChange:function(ev){setAddForm(function(f){return{...f,memo:ev.target.value};})}}),
+      e('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
+        e('button',{style:S.btnGhost,onClick:function(){setShowAdd(false);setAddForm({});}}, 'キャンセル'),
+        e('button',{style:S.btnPrimary,onClick:addCast},'追加')
+      )
+    )),
+    // 検索
+    e('div',{style:{position:'relative',marginBottom:'10px'}},
+      e('span',{style:{position:'absolute',left:'12px',top:'50%',transform:'translateY(-50%)',color:'#4b5563',fontSize:'15px',pointerEvents:'none'}},e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round'},e('circle',{cx:11,cy:11,r:8}),e('line',{x1:21,y1:21,x2:16.65,y2:16.65}))),
+      e('input',{style:{...S.input,paddingLeft:'38px',marginBottom:0},placeholder:'名前・本名・出身地・身長・メモで検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})
+    ),
+    // 並べ替え
+    e('div',{style:{display:'flex',gap:'6px',marginBottom:'14px',flexWrap:'wrap'}},
+      e('span',{style:{color:'#6b7280',fontSize:'11px',alignSelf:'center'}},'並べ替え:'),
+      [['name','50音順'],['age','年齢順'],['height','身長順']].map(function(item){
+        return e('button',{key:item[0],style:{...(sortBy===item[0]?S.modeActive:S.modeBtn),fontSize:'11px',padding:'4px 10px'},onClick:function(){setSortBy(item[0]);}},item[1]);
+      })
+    ),
+    filtered.length===0?e('div',{style:S.empty},e('div',{style:{color:'#6b7280'}},query?'該当するキャストがいません':'キャストを登録してください')):
+    filtered.map(function(c){
+      var age=calcAge(c.birthday);
+      var folderName=getCastFolder(c.id);
+      return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'14px 16px',marginBottom:'8px',cursor:'pointer',display:'flex',alignItems:'center',gap:'12px'},onClick:function(){setDetail(c.id);}},
+        e('div',{style:{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:700,color:'#0d0d1a',flexShrink:0}},c.name[0]),
+        e('div',{style:{flex:1}},
+          e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},e('div',{style:{fontWeight:700,color:c.isDispatch?'#a78bfa':'#f3f4f6',fontSize:'14px'}},c.name),c.isDispatch&&e('span',{style:{background:'#a78bfa22',color:'#a78bfa',border:'1px solid #a78bfa44',borderRadius:'4px',padding:'1px 5px',fontSize:'10px',fontWeight:700}},'派遣')),
+          e('div',{style:{color:'#6b7280',fontSize:'11px',marginTop:'2px',display:'flex',gap:'8px',flexWrap:'wrap'}},
+            folderName&&e('span',{style:{color:'#a78bfa'}},folderName),
+            age!==null&&e('span',{},age+'歳'),
+            c.height&&e('span',{},c.height+'cm'),
+            c.hometown&&e('span',{},c.hometown)
+          )
+        ),
+        e('span',{style:{color:'#4b5563',fontSize:'16px'}}, '›')
+      );
+    })
+  );
+}
+
+
+// ─── シフト管理ページ ──────────────────────────────────────────────────────────
+var SHIFT_STATUSES=[
+  {key:'off',label:'休み',color:'#4b5563',bg:'#1e2035'},
+  {key:'work',label:'出勤',color:'#34d399',bg:'#34d39918'},
+  {key:'douhan',label:'同伴',color:'#a78bfa',bg:'#a78bfa18'},
+  {key:'pending',label:'保留',color:'#fbbf24',bg:'#fbbf2418'},
+];
+
 function ShiftPage(p){
   var now=new Date();if(now.getHours()<3)now.setDate(now.getDate()-1);
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
@@ -1104,355 +1734,6 @@ function TargetModal(p){
 }
 
 // ─── QRビューアー（index.html内に組み込み）────────────────────────────────
-function MyCastPage(p){
-  var s1=useState(null);var editFolderId=s1[0];var setEditFolderId=s1[1];
-  var s2=useState('');var folderName=s2[0];var setFolderName=s2[1];
-  // openFolderをAppから受け取る（castページから戻った時に復元）
-  var openFolder=p.openFolderProp||null;
-  var setOpenFolder=p.setOpenFolderProp||function(){};
-  var s4=useState(false);var showAddFolder=s4[0];var setShowAddFolder=s4[1];
-  var s_efm=useState(false);var editFolderMode=s_efm[0];var setEditFolderMode=s_efm[1];
-  var s_sel=useState({});var selectedCastIds=s_sel[0];var setSelectedCastIds=s_sel[1];
-  var s_tgt=useState('');var targetFolderId=s_tgt[0];var setTargetFolderId=s_tgt[1];
-
-  var folders=p.data.folders||[];
-
-  // フォルダ開いた時にsubBackを設定
-  React.useEffect(function(){
-    if(!p.isActive)return; // castページ表示中は上書きしない
-    if(p.onSetSubBack){
-      if(openFolder){
-        p.onSetSubBack(function(){setOpenFolder(null);return false;});
-      } else {
-        p.onSetSubBack(null);
-      }
-    }
-  },[openFolder,p.isActive]);
-
-  function moveCastsToFolder(){
-    if(!targetFolderId)return;
-    var ids=Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];});
-    if(ids.length===0)return;
-    var now2=new Date();var curMK=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-    var newCasts=p.data.casts.map(function(c){
-      if(!ids.includes(c.id))return c;
-      // folderHistory更新
-      var existingHist=c.folderHistory||[];
-      var currentFolder=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(c.id);});
-      var currentFolderId=currentFolder?currentFolder.id:null;
-      if(existingHist.length===0&&currentFolderId){
-        var allRecs=(p.data.records[c.id]||[]);
-        var firstMonth=allRecs.length>0?allRecs.slice().sort(function(a,b){return a.date.localeCompare(b.date);})[0].date.slice(0,7):'2020-01';
-        existingHist=[{folderId:currentFolderId,from:firstMonth}];
-      }
-      var hist=existingHist.filter(function(h){return h.from!==curMK;});
-      hist.push({folderId:targetFolderId,from:curMK});
-      return Object.assign({},c,{folderHistory:hist});
-    });
-    var newFolders=(p.data.folders||[]).map(function(f){
-      var newIds=(f.castIds||[]).filter(function(id){return!ids.includes(id);});
-      if(f.id===targetFolderId)newIds=newIds.concat(ids.filter(function(id){return!newIds.includes(id);}));
-      return Object.assign({},f,{castIds:newIds});
-    });
-    p.persist(Object.assign({},p.data,{casts:newCasts,folders:newFolders}));
-    setEditFolderMode(false);setSelectedCastIds({});setTargetFolderId('');
-    p.notify('フォルダを変更しました','success');
-  }
-  function addFolder(){
-    var name=folderName.trim();if(!name)return;
-    var newFolder={id:uid(),name:name,castIds:[]};
-    p.persist(Object.assign({},p.data,{folders:[...folders,newFolder]}));
-    setFolderName('');setShowAddFolder(false);p.notify(name+' フォルダを追加しました');
-  }
-  function deleteFolder(fid,name){
-    if(!confirm(name+' フォルダを削除しますか？'))return;
-    p.persist(Object.assign({},p.data,{folders:folders.filter(function(f){return f.id!==fid;})}));
-  }
-  function saveFolder(fid){
-    p.persist(Object.assign({},p.data,{folders:folders.map(function(f){return f.id===fid?Object.assign({},f,{name:folderName}):f;})}));
-    setEditFolderId(null);p.notify('フォルダ名を変更しました');
-  }
-
-  if(openFolder){
-    var folder=folders.find(function(f){return f.id===openFolder;});
-    if(!folder){setOpenFolder(null);return null;}
-    var folderCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
-    return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:p.data,onOpenCast:p.onOpenCast,notify:p.notify,uid:p.uid,onSetSubBack:p.onSetSubBack,onRestoreFolder:function(){setOpenFolder(openFolder);}});
-  }
-
-  return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
-    e('div',{style:S.pageTitle},
-      e('h1',{style:S.h1},'MG実績'),
-      e('div',{style:{display:'flex',gap:'8px'}},
-        e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))),
-        e('button',{style:S.btnPrimary,onClick:function(){setShowAddFolder(!showAddFolder);setEditFolderMode(false);}},showAddFolder?'キャンセル':'+ フォルダ追加'),
-        e('button',{style:{background:editFolderMode?'#e8b86d22':'transparent',border:'1px solid '+(editFolderMode?'#e8b86d':'#4b5563'),borderRadius:'8px',padding:'6px 12px',color:editFolderMode?'#e8b86d':'#9ca3af',fontSize:'12px',fontWeight:700,cursor:'pointer'},
-          onClick:function(){setEditFolderMode(!editFolderMode);setSelectedCastIds({});setShowAddFolder(false);}
-        },editFolderMode?'完了':'編集')
-      )
-    ),
-    editFolderMode&&Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length>0&&e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'12px',marginBottom:'12px'}},
-      e('div',{style:{color:'#e8b86d',fontSize:'12px',fontWeight:700,marginBottom:'8px'}},Object.keys(selectedCastIds).filter(function(id){return selectedCastIds[id];}).length+'名選択中'),
-      e('select',{value:targetFolderId,onChange:function(ev){setTargetFolderId(ev.target.value);},style:{width:'100%',background:'#12122a',color:'#e5e7eb',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px',fontSize:'13px',marginBottom:'8px'}},
-        e('option',{value:''},'移動先フォルダを選択'),
-        folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
-      ),
-      e('button',{style:{width:'100%',background:'#e8b86d',color:'#0d0d1a',border:'none',borderRadius:'8px',padding:'10px',fontWeight:700,cursor:'pointer',fontSize:'13px'},onClick:moveCastsToFolder},'フォルダを変更')
-    ),
-    
-    showAddFolder&&e('div',{style:S.addForm},
-      e('input',{style:{...S.input,marginBottom:0},placeholder:'フォルダ名を入力',value:folderName,autoFocus:true,onChange:function(ev){setFolderName(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')addFolder();}}),
-      e('button',{style:S.btnPrimary,onClick:addFolder},'追加')
-    ),
-    folders.length===0
-      ?e('div',{style:S.empty},e('div',{style:{fontSize:'40px',marginBottom:'12px'}},'📁'),e('div',{style:{color:'#6b7280'}},'フォルダを追加してください'))
-      :folders.map(function(folder){
-        var fCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
-        return e('div',{key:folder.id,className:'luxury-card card-hover',style:{background:'linear-gradient(145deg,#12122a,#0f0f20)',border:'1px solid rgba(232,184,109,0.12)',borderRadius:'12px',marginBottom:'10px',overflow:'hidden'}},
-          e('div',{style:{display:'flex',alignItems:'center',gap:'10px',padding:'14px 16px',cursor:'pointer'},onClick:function(){setOpenFolder(folder.id);}},
-            e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
-            editFolderId===folder.id
-              ?e('div',{style:{display:'flex',gap:'8px',flex:1},onClick:function(ev){ev.stopPropagation();}},
-                e('input',{style:{...S.input,marginBottom:0,flex:1,fontSize:'13px',padding:'6px 10px'},value:folderName,autoFocus:true,onChange:function(ev){setFolderName(ev.target.value);}}),
-                e('button',{style:{...S.btnPrimary,padding:'6px 12px',fontSize:'12px'},onClick:function(){saveFolder(folder.id);}},'保存'),
-                e('button',{style:S.btnGhost,onClick:function(){setEditFolderId(null);}},'✗')
-              )
-              :e(Fragment,null,
-                e('div',{style:{flex:1}},
-                  e('div',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'14px'}},folder.name),
-                  e('div',{style:{color:'#6b7280',fontSize:'12px'}},fCasts.length+'名')
-                ),
-                e('button',{style:S.bdEditBtn,onClick:function(ev){ev.stopPropagation();setEditFolderId(folder.id);setFolderName(folder.name);}},'編集'),
-                e('button',{style:{...S.btnDanger,marginLeft:'4px'},onClick:function(ev){ev.stopPropagation();deleteFolder(folder.id,folder.name);}},'削除'),
-                e('span',{style:{color:'#4b5563',fontSize:'14px'}}, '›')
-              )
-          ),
-          editFolderMode&&e('div',{style:{padding:'8px 16px 12px',borderTop:'1px solid #1e2035'}},
-            fCasts.map(function(c){
-              var checked=!!selectedCastIds[c.id];
-              return e('div',{key:c.id,style:{display:'flex',alignItems:'center',gap:'8px',padding:'6px 0',cursor:'pointer'},
-                onClick:function(){var ns=Object.assign({},selectedCastIds);if(ns[c.id])delete ns[c.id];else ns[c.id]=folder.id;setSelectedCastIds(ns);}},
-                e('div',{style:{width:'18px',height:'18px',borderRadius:'4px',border:'2px solid '+(checked?'#e8b86d':'#374151'),background:checked?'#e8b86d':'transparent',display:'flex',alignItems:'center',justifyContent:'center'}},
-                  checked&&e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'#0d0d1a',strokeWidth:3},e('polyline',{points:'20 6 9 17 4 12'}))
-                ),
-                e('span',{style:{fontSize:'13px',color:'#e5e7eb'}},c.name)
-              );
-            })
-          )
-        );
-      })
-  );
-}
-
-
-// ─── 売上管理ページ ────────────────────────────────────────────────────────────
-function FolderMKDetail(p){
-  if(!p.selFolderMK)return null;
-  var mkKey=p.chartYear+'-'+pad(Number(p.selFolderMK.replace('月','')));
-  var castSales=(p.data.casts||[]).filter(function(c){
-    if(c.folderHistory&&c.folderHistory.length>0)return getCastFolderAt(c,mkKey)===p.folder.id;
-    return(p.folder.castIds||[]).includes(c.id);
-  }).map(function(c){
-    var rows=((p.data.records||{})[c.id]||[]).filter(function(r){return r.date.slice(0,7)===mkKey;});
-    return{name:c.name,sales:rows.reduce(function(s,r){return s+Number(r.sales||0);},0)};
-  }).filter(function(x){return x.sales>0;}).sort(function(a,b){return b.sales-a.sales;});
-  var maxS=castSales.length>0?castSales[0].sales:1;
-  return e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d33',borderRadius:'12px',padding:'14px',marginBottom:'16px'}},
-    e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
-      e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},p.selFolderMK+'　キャスト別売上'),
-      e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer',fontSize:'16px'},onClick:function(){p.setSelFolderMK(null);}},'✗')
-    ),
-    castSales.length===0
-      ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'4px 0'}},'データなし')
-      :e('div',null,castSales.map(function(item,i){
-        return e('div',{key:item.name,style:{marginBottom:'8px'}},
-          e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'3px'}},
-            e('span',{style:{width:'18px',fontSize:'12px',textAlign:'center'}},e('span',{style:{fontWeight:700,color:i===0?'#f59e0b':i===1?'#9ca3af':i===2?'#b45309':'#6b7280'}},i===0?'1':i===1?'2':i===2?'3':String(i+1))),
-            e('span',{style:{flex:1,fontSize:'13px',fontWeight:700,color:'#f3f4f6'}},item.name),
-            e('span',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px'}},yen(item.sales))
-          ),
-          e('div',{style:{background:'#0d0d1a',borderRadius:'99px',height:'4px',overflow:'hidden'}},
-            e('div',{style:{background:'linear-gradient(90deg,#e8b86d,#a78bfa)',height:'100%',width:Math.round(item.sales/maxS*100)+'%',borderRadius:'99px'}})
-          )
-        );
-      }))
-  );
-}
-
-function FolderDetail(p){
-  var now=new Date();
-  var tm=now.getFullYear()+'-'+pad(now.getMonth()+1);
-  var s1=useState(null);var qrCast=s1[0];var setQrCast=s1[1];
-
-  var fcAllYears=useMemo(function(){
-    var ys=new Set();
-    p.folderCasts.forEach(function(c){(p.data.records[c.id]||[]).forEach(function(r){ys.add(r.date.slice(0,4));});});
-    ys.add(String(now.getFullYear()));
-    return Array.from(ys).sort(function(a,b){return b.localeCompare(a);});
-  },[p.folderCasts,p.data.records]);
-
-  var s2=useState(String(now.getFullYear()));var fcYear=s2[0];var setFcYear=s2[1];
-  var s10=useState(null);var selFolderMK=s10[0];var setSelFolderMK=s10[1];
-
-  var monthlyData=useMemo(function(){
-    var list=[];
-    // folderHistoryを持つキャストはその月の所属フォルダで集計
-    var allCasts=p.data.casts;
-    for(var mi=1;mi<=12;mi++){
-      var mk2=fcYear+'-'+pad(mi);
-      var totalS=0;var totalT=0;
-      // この月にこのフォルダに所属していたキャストを収集
-      var castsInFolder=allCasts.filter(function(c){
-        if(c.folderHistory&&c.folderHistory.length>0){
-          // 履歴あり: その月の所属フォルダIDを確認
-          return getCastFolderAt(c,mk2)===p.folder.id;
-        }
-        // 履歴なし: 現在のフォルダメンバーかどうか
-        return(p.folder.castIds||[]).includes(c.id);
-      });
-      castsInFolder.forEach(function(c){
-        var rows=(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===mk2;});
-        totalS+=rows.reduce(function(s,r){return s+Number(r.sales||0);},0);
-        totalT+=getMonthlyTarget(c,mk2);
-      });
-      list.push({month:mi+'月',sales:totalS,target:totalT>0?totalT:null});
-    }
-    return list;
-  },[p.folderCasts,p.data,p.folder,fcYear]);
-
-  var castsThisMonth=p.data.casts.filter(function(c){
-    if(c.folderHistory&&c.folderHistory.length>0)return getCastFolderAt(c,tm)===p.folder.id;
-    return(p.folder.castIds||[]).includes(c.id);
-  });
-  var thisMonthS=castsThisMonth.reduce(function(sum,c){return sum+(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm;}).reduce(function(s,r){return s+Number(r.sales||0);},0);},0);
-  var thisMonthT=castsThisMonth.reduce(function(sum,c){return sum+getMonthlyTarget(c,tm);},0);
-  var pct=thisMonthT>0?Math.round(thisMonthS/thisMonthT*100):0;
-
-  function FTooltip(tp){
-    if(!tp.active||!tp.payload||!tp.payload.length)return null;
-    return e('div',{style:{background:'#1a1a2e',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'10px 14px',fontSize:'12px'}},
-      e('div',{style:{color:'#9ca3af',marginBottom:'6px'}},tp.label),
-      tp.payload.filter(function(pp){return pp.value!=null;}).map(function(pp){return e('div',{key:pp.dataKey,style:{color:pp.color,marginBottom:'2px'}},pp.dataKey==='sales'?'売上: ':'目標: ',e('b',null,yen(pp.value)));})
-    );
-  }
-
-  function QRModal(){
-    var cast=p.data.casts.find(function(c){return c.id===qrCast;});
-    if(!cast)return null;
-    var url=window.location.origin+'/cast-view.html?id='+qrCast+'&uid='+(p.uid||'');
-    var qrRef=React.useRef(null);
-    React.useEffect(function(){
-      if(qrRef.current&&window.QRCode){
-        qrRef.current.innerHTML='';
-        try{new window.QRCode(qrRef.current,{text:url,width:200,height:200,colorDark:'#e8b86d',colorLight:'#12122a'});}catch(ex){}
-      }
-    },[url]);
-    return e('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'},onClick:function(){setQrCast(null);}},
-      e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'28px',maxWidth:'320px',width:'100%',textAlign:'center'},onClick:function(ev){ev.stopPropagation();}},
-        e('div',{style:{fontWeight:700,color:'#e8b86d',fontSize:'16px',marginBottom:'4px'}},cast.name),
-        e('div',{style:{color:'#6b7280',fontSize:'12px',marginBottom:'16px'}},'QRを読み込むとグラフ・顧客データを閲覧できます'),
-        window.QRCode
-          ?e('div',{ref:qrRef,style:{display:'flex',justifyContent:'center',marginBottom:'16px'}})
-          :e('div',{style:{background:'#0d0d1a',borderRadius:'8px',padding:'20px',marginBottom:'16px',color:'#6b7280',fontSize:'12px'}},'QRライブラリ読み込み中...'),
-        e('div',{style:{background:'#0d0d1a',borderRadius:'6px',padding:'8px',marginBottom:'12px',fontSize:'10px',color:'#4b5563',wordBreak:'break-all',userSelect:'all'}},url),
-        e('button',{style:{...S.btnPrimary,width:'100%',marginBottom:'8px'},onClick:function(){navigator.clipboard&&navigator.clipboard.writeText(url).then(function(){p.notify('URLをコピーしました');});}},'URLをコピー'),
-        e('button',{style:{...S.btnGhost,width:'100%'},onClick:function(){setQrCast(null);}},'閉じる')
-      )
-    );
-  }
-
-  var s_fai=React.useState(false);var showFAI=s_fai[0];var setShowFAI=s_fai[1];
-  var s_fair=React.useState('');var faiResult=s_fair[0];var setFaiResult=s_fair[1];
-  var s_fail=React.useState(false);var faiLoading=s_fail[0];var setFaiLoading=s_fail[1];
-
-  function runFolderAI(){
-    setFaiLoading(true);setFaiResult('');setShowFAI(true);
-    var now2=new Date();var tm2=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-    var lines=p.folderCasts.map(function(c){
-      var rows=(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm2;});
-      var s=rows.reduce(function(a,r){return a+Number(r.sales||0);},0);
-      var t=getMonthlyTarget(c,tm2);
-      return c.name+': '+yen(s)+(t>0?' 目標'+yen(t)+' '+(Math.round(s/t*100))+'%':'');
-    }).join(', ');
-    var prompt=p.folder.name+'フォルダの'+( now2.getMonth()+1)+'月売上: '+lines+' 各キャストへのアドバイスを日本語300文字以内で。';
-    fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})})
-    .then(function(r){return r.json();}).then(function(d){setFaiResult(d.content&&d.content[0]?d.content[0].text:'失敗');setFaiLoading(false);})
-    .catch(function(){setFaiResult('エラー');setFaiLoading(false);});
-  }
-
-  return e(FolderErrorBoundary,null,e('div',null,
-    e('div',{style:S.pageTitle},
-      e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
-        e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z'})),
-        e('h2',{style:Object.assign({},S.h2,{margin:0})},p.folder.name)
-      ),
-      e('div',{style:{color:'#6b7280',fontSize:'12px'}},p.folderCasts.length+'名')
-    ),
-    showFAI&&e('div',{style:{background:'#12122a',border:'1px solid #a78bfa44',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
-      e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
-        e('span',{style:{color:'#a78bfa',fontWeight:700}},p.folder.name+' AI分析'),
-        e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setShowFAI(false);}},'✗')
-      ),
-      faiLoading?e('div',{style:{color:'#6b7280',fontSize:'13px'}},'分析中...'):e('div',{style:{color:'#e5e7eb',fontSize:'13px',lineHeight:'1.8',whiteSpace:'pre-wrap'}},faiResult)
-    ),
-
-    // グラフ
-    HAS_CHARTS&&p.folderCasts.length>0&&e('div',{style:{marginBottom:'16px'}},
-      e('div',{style:{display:'flex',gap:'6px',marginBottom:'8px',flexWrap:'wrap'}},
-        fcAllYears.map(function(y){return e('button',{key:y,style:{...(fcYear===y?S.modeActive:S.modeBtn),fontSize:'11px',padding:'4px 10px'},onClick:function(){setFcYear(y);}},y+'年');})
-      ),
-      e('div',{style:S.chartWrap},
-        e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'0 4px',marginBottom:'8px'}},
-          e('div',{style:{color:'#6b7280',fontSize:'11px'}},fcYear+'年 月別'),
-          e('div',{style:{display:'flex',gap:'12px'}},
-            e('div',{style:{textAlign:'right'}},e('div',{style:{color:'#6b7280',fontSize:'10px'}},(now.getMonth()+1)+'月売上'),e('div',{style:{color:'#e8b86d',fontWeight:700}},yen(thisMonthS))),
-            thisMonthT>0&&e('div',{style:{textAlign:'right'}},e('div',{style:{color:'#6b7280',fontSize:'10px'}},'達成率'),e('div',{style:{color:pct>=100?'#34d399':pct>=70?'#fbbf24':'#fca5a5',fontWeight:700}},pct+'%'))
-          )
-        ),
-        e('div',{style:{overflowX:'auto'}},
-          e('div',{style:{minWidth:'480px'}},
-            e(ResponsiveContainer,{width:'100%',height:200},
-              e(ComposedChart,{data:monthlyData,margin:{left:10,right:10,top:4,bottom:4},onClick:function(ev){if(ev&&ev.activeLabel){var d=monthlyData.find(function(x){return x.month===ev.activeLabel;});if(d)setSelFolderMK(function(prev){return prev===d.month?null:d.month;});}}},
-                e(CartesianGrid,{strokeDasharray:'3 3',stroke:'#1e2035'}),
-                e(XAxis,{dataKey:'month',tick:{fill:'#6b7280',fontSize:11}}),
-                e(YAxis,{tickFormatter:function(v){return v>=10000?(v/10000).toFixed(0)+'万':v;},tick:{fill:'#9ca3af',fontSize:11},width:44}),
-                e(Tooltip,{content:e(FTooltip,null)}),
-                e(Bar,{isAnimationActive:false,dataKey:'sales',fill:'#e8b86d',fillOpacity:0.85,radius:[4,4,0,0],name:'sales'}),
-                e(Line,{isAnimationActive:false,type:'monotone',dataKey:'target',stroke:'#34d399',strokeWidth:2,strokeDasharray:'6 3',dot:{r:3,fill:'#34d399'},connectNulls:false,name:'target'})
-              )
-            )
-          )
-        )
-      )
-    ),
-
-    // グラフタップ詳細
-    e(FolderMKDetail,{selFolderMK:selFolderMK,setSelFolderMK:setSelFolderMK,chartYear:fcYear,folder:p.folder,data:p.data}),
-    // キャスト一覧（今月このフォルダに所属しているキャスト）
-    castsThisMonth.length===0
-      ?e('div',{style:S.empty},e('div',{style:{color:'#6b7280'}},'このフォルダにキャストがいません'))
-      :castsThisMonth.map(function(c){
-        var rows=p.data.records[c.id]||[];
-        var thisRows=rows.filter(function(r){return r.date.slice(0,7)===tm;});
-        var sales=thisRows.reduce(function(s,r){return s+Number(r.sales||0);},0);
-        var target=getMonthlyTarget(c,tm);
-        var cpct=target>0?Math.round(sales/target*100):null;
-        return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px 16px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'12px'}},
-          e('div',{style:{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:700,color:'#0d0d1a',flexShrink:0,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();});}},c.name[0]),
-          e('div',{style:{flex:1,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();})}},
-            e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},e('div',{style:{fontWeight:700,color:c.isDispatch?'#a78bfa':'#f3f4f6',fontSize:'14px'}},c.name),c.isDispatch&&e('span',{style:{background:'#a78bfa22',color:'#a78bfa',border:'1px solid #a78bfa44',borderRadius:'4px',padding:'1px 5px',fontSize:'10px',fontWeight:700}},'派遣')),
-            e('div',{style:{display:'flex',gap:'12px',marginTop:'4px'}},
-              e('span',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700}},yen(sales)),
-              cpct!==null&&e('span',{style:{color:cpct>=100?'#34d399':cpct>=70?'#fbbf24':'#9ca3af',fontSize:'12px'}},cpct+'%達成')
-            )
-          ),
-          e('button',{style:{background:'#1e2035',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#9ca3af',fontSize:'12px',padding:'4px 8px',cursor:'pointer'},onClick:function(){setQrCast(c.id);}}, e('span',{style:{display:'flex',alignItems:'center',gap:'3px'}},e('svg',{width:11,height:11,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2},e('rect',{x:3,y:3,width:7,height:7}),e('rect',{x:14,y:3,width:7,height:7}),e('rect',{x:14,y:14,width:7,height:7}),e('rect',{x:3,y:14,width:7,height:7})),'QR'))
-        );
-      }),
-    qrCast&&e(QRModal,null)
-  ));
-}
-
 function MiniApp(){
   var useState=React.useState,useEffect=React.useEffect;
   var e=React.createElement;
@@ -1571,6 +1852,7 @@ function MiniApp(){
 
     var pages=[
       {key:'mycast',label:'MG実績',desc:'フォルダ管理',icon:e('svg',{width:28,height:28,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.5,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'}),e('circle',{cx:9,cy:7,r:4}),e('path',{d:'M23 21v-2a4 4 0 0 0-3-3.87'}),e('path',{d:'M16 3.13a4 4 0 0 1 0 7.75'}))},
+      {key:'castlist',label:'キャスト一覧',desc:'登録・詳細',icon:e('svg',{width:28,height:28,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.5,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'}),e('circle',{cx:12,cy:7,r:4}))},
       {key:'shift',label:'シフト管理',desc:'出勤カレンダー',icon:e('svg',{width:28,height:28,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.5,strokeLinecap:'round',strokeLinejoin:'round'},e('rect',{x:3,y:4,width:18,height:18,rx:2,ry:2}),e('line',{x1:16,y1:2,x2:16,y2:6}),e('line',{x1:8,y1:2,x2:8,y2:6}),e('line',{x1:3,y1:10,x2:21,y2:10}))},
       {key:'visit',label:'来店予定',desc:'同伴・来店管理',icon:e('svg',{width:28,height:28,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.5,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'}),e('circle',{cx:12,cy:10,r:3}))},
     ];
@@ -1626,26 +1908,12 @@ function MiniApp(){
           var folderCasts=(data.casts||[]).filter(function(c){return (folder.castIds||[]).includes(c.id);});
           return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:data,onOpenCast:openCast,notify:notify,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){setAppOpenFolder(selFolder);},persist:persist});
         }
-        // フォルダ選択画面
-        return e('div',{style:{animation:'pageFadeIn 1.4s ease both',padding:'0 16px'}},
-          e('div',{style:S.pageTitle},
-            e('h1',{style:S.h1},'MG実績'),
-            e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){refreshData(true);}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})))
-          ),
-          e('div',{style:{display:'flex',flexDirection:'column',gap:'10px'}},
-            (data.folders||[]).map(function(folder){
-              var castCount=(data.casts||[]).filter(function(c){return (folder.castIds||[]).includes(c.id)&&!c.inactive;}).length;
-              return e('div',{key:folder.id,style:{background:'linear-gradient(145deg,#12122a,#0f0f20)',border:'1px solid rgba(232,184,109,0.12)',borderRadius:'12px',padding:'16px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between'},onClick:function(){setAppOpenFolder(folder.id);if(subBack)setSubBack(null);}},
-                e('div',null,
-                  e('div',{style:{fontWeight:600,fontSize:'15px',color:'#f3f4f6',marginBottom:'4px'}},folder.name),
-                  e('div',{style:{fontSize:'12px',color:'#6b7280'}},castCount+'名')
-                ),
-                e('span',{style:{color:'#e8b86d',fontSize:'18px'}},'›')
-              );
-            })
-          )
-        );
+        // フォルダが未選択の場合は最初のフォルダを自動選択
+        var firstFolder=(data.folders||[])[0];
+        if(firstFolder){setAppOpenFolder(firstFolder.id);}
+        return null;
       })(),
+      layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps)),
       layer==='visit'&&e(VisitPage,Object.assign({},commonProps)),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
