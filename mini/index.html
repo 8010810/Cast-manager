@@ -213,6 +213,19 @@ function LoginScreen(){
     )
   );
 }
+class FolderErrorBoundary extends React.Component{
+  constructor(props){super(props);this.state={hasError:false,error:null};}
+  static getDerivedStateFromError(error){return{hasError:true,error:error};}
+  render(){
+    if(this.state.hasError){
+      return React.createElement('div',{style:{padding:'20px',color:'#ff6b6b',background:'#1a0000',borderRadius:'12px',margin:'20px',fontSize:'12px',wordBreak:'break-all'}},
+        React.createElement('div',{style:{fontWeight:700,marginBottom:'8px'}},'ERROR:'),
+        React.createElement('div',null,String(this.state.error))
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function FolderMKDetail(p){
   if(!p.selFolderMK)return null;
@@ -883,11 +896,11 @@ function ShiftPage(p){
   var filteredCasts=useMemo(function(){
     var q=query.trim().toLowerCase();
     var base=q?p.data.casts.filter(function(c){return c.name.toLowerCase().includes(q);}):p.data.casts;
-    if(selShiftFolder==='all')return base;
-    var folder=(p.data.folders||[]).find(function(f){return f.id===selShiftFolder;});
-    if(!folder)return base;
-    return base.filter(function(c){return(folder.castIds||[]).includes(c.id);});
-  },[p.data.casts,query,selShiftFolder,p.data.folders]);
+    // miniは最初のフォルダ固定
+    var firstFolder=(p.data.folders||[])[0];
+    if(!firstFolder)return base;
+    return base.filter(function(c){return(firstFolder.castIds||[]).includes(c.id);});
+  },[p.data.casts,query,p.data.folders]);
 
   function getShift(castId,date){return(shifts[castId]||{})[date]||null;}
   function saveQuota(){
@@ -1095,14 +1108,6 @@ function ShiftPage(p){
         })
       );
     })(),
-    // フォルダフィルタ
-    e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',paddingBottom:'2px'}},
-      e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(selShiftFolder==='all'?'#e8b86d':'#374151'),background:selShiftFolder==='all'?'#e8b86d22':'transparent',color:selShiftFolder==='all'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:selShiftFolder==='all'?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder('all');}},'全員'),
-      (p.data.folders||[]).map(function(f){
-        var active=selShiftFolder===f.id;
-        return e('button',{key:f.id,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder(f.id);}},f.name);
-      })
-    ),
     // 週/月切替
     e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}},
       e('div',{style:{display:'flex',gap:'6px'}},
