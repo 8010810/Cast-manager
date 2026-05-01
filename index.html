@@ -2680,15 +2680,15 @@ function App(){
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER'),
         e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'8px'}},'ユーザー名を入力してください'),
         e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'20px'}},'あなたのフォルダ名になります'),
-        e('input',{style:{...S.input,marginBottom:'20px'},placeholder:'例：田熊',value:userName,onChange:function(ev){setUserName(ev.target.value);},autoFocus:true}),
+        e('input',{style:{...S.input,marginBottom:'20px'},placeholder:'名前',value:userName,onChange:function(ev){setUserName(ev.target.value);},autoFocus:true}),
         e('button',{style:{width:'100%',background:canSubmit?'linear-gradient(135deg,#c9983a,#e8b86d)':'#1e2035',border:'none',borderRadius:'10px',padding:'14px',color:canSubmit?'#0d0d1a':'#4b5563',fontWeight:700,fontSize:'15px',cursor:canSubmit?'pointer':'default'},disabled:!canSubmit,onClick:function(){
           if(!canSubmit)return;
           var uName=userName.trim();
           var newData=Object.assign({},data);
-          if(newData.folders&&newData.folders.length>0){
-            newData.folders=[Object.assign({},newData.folders[0],{name:uName})].concat(newData.folders.slice(1));
-          } else {
-            newData.folders=[{id:uid(),name:uName,castIds:[]}];
+          // 既存フォルダは維持しつつ、ユーザー名のフォルダを先頭に追加
+          var alreadyExists=(newData.folders||[]).some(function(f){return f.name===uName;});
+          if(!alreadyExists){
+            newData.folders=[{id:uid(),name:uName,castIds:[]}].concat(newData.folders||[]);
           }
           db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
           setData(newData);
