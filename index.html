@@ -1107,7 +1107,7 @@ function CastListPage(p){
     var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
     // 派遣の場合は「派遣」フォルダ、なければ作成
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
-    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):newFolder||(p.data.folders.find(function(f){return f.name==='新入店';})||{}).id||'';
+    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(p.data.folders[0]||{}).id||'';
     var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
     var newFolders=(p.data.folders||[]).map(function(f){
       var shouldAdd=isDispatch?f.id===initFid:newFolder?f.id===newFolder:f.name==='新入店';
@@ -1278,11 +1278,7 @@ function CastListPage(p){
         ),
       e('label',{style:S.label},'キャスト名 *'),
       e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
-      e('label',{style:S.label},'所属フォルダ'),
-      e('select',{style:{...S.input,appearance:'none'},value:newFolder,onChange:function(ev){setNewFolder(ev.target.value);}},
-        e('option',{value:''},'新入店（デフォルト）'),
-        folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
-      ),
+
       e('label',{style:S.label},'誕生日'),
       e('input',{type:'date',style:S.input,value:addForm.birthday||'',onChange:function(ev){setAddForm(function(f){return{...f,birthday:ev.target.value};})}}),
       e('label',{style:S.label},'本名'),
@@ -2555,6 +2551,8 @@ function App(){
   var s7=useState(null);var toast=s7[0];var setToast=s7[1];
   // サブページの戻り先（mycast内のopenFolder, castlist内のdetailなど）
   var s8=useState(null);var subBack=s8[0];var setSubBack=s8[1];
+  var s9=useState('loading');var consentState=s9[0];var setConsentState=s9[1]; // 'loading'|'needed'|'username'|'done'
+  var s10=useState('');var userName=s10[0];var setUserName=s10[1];
   var s_ai=useState(false);var showGlobalAI=s_ai[0];var setShowGlobalAI=s_ai[1];
   var s_of=useState(null);var appOpenFolder=s_of[0];var setAppOpenFolder=s_of[1];
   var s_air=useState('');var globalAIResult=s_air[0];var setGlobalAIResult=s_air[1];
@@ -2597,7 +2595,17 @@ function App(){
         loadFromDB(u.uid).then(function(d){
           var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
           if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-          setData(nd);setLoading(false);
+          setData(nd);
+          // 同意状態確認
+          db.collection('users').doc(u.uid).collection('meta').doc('consent').get().then(function(doc){
+            if(doc.exists&&doc.data().agreedAt){
+              setUserName(doc.data().userName||'');
+              setConsentState('done');
+            } else {
+              setConsentState('needed');
+            }
+            setLoading(false);
+          }).catch(function(){setConsentState('done');setLoading(false);});
         }).catch(function(){setLoading(false);});
         var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
         var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
@@ -2643,6 +2651,54 @@ function App(){
 
   if(loading)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...'));
   if(!user)return e(LoginScreen,null);
+
+  // 利用規約同意画面
+  if(consentState==='needed'){
+    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'}},
+        e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER'),
+        e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'16px'}},'利用規約・プライバシーポリシー'),
+        e('div',{style:{background:'#0d0d1a',borderRadius:'10px',padding:'16px',marginBottom:'20px',maxHeight:'300px',overflowY:'auto',fontSize:'13px',lineHeight:1.8,color:'#9ca3af'}},
+          e('p',{style:{fontWeight:700,color:'#e8b86d',marginBottom:'8px'}},'【利用規約】'),
+          e('p',null,'（利用規約の内容をここに入れてください）'),
+          e('p',{style:{fontWeight:700,color:'#e8b86d',marginTop:'16px',marginBottom:'8px'}},'【プライバシーポリシー】'),
+          e('p',null,'（プライバシーポリシーの内容をここに入れてください）')
+        ),
+        e('button',{style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'14px',color:'#0d0d1a',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'12px'},onClick:function(){
+          db.collection('users').doc(user.uid).collection('meta').doc('consent').set({agreedAt:new Date().toISOString()}).then(function(){setConsentState('username');}).catch(function(){setConsentState('username');});
+        }},'同意して登録'),
+        e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px'},onClick:function(){fbSignOut();}},'キャンセル')
+      )
+    );
+  }
+
+  // ユーザー名入力画面
+  if(consentState==='username'){
+    var canSubmit=userName.trim().length>0;
+    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'}},
+        e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER'),
+        e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'8px'}},'ユーザー名を入力してください'),
+        e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'20px'}},'あなたのフォルダ名になります'),
+        e('input',{style:{...S.input,marginBottom:'20px'},placeholder:'例：田熊',value:userName,onChange:function(ev){setUserName(ev.target.value);},autoFocus:true}),
+        e('button',{style:{width:'100%',background:canSubmit?'linear-gradient(135deg,#c9983a,#e8b86d)':'#1e2035',border:'none',borderRadius:'10px',padding:'14px',color:canSubmit?'#0d0d1a':'#4b5563',fontWeight:700,fontSize:'15px',cursor:canSubmit?'pointer':'default'},disabled:!canSubmit,onClick:function(){
+          if(!canSubmit)return;
+          var uName=userName.trim();
+          var newData=Object.assign({},data);
+          if(newData.folders&&newData.folders.length>0){
+            newData.folders=[Object.assign({},newData.folders[0],{name:uName})].concat(newData.folders.slice(1));
+          } else {
+            newData.folders=[{id:uid(),name:uName,castIds:[]}];
+          }
+          db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
+          setData(newData);
+          if(user)saveToDB(user.uid,newData);
+          setConsentState('done');
+        }},'登録する')
+      )
+    );
+  }
+
   if(!data)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'データを読み込み中...'));
 
   var cast=data.casts.find(function(c){return c.id===selectedCast;});
