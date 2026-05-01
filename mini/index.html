@@ -1,11 +1,7 @@
 <!doctype html><html lang="ja"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/><title>CAST MANAGER mini</title>
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="CAST MANAGER mini">
-<meta name="theme-color" content="#0a0a16">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="CAST MANAGER mini"><meta name="theme-color" content="#0a0a16">
 <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#0a0a16;color:#e5e7eb;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);font-family:'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif;min-height:100vh}input,textarea,button,select{font-family:inherit}input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}select{background:#12122a;color:#e5e7eb;border:1px solid #2d2d4e;border-radius:8px;padding:10px 14px;width:100%;margin-bottom:12px;outline:none;font-size:14px}table{border-spacing:0}@keyframes spin{to{transform:rotate(360deg)}}@keyframes pageFadeIn{0%{opacity:0}100%{opacity:1}}.card-hover{transition:transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.2s,border-color 0.2s;}.card-hover:active{transform:scale(0.96);}button{transition:transform 0.12s,opacity 0.12s;}button:active{transform:scale(0.94);}</style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head><body>
 <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e8b86d;font-size:14px;font-family:'Cormorant Garamond',serif;letter-spacing:0.2em">LOADING...</div></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -128,7 +124,7 @@ var S={
   root:{minHeight:'100vh',background:'#0d0d1a',color:'#e5e7eb',fontFamily:"'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif",position:'relative',overflowX:'hidden'},
   header:{position:'sticky',top:0,zIndex:100,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',gap:'12px'},
   tabBar:{position:'sticky',top:'57px',zIndex:99,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.12)',display:'flex',alignItems:'stretch'},
-  main:{padding:'18px 16px',maxWidth:'900px',margin:'0 auto',position:'relative',zIndex:1},
+  main:{padding:'0 16px 18px 16px',maxWidth:'900px',margin:'0 auto',position:'relative',zIndex:1},
   logo:{display:'flex',alignItems:'center',gap:'8px'},
   logoIcon:{color:'#e8b86d',fontSize:'18px'},
   logoText:{fontSize:'14px',fontWeight:700,letterSpacing:'3px',color:'#e8b86d'},
@@ -423,7 +419,7 @@ function FolderDetail(p){
     .catch(function(){setFaiResult('エラー');setFaiLoading(false);});
   }
 
-  return e(FolderErrorBoundary,null,e('div',null,
+  return e(FolderErrorBoundary,null,e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
     e('div',{style:S.pageTitle},
       e('button',{style:{background:'transparent',border:'none',padding:'2px 4px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center',marginRight:'2px'},onClick:function(){if(p.onGoBack)p.onGoBack();}},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'15 18 9 12 15 6'}))),
       e('h1',{style:{...S.h1,flex:1,textAlign:'center'}},'MG実績'),
