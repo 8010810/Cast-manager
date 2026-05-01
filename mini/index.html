@@ -1,7 +1,11 @@
 <!doctype html><html lang="ja"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/><title>CAST MANAGER mini</title>
-<meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="CAST MANAGER mini"><meta name="theme-color" content="#0a0a16">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CAST MANAGER mini">
+<meta name="theme-color" content="#0a0a16">
 <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#0a0a16;color:#e5e7eb;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);font-family:'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif;min-height:100vh}input,textarea,button,select{font-family:inherit}input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}select{background:#12122a;color:#e5e7eb;border:1px solid #2d2d4e;border-radius:8px;padding:10px 14px;width:100%;margin-bottom:12px;outline:none;font-size:14px}table{border-spacing:0}@keyframes spin{to{transform:rotate(360deg)}}@keyframes pageFadeIn{0%{opacity:0}100%{opacity:1}}.card-hover{transition:transform 0.2s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.2s,border-color 0.2s;}.card-hover:active{transform:scale(0.96);}button{transition:transform 0.12s,opacity 0.12s;}button:active{transform:scale(0.94);}</style>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 </head><body>
 <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e8b86d;font-size:14px;font-family:'Cormorant Garamond',serif;letter-spacing:0.2em">LOADING...</div></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -122,9 +126,9 @@ var blankGuest=function(){return{_id:uid(),type:'指名',name:'',sales:'',bottle
 // ─── Styles ──────────────────────────────────────────────────────────────────
 var S={
   root:{minHeight:'100vh',background:'#0d0d1a',color:'#e5e7eb',fontFamily:"'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif",position:'relative',overflowX:'hidden'},
-  header:{position:'sticky',top:0,zIndex:100,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',gap:'12px'},
+  header:{position:'sticky',top:0,zIndex:100,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',gap:'12px',height:'56px',boxSizing:'content-box'},
   tabBar:{position:'sticky',top:'57px',zIndex:99,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.12)',display:'flex',alignItems:'stretch'},
-  main:{padding:'0 16px 18px 16px',maxWidth:'900px',margin:'0 auto',position:'relative',zIndex:1},
+  main:{padding:'16px',maxWidth:'900px',margin:'0 auto',position:'relative',zIndex:1},
   logo:{display:'flex',alignItems:'center',gap:'8px'},
   logoIcon:{color:'#e8b86d',fontSize:'18px'},
   logoText:{fontSize:'14px',fontWeight:700,letterSpacing:'3px',color:'#e8b86d'},
@@ -159,7 +163,7 @@ var S={
   toast:{position:'fixed',top:'68px',left:'50%',transform:'translateX(-50%)',color:'#fff',fontSize:'13px',fontWeight:600,padding:'10px 20px',borderRadius:'8px',zIndex:999,boxShadow:'0 4px 20px rgba(0,0,0,.4)',whiteSpace:'nowrap'},
   typeBadge:{fontSize:'11px',fontWeight:700,padding:'3px 8px',borderRadius:'4px',border:'1px solid',flexShrink:0},
   addForm:{display:'flex',gap:'10px',marginBottom:'20px',alignItems:'center'},
-  pageTitle:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'8px',padding:'18px 0 14px 0',borderBottom:'1px solid rgba(232,184,109,0.2)'},
+  pageTitle:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'16px',flexWrap:'wrap',gap:'8px',padding:'0 0 14px 0',borderBottom:'1px solid rgba(232,184,109,0.2)'},
   h1:{fontSize:'20px',fontWeight:400,color:'#f3f4f6',margin:0,fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",letterSpacing:'0.1em'},
   h2:{fontSize:'17px',fontWeight:400,color:'#f3f4f6',margin:'0 0 16px',fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",letterSpacing:'0.06em'},
   // ホーム画面カード
@@ -681,7 +685,7 @@ function CastListPage(p){
     var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
     // 派遣の場合は「派遣」フォルダ、なければ作成
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
-    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):newFolder||(p.data.folders.find(function(f){return f.name==='新入店';})||{}).id||'';
+    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(p.data.folders[0]||{}).id||'';
     var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
     var newFolders=(p.data.folders||[]).map(function(f){
       var shouldAdd=isDispatch?f.id===initFid:newFolder?f.id===newFolder:f.name==='新入店';
@@ -852,11 +856,7 @@ function CastListPage(p){
         ),
       e('label',{style:S.label},'キャスト名 *'),
       e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
-      e('label',{style:S.label},'所属フォルダ'),
-      e('select',{style:{...S.input,appearance:'none'},value:newFolder,onChange:function(ev){setNewFolder(ev.target.value);}},
-        e('option',{value:''},'新入店（デフォルト）'),
-        folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
-      ),
+
       e('label',{style:S.label},'誕生日'),
       e('input',{type:'date',style:S.input,value:addForm.birthday||'',onChange:function(ev){setAddForm(function(f){return{...f,birthday:ev.target.value};})}}),
       e('label',{style:S.label},'本名'),
@@ -1972,11 +1972,20 @@ function MiniApp(){
     header,toastEl,
     e('div',{style:{paddingTop:'0'}},
       layer==='mycast'&&(function(){
-        // 常に最初のフォルダの中身を表示（フォルダ一覧不要）
-        var folder=(data.folders||[])[0];
-        if(!folder)return e('div',{style:{padding:'32px',textAlign:'center',color:'#6b7280'}},'フォルダがありません');
-        var folderCasts=(data.casts||[]).filter(function(c){return (folder.castIds||[]).includes(c.id);});
-        return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:data,onOpenCast:openCast,notify:notify,uid:user?user.uid:'',onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){},persist:persist});
+        var folders=data.folders||[];
+        var mainFolder=folders[0];
+        if(!mainFolder)return e('div',{style:{padding:'32px',textAlign:'center',color:'#6b7280'}},'フォルダがありません');
+        var dispatchFolder=folders.find(function(f){return f.name==='派遣';});
+        var commonProps2={data:data,onOpenCast:openCast,notify:notify,uid:user?user.uid:'',onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){},persist:persist};
+        var mainCasts=(data.casts||[]).filter(function(c){return (mainFolder.castIds||[]).includes(c.id);});
+        if(dispatchFolder){
+          var dispCasts=(data.casts||[]).filter(function(c){return (dispatchFolder.castIds||[]).includes(c.id);});
+          return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
+            e(FolderDetail,Object.assign({},commonProps2,{folder:mainFolder,folderCasts:mainCasts})),
+            e(FolderDetail,Object.assign({},commonProps2,{folder:dispatchFolder,folderCasts:dispCasts}))
+          );
+        }
+        return e(FolderDetail,Object.assign({},commonProps2,{folder:mainFolder,folderCasts:mainCasts}));
       })(),
       layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack})),
