@@ -2664,8 +2664,9 @@ function App(){
   var s7=useState(null);var toast=s7[0];var setToast=s7[1];
   // サブページの戻り先（mycast内のopenFolder, castlist内のdetailなど）
   var s8=useState(null);var subBack=s8[0];var setSubBack=s8[1];
-  var s9=useState('loading');var consentState=s9[0];var setConsentState=s9[1]; // 'loading'|'needed'|'username'|'done'
+  var s9=useState('loading');var consentState=s9[0];var setConsentState=s9[1];
   var s10=useState('');var userName=s10[0];var setUserName=s10[1];
+  var s_sn=useState('');var storeName=s_sn[0];var setStoreName=s_sn[1];
   var s11=useState(null);var settingsPage=s11[0];var setSettingsPage=s11[1]; // null|'settings'|'profile'|'terms'|'privacy'
   var s12=useState(false);var deletingAccount=s12[0];var setDeletingAccount=s12[1];
   var s_ai=useState(false);var showGlobalAI=s_ai[0];var setShowGlobalAI=s_ai[1];
@@ -2715,6 +2716,7 @@ function App(){
           db.collection('users').doc(u.uid).collection('meta').doc('consent').get().then(function(doc){
             if(doc.exists&&doc.data().agreedAt){
               setUserName(doc.data().userName||'');
+              setStoreName(doc.data().storeName||'');
               setConsentState('done');
             } else {
               setConsentState('needed');
@@ -2814,12 +2816,32 @@ function App(){
           e('p',null,'（プライバシーポリシーの内容をここに入れてください）')
         ),
         e('button',{style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'14px',color:'#0d0d1a',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'12px'},onClick:function(){
-          db.collection('users').doc(user.uid).collection('meta').doc('consent').set({agreedAt:new Date().toISOString()}).then(function(){setConsentState('username');}).catch(function(){setConsentState('username');});
+          db.collection('users').doc(user.uid).collection('meta').doc('consent').set({agreedAt:new Date().toISOString()}).then(function(){setConsentState('storename');}).catch(function(){setConsentState('storename');});
         }},'同意して登録'),
         e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px'},onClick:function(){fbSignOut();}},'キャンセル')
       )
     );
   }
+
+  // 店舗名入力画面
+  if(consentState==='storename'){
+    var canSubmitSN=storeName.trim().length>0;
+    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'}},
+        e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER'),
+        e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'4px'}},'STEP 1 / 3'),
+        e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'8px'}},'店舗名を入力してください'),
+        e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'20px'}},'アプリ内で使用する店舗名です'),
+        e('input',{style:{...S.input,marginBottom:'20px'},placeholder:'店舗名',value:storeName,onChange:function(ev){setStoreName(ev.target.value);},autoFocus:true}),
+        e('button',{style:{width:'100%',background:canSubmitSN?'linear-gradient(135deg,#c9983a,#e8b86d)':'#1e2035',border:'none',borderRadius:'10px',padding:'14px',color:canSubmitSN?'#0d0d1a':'#4b5563',fontWeight:700,fontSize:'15px',cursor:canSubmitSN?'pointer':'default'},disabled:!canSubmitSN,onClick:function(){
+          if(!canSubmitSN)return;
+          db.collection('users').doc(user.uid).collection('meta').doc('consent').update({storeName:storeName.trim()}).catch(function(){});
+          setConsentState('username');
+        }},'次へ')
+      )
+    );
+  }
+
 
   // ユーザー名入力画面
   if(consentState==='username'){
@@ -2827,6 +2849,7 @@ function App(){
     return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
       e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'}},
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER'),
+        e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'4px'}},'STEP 2 / 3'),
         e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'8px'}},'ユーザー名を入力してください'),
         e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'20px'}},'あなたのフォルダ名になります'),
         e('input',{style:{...S.input,marginBottom:'20px'},placeholder:'名前',value:userName,onChange:function(ev){setUserName(ev.target.value);},autoFocus:true}),
@@ -2839,10 +2862,11 @@ function App(){
           if(!alreadyExists){
             newData.folders=[{id:uid(),name:uName,castIds:[]}].concat(newData.folders||[]);
           }
+          var isLineUser=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId.includes('line');}));
           db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
           setData(newData);
           if(user)saveToDB(user.uid,newData);
-          setConsentState('done');
+          setConsentState(isLineUser?'done':'linelinkage');
         }},'登録する')
       )
     );
@@ -2928,6 +2952,35 @@ function App(){
             )
           )
         )
+      )
+    );
+  }
+
+
+  // LINE連携画面（メール・Google登録者向け）
+  if(consentState==='linelinkage'){
+    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'}},
+        e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER'),
+        e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'4px'}},'STEP 3 / 3'),
+        e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'8px'}},'管理者LINE連携'),
+        e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'24px'}},'管理者のLINEアカウントと連携することで'+
+          'キャストとのメッセージ機能が使えるようになります'),
+        e('button',{style:{width:'100%',background:'#06C755',border:'none',borderRadius:'10px',padding:'14px',color:'#fff',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'12px',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},onClick:function(){
+          var state=Math.random().toString(36).slice(2);
+          sessionStorage.setItem('line_link_state',state);
+          sessionStorage.setItem('line_link_purpose','linelinkage');
+          var redirectUri=window.location.origin+'/';
+          var url='https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2009934823&redirect_uri='+encodeURIComponent(redirectUri)+'&state='+state+'&scope=profile%20openid%20phone';
+          window.location.href=url;
+        }},
+          e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'#fff'},e('path',{d:'M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.07 9.436-6.975C23.176 14.393 24 12.458 24 10.314'})),
+          'LINEで連携する'
+        ),
+        e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px'},onClick:function(){
+          db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lineLinked:false}).catch(function(){});
+          setConsentState('done');
+        }},'スキップする')
       )
     );
   }
