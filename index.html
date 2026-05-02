@@ -2706,7 +2706,10 @@ function App(){
     var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);
       if(unsubAtt){unsubAtt();unsubAtt=null;}
+      if(!u){window._castManagerDeleting=false;}
       if(u){
+        // 削除処理中はログイン画面のまま待機
+        if(window._castManagerDeleting){setLoading(false);return;}
         setLoading(true);
         loadFromDB(u.uid).then(function(d){
           var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
@@ -2772,6 +2775,7 @@ function App(){
   function executeDeleteAccount(){
     if(!user)return;
     var uid=user.uid;
+    window._castManagerDeleting=true; // 削除中フラグ
     var userRef=db.collection('users').doc(uid);
     function deleteFirestoreData(){
       return Promise.all([
@@ -2783,10 +2787,12 @@ function App(){
     deleteFirestoreData().then(function(){
       return auth.currentUser.delete();
     }).then(function(){
+      window._castManagerDeleting=false;
       setDeletingAccount(false);
       setSettingsPage(null);
       setData(null);setNavStack(['home']);setSC(null);
-      fbSignOut().then(function(){setConsentState('loading');});
+      setConsentState('loading');
+      fbSignOut();
     }).catch(function(e){
       if(e.code==='auth/requires-recent-login'){
         // 再認証: Googleユーザーならproviderで、それ以外はメール/パスワード
