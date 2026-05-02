@@ -2793,8 +2793,15 @@ function App(){
       return auth.currentUser.delete();
     }).then(function(){
       window._castManagerDeleting=false;
-      // 削除完了後はページリロードでログイン画面へ
-      fbSignOut().then(function(){window.location.reload();}).catch(function(){window.location.reload();});
+      // onAuthStateChangedをアンサブしてから全stateリセット
+      if(unsubAuth){unsubAuth();}
+      setUser(null);
+      setData(null);
+      setConsentState('loading');
+      setDeletingAccount(false);
+      setSettingsPage(null);
+      setNavStack(['home']);
+      setSC(null);
     }).catch(function(e){
       if(e.code==='auth/requires-recent-login'){
         // 再認証: Googleユーザーならproviderで、それ以外はメール/パスワード
