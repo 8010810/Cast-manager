@@ -2788,11 +2788,8 @@ function App(){
       return auth.currentUser.delete();
     }).then(function(){
       window._castManagerDeleting=false;
-      setDeletingAccount(false);
-      setSettingsPage(null);
-      setData(null);setNavStack(['home']);setSC(null);
-      setConsentState('loading');
-      fbSignOut();
+      // 削除完了後はページリロードでログイン画面へ
+      fbSignOut().then(function(){window.location.reload();}).catch(function(){window.location.reload();});
     }).catch(function(e){
       if(e.code==='auth/requires-recent-login'){
         // 再認証: Googleユーザーならproviderで、それ以外はメール/パスワード
