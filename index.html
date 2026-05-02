@@ -2764,12 +2764,35 @@ function App(){
   function handleSignOut(){fbSignOut().then(function(){setData(null);setNavStack(['home']);setSC(null);});}
   function handleDeleteAccount(){
     if(!user)return;
-    auth.currentUser.delete().then(function(){
-      setData(null);setNavStack(['home']);setSC(null);
+    var uid=user.uid;
+    // Firestoreのデータを先に削除してからFirebase Authアカウントを削除
+    function deleteFirestoreData(){
+      var userRef=db.collection('users').doc(uid);
+      // data/mainドキュメント削除
+      return userRef.collection('data').doc('main').delete()
+        .then(function(){return userRef.collection('meta').doc('consent').delete();})
+        .then(function(){return userRef.collection('attendance').doc('settings').delete();})
+        .catch(function(){}) // サブコレクションの削除エラーは無視
+        .then(function(){return userRef.delete();})
+        .catch(function(){});
+    }
+    deleteFirestoreData().then(function(){
+      return auth.currentUser.delete();
+    }).then(function(){
+      setData(null);setNavStack(['home']);setSC(null);setConsentState('loading');
     }).catch(function(e){
-      // 再認証が必要な場合
       if(e.code==='auth/requires-recent-login'){
-        alert('再ログインが必要です。一度ログアウトして再度ログインしてください。');
+        // 再認証してから削除
+        var provider=new firebase.auth.GoogleAuthProvider();
+        auth.currentUser.reauthenticateWithPopup(provider).then(function(){
+          return deleteFirestoreData();
+        }).then(function(){
+          return auth.currentUser.delete();
+        }).then(function(){
+          setData(null);setNavStack(['home']);setSC(null);setConsentState('loading');
+        }).catch(function(e2){
+          alert('削除に失敗しました。もう一度お試しください。');
+        });
       }else{
         alert('削除に失敗しました: '+e.message);
       }
