@@ -2785,7 +2785,8 @@ function App(){
     }).then(function(){
       setDeletingAccount(false);
       setSettingsPage(null);
-      setData(null);setNavStack(['home']);setSC(null);setConsentState('loading');
+      setData(null);setNavStack(['home']);setSC(null);
+      fbSignOut().then(function(){setConsentState('loading');});
     }).catch(function(e){
       if(e.code==='auth/requires-recent-login'){
         // 再認証: Googleユーザーならproviderで、それ以外はメール/パスワード
@@ -2938,11 +2939,7 @@ function App(){
           e('button',{style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'12px',padding:'16px',color:'#f87171',fontSize:'15px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
             if(confirm('ログアウトしますか？')){handleSignOut();setSettingsPage(null);}
           }},'ログアウト'),
-          e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'16px',color:'#f87171',fontSize:'14px',cursor:'pointer'},onClick:function(){
-            if(confirm('本当にアカウントを削除しますか？\nすべてのデータが完全に削除されます。\nこの操作は取り消せません。')){
-              handleDeleteAccount();
-            }
-          }},'アカウントを削除する'),
+          e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'16px',color:'#f87171',fontSize:'14px',cursor:'pointer'},onClick:function(){handleDeleteAccount();}},'アカウントを削除する'),
           deletingAccount&&e('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.8)',zIndex:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
             e('div',{style:{background:'#12122a',borderRadius:'16px',padding:'28px',maxWidth:'360px',width:'100%',textAlign:'center'}},
               e('div',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',marginBottom:'8px'}},'アカウントを削除しますか？'),
