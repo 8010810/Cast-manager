@@ -2667,6 +2667,7 @@ function App(){
   var s9=useState('loading');var consentState=s9[0];var setConsentState=s9[1]; // 'loading'|'needed'|'username'|'done'
   var s10=useState('');var userName=s10[0];var setUserName=s10[1];
   var s11=useState(null);var settingsPage=s11[0];var setSettingsPage=s11[1]; // null|'settings'|'profile'|'terms'|'privacy'
+  var s12=useState(false);var deletingAccount=s12[0];var setDeletingAccount=s12[1];
   var s_ai=useState(false);var showGlobalAI=s_ai[0];var setShowGlobalAI=s_ai[1];
   var s_of=useState(null);var appOpenFolder=s_of[0];var setAppOpenFolder=s_of[1];
   var s_air=useState('');var globalAIResult=s_air[0];var setGlobalAIResult=s_air[1];
@@ -2764,42 +2765,40 @@ function App(){
   function handleSignOut(){fbSignOut().then(function(){setData(null);setNavStack(['home']);setSC(null);});}
   function handleDeleteAccount(){
     if(!user)return;
+    setDeletingAccount(true);
+  }
+  function executeDeleteAccount(){
+    if(!user)return;
     var uid=user.uid;
-    // Firestoreのデータを先に削除してからFirebase Authアカウントを削除
+    var userRef=db.collection('users').doc(uid);
     function deleteFirestoreData(){
-      var userRef=db.collection('users').doc(uid);
-      // data/mainドキュメント削除
-      return userRef.collection('data').doc('main').delete()
-        .then(function(){return userRef.collection('meta').doc('consent').delete();})
-        .then(function(){return userRef.collection('attendance').doc('settings').delete();})
-        .catch(function(){}) // サブコレクションの削除エラーは無視
-        .then(function(){return userRef.delete();})
-        .catch(function(){});
+      return Promise.all([
+        userRef.collection('data').doc('main').delete().catch(function(){}),
+        userRef.collection('meta').doc('consent').delete().catch(function(){}),
+        userRef.collection('attendance').doc('settings').delete().catch(function(){})
+      ]).then(function(){return userRef.delete().catch(function(){});});
     }
     deleteFirestoreData().then(function(){
       return auth.currentUser.delete();
     }).then(function(){
+      setDeletingAccount(false);
+      setSettingsPage(null);
       setData(null);setNavStack(['home']);setSC(null);setConsentState('loading');
     }).catch(function(e){
       if(e.code==='auth/requires-recent-login'){
-        // 再認証してから削除
+        // 再認証: Googleユーザーならproviderで、それ以外はメール/パスワード
         var provider=new firebase.auth.GoogleAuthProvider();
-        auth.currentUser.reauthenticateWithPopup(provider).then(function(){
-          return deleteFirestoreData();
-        }).then(function(){
-          return auth.currentUser.delete();
-        }).then(function(){
-          setData(null);setNavStack(['home']);setSC(null);setConsentState('loading');
-        }).catch(function(e2){
-          alert('削除に失敗しました。もう一度お試しください。');
-        });
+        auth.currentUser.reauthenticateWithRedirect(provider);
+        // redirect後にページが戻ってきたら削除を続行するためsessionStorageに記録
+        sessionStorage.setItem('pendingDelete','1');
+        sessionStorage.setItem('pendingDeleteUid',uid);
       }else{
+        setDeletingAccount(false);
         alert('削除に失敗しました: '+e.message);
       }
     });
   }
-
-  if(loading)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...'));
+    if(loading)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...'));
   if(!user)return e(LoginScreen,null);
 
   // 利用規約同意画面
@@ -2916,12 +2915,18 @@ function App(){
             if(confirm('ログアウトしますか？')){handleSignOut();setSettingsPage(null);}
           }},'ログアウト'),
           e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'16px',color:'#f87171',fontSize:'14px',cursor:'pointer'},onClick:function(){
-            if(confirm('本当にアカウントを削除しますか？\nこの操作は取り消せません。')){
-              if(confirm('もう一度確認します。アカウントを削除してよろしいですか？')){
-                handleDeleteAccount();setSettingsPage(null);
-              }
+            if(confirm('本当にアカウントを削除しますか？\nすべてのデータが完全に削除されます。\nこの操作は取り消せません。')){
+              handleDeleteAccount();
             }
-          }},'アカウントを削除する')
+          }},'アカウントを削除する'),
+          deletingAccount&&e('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.8)',zIndex:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+            e('div',{style:{background:'#12122a',borderRadius:'16px',padding:'28px',maxWidth:'360px',width:'100%',textAlign:'center'}},
+              e('div',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',marginBottom:'8px'}},'アカウントを削除しますか？'),
+              e('div',{style:{fontSize:'13px',color:'#9ca3af',marginBottom:'24px'}},'すべてのデータが完全に削除されます。この操作は取り消せません。'),
+              e('button',{style:{width:'100%',background:'#ef4444',border:'none',borderRadius:'10px',padding:'14px',color:'#fff',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'10px'},onClick:function(){executeDeleteAccount();}},'完全に削除する'),
+              e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px'},onClick:function(){setDeletingAccount(false);}}, 'キャンセル')
+            )
+          )
         )
       )
     );
