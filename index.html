@@ -2803,17 +2803,17 @@ function App(){
       setNavStack(['home']);
       setSC(null);
     }).catch(function(e){
-      if(e.code==='auth/requires-recent-login'){
-        // 再認証: Googleユーザーならproviderで、それ以外はメール/パスワード
-        var provider=new firebase.auth.GoogleAuthProvider();
-        auth.currentUser.reauthenticateWithRedirect(provider);
-        // redirect後にページが戻ってきたら削除を続行するためsessionStorageに記録
-        sessionStorage.setItem('pendingDelete','1');
-        sessionStorage.setItem('pendingDeleteUid',uid);
-      }else{
-        setDeletingAccount(false);
-        alert('削除に失敗しました: '+e.message);
-      }
+      // Firestoreデータは削除済みなのでAuth削除が失敗してもログイン画面へ
+      // (次回ログイン時に新規登録フローになる)
+      window._castManagerDeleting=false;
+      if(unsubAuth){unsubAuth();}
+      setUser(null);
+      setData(null);
+      setConsentState('loading');
+      setDeletingAccount(false);
+      setSettingsPage(null);
+      setNavStack(['home']);
+      setSC(null);
     });
   }
     if(loading)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...'));
