@@ -187,7 +187,8 @@ function LoginScreen(){
       +'&redirect_uri='+encodeURIComponent('https://cast-manager-seven.vercel.app/')
       +'&state='+state
       +'&scope=profile%20openid%20phone';
-    window.location.replace(url);
+    // 現在のタブでリダイレクト（同じタブで戻ってくる）
+    window.location.href=url;
   }
   function handleEmail(){
     if(!email.trim()||!pass.trim()){setErr('メールアドレスとパスワードを入力してください');return;}
@@ -220,7 +221,14 @@ function LoginScreen(){
           return auth.signInWithCustomToken(data.customToken);
         }else{throw new Error(data.error||'LINE認証失敗');}
       })
-      .then(function(){window.history.replaceState({},'','/');})
+      .then(function(){
+        window.history.replaceState({},'','/');
+        // 元のタブがあれば閉じる（別タブで開かれた場合）
+        if(window.opener&&!window.opener.closed){
+          window.opener.postMessage({type:'line_auth_done'},'*');
+          window.close();
+        }
+      })
       .catch(function(e){setErr('LINEログインに失敗しました: '+e.message);setLoading(false);});
   },[]);
 
@@ -2703,6 +2711,14 @@ function App(){
 
     useEffect(function(){
     var unsubAtt=null;
+    // LINE認証完了を別タブから受け取る
+    function onLineMessage(ev){
+      if(ev.data&&ev.data.type==='line_auth_done'){
+        // 別タブが閉じた後、auth状態が更新されるまで少し待つ
+        setTimeout(function(){auth.currentUser&&auth.currentUser.reload();},500);
+      }
+    }
+    window.addEventListener('message',onLineMessage);
     var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);
       if(unsubAtt){unsubAtt();unsubAtt=null;}
