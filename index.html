@@ -273,6 +273,13 @@ function LoginScreen(){
         isLogin?'LINEでログイン':'LINEで新規登録'
       ),
 
+      e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginTop:'8px',lineHeight:1.6}},
+        e('span',{style:{color:'#fbbf24'}},'⚠️ '),
+        'ホーム画面追加アプリからLINEでログインすると',
+        e('br',null),
+        '別タブで開きます。Safariから直接ご利用ください'
+      ),
+
       err&&e('div',{style:{color:'#f87171',fontSize:'12px',marginTop:'14px',textAlign:'left',background:'#7f1d1d22',borderRadius:'8px',padding:'10px 12px'}},err)
     )
   );
