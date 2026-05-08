@@ -2739,6 +2739,7 @@ function App(){
   var s9=useState('loading');var consentState=s9[0];var setConsentState=s9[1];
   var s10=useState('');var userName=s10[0];var setUserName=s10[1];
   var s_sn=useState('');var storeName=s_sn[0];var setStoreName=s_sn[1];
+  var s_il=useState(false);var isLineUser=s_il[0];var setIsLineUser=s_il[1];
   var s11=useState(null);var settingsPage=s11[0];var setSettingsPage=s11[1]; // null|'settings'|'profile'|'terms'|'privacy'
   var s12=useState(false);var deletingAccount=s12[0];var setDeletingAccount=s12[1];
   var s_ai=useState(false);var showGlobalAI=s_ai[0];var setShowGlobalAI=s_ai[1];
@@ -2805,6 +2806,10 @@ function App(){
             if(doc.exists&&doc.data().agreedAt){
               setUserName(doc.data().userName||'');
               setStoreName(doc.data().storeName||'');
+              setIsLineUser(!!(doc.data().isLineUser));
+              // storeName/usernameが未入力ならフロー続行
+              if(!doc.data().storeName){setConsentState('storename');setLoading(false);return;}
+              if(!doc.data().userName){setConsentState('username');setLoading(false);return;}
               setConsentState('done');
             } else {
               setConsentState('needed');
@@ -2981,7 +2986,7 @@ function App(){
     if(settingsPage==='profile'){
       var linkedGoogle=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId==='google.com';}));
       var linkedLine=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId==='oidc.line'||p.providerId.includes('line');}));
-      return e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,linkedGoogle:linkedGoogle,linkedLine:linkedLine,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});}});
+      return e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,linkedGoogle:linkedGoogle,linkedLine:linkedLine||isLineUser,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});}});
     }
     // 利用規約ページ
     if(settingsPage==='terms'){
