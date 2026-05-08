@@ -17,8 +17,6 @@ var firebaseConfig={apiKey:"AIzaSyBGxD2CQ-N-0mZYRZbkC5yVsDA4DdGKqeA",authDomain:
 firebase.initializeApp(firebaseConfig);var auth=firebase.auth();var db=firebase.firestore();
 function signInWithGoogle(){var provider=new firebase.auth.GoogleAuthProvider();return auth.signInWithPopup(provider);}
 function fbSignOut(){return auth.signOut();}
-
-// ルームベースのデータ操作
 function loadFromRoom(roomId){
   return db.collection('rooms').doc(roomId).collection('data').doc('main').get()
     .then(function(doc){
@@ -31,7 +29,6 @@ function saveToRoom(roomId,data){
     .set({casts:data.casts,records:data.records,customers:data.customers,folders:data.folders||[],shifts:data.shifts||{},visits:data.visits||[],quota:data.quota||{}})
     .catch(function(e){console.error('Save error:',e);});
 }
-// 後方互換（旧データ移行用）
 function loadFromDB(uid){return loadFromRoom(uid);}
 function saveToDB(uid,data){return saveToRoom(uid,data);}
 </script><script>
@@ -3016,7 +3013,10 @@ function App(){
       var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
       if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
       setData(nd);setLoading(false);setConsentState('done');
-    }).catch(function(){setLoading(false);setConsentState('done');});
+    }).catch(function(){
+      var empty={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}};
+      setData(empty);setLoading(false);setConsentState('done');
+    });
   }
   function persist(next){setData(next);if(user&&roomId)saveToRoom(roomId,next);}
   function openCast(id,backFn){
@@ -3145,7 +3145,7 @@ function App(){
     );
   }
 
-  if(!data)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'データを読み込み中...'));
+  if(!data&&consentState==='done')return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'データを読み込み中...'));
 
 
   // 設定画面
