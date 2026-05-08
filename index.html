@@ -2952,32 +2952,33 @@ function App(){
         // 削除処理中はログイン画面のまま待機
         if(window._castManagerDeleting){setLoading(false);return;}
         setLoading(true);
+        // タイムアウト保険: 10秒でフォールバック
+        var authTimeout=setTimeout(function(){setLoading(false);setConsentState('roomselect');},10000);
         // 同意状態確認
         db.collection('users').doc(u.uid).collection('meta').doc('consent').get().then(function(doc){
-          if(!doc.exists||!doc.data().agreedAt){setConsentState('needed');setLoading(false);return;}
+          if(!doc.exists||!doc.data().agreedAt){clearTimeout(authTimeout);setConsentState('needed');setLoading(false);return;}
           var cd=doc.data();
           setUserName(cd.userName||'');
           setStoreName(cd.storeName||'');
           setIsLineUser(!!(cd.isLineUser));
-          if(!cd.userName){setConsentState('username');setLoading(false);return;}
+          if(!cd.userName){clearTimeout(authTimeout);setConsentState('username');setLoading(false);return;}
           // ルーム一覧取得
           db.collection('users').doc(u.uid).collection('rooms').get().then(function(snap){
+            clearTimeout(authTimeout);
             var rooms=[];
             snap.forEach(function(d){rooms.push(Object.assign({roomId:d.id},d.data()));});
             setRoomsList(rooms);
             if(rooms.length===0){
-              // ルーム未参加 → ルーム選択画面へ
               setConsentState('roomselect');setLoading(false);return;
             }
-            // 最後に使ったroomかrooms[0]をロード
             var lastRoomId=cd.lastRoomId||rooms[0].roomId;
             var roomInfo=rooms.find(function(r){return r.roomId===lastRoomId;})||rooms[0];
             setRoomId(roomInfo.roomId);
             setRoomRole(roomInfo.role||'member');
             setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
             loadRoomData(roomInfo.roomId);
-          }).catch(function(){setConsentState('roomselect');setLoading(false);});
-        }).catch(function(){setConsentState('done');setLoading(false);});
+          }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
+        }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
         var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
         var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
         unsubAtt=db.collection('users').doc(u.uid).collection('attendance').doc(ts).onSnapshot(function(doc){
@@ -3212,14 +3213,6 @@ function App(){
             if(confirm('ログアウトしますか？')){handleSignOut();setSettingsPage(null);}
           }},'ログアウト'),
           e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'16px',color:'#f87171',fontSize:'14px',cursor:'pointer'},onClick:function(){handleDeleteAccount();}},'アカウントを削除する'),
-          deletingAccount&&e('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.8)',zIndex:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
-            e('div',{style:{background:'#12122a',borderRadius:'16px',padding:'28px',maxWidth:'360px',width:'100%',textAlign:'center'}},
-              e('div',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',marginBottom:'8px'}},'アカウントを削除しますか？'),
-              e('div',{style:{fontSize:'13px',color:'#9ca3af',marginBottom:'24px'}},'すべてのデータが完全に削除されます。この操作は取り消せません。'),
-              e('button',{style:{width:'100%',background:'#ef4444',border:'none',borderRadius:'10px',padding:'14px',color:'#fff',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'10px'},onClick:function(){executeDeleteAccount();}},'完全に削除する'),
-              e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px'},onClick:function(){setDeletingAccount(false);}}, 'キャンセル')
-            )
-          )
         )
       )
     );
@@ -3289,6 +3282,14 @@ function App(){
   var pageTitle=layer==='mycast'?'MG実績':layer==='sales'?'売上管理':layer==='castlist'?'キャスト一覧':layer==='shift'?'シフト管理':layer==='attendance'?'勤怠管理':'';
 
   return e('div',{style:S.root},
+    deletingAccount&&e('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.8)',zIndex:300,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      e('div',{style:{background:'#12122a',borderRadius:'16px',padding:'28px',maxWidth:'360px',width:'100%',textAlign:'center'}},
+        e('div',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',marginBottom:'8px'}},'アカウントを削除しますか？'),
+        e('div',{style:{fontSize:'13px',color:'#9ca3af',marginBottom:'24px'}},'すべてのデータが完全に削除されます。この操作は取り消せません。'),
+        e('button',{style:{width:'100%',background:'#ef4444',border:'none',borderRadius:'10px',padding:'14px',color:'#fff',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'10px'},onClick:function(){executeDeleteAccount();}},'完全に削除する'),
+        e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px'},onClick:function(){setDeletingAccount(false);}},'キャンセル')
+      )
+    ),
     toast&&e('div',{style:Object.assign({},S.toast,{background:toast.type==='error'?'#7f1d1d':'#14532d'})},toast.msg),
 
     // ヘッダー
