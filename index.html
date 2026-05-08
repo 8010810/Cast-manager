@@ -3113,7 +3113,7 @@ function App(){
           var isLineUser=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId.includes('line');}));
           db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
           setUserName(uName);
-          setConsentState(isLineUser?'roomselect':'linelinkage');
+          setConsentState('roomselect');
         }},'登録する')
       )
     );
@@ -3194,36 +3194,6 @@ function App(){
       )
     );
   }
-
-
-  // LINE連携画面（メール・Google登録者向け）
-  if(consentState==='linelinkage'){
-    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
-      e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'}},
-        e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER'),
-        e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'4px'}},'新規登録 STEP 3/3'),
-        e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'8px'}},'管理者LINE連携'),
-        e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'24px'}},'管理者のLINEアカウントと連携することで'+
-          'キャストとのメッセージ機能が使えるようになります'),
-        e('button',{style:{width:'100%',background:'#06C755',border:'none',borderRadius:'10px',padding:'14px',color:'#fff',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'12px',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},onClick:function(){
-          var state=Math.random().toString(36).slice(2);
-          sessionStorage.setItem('line_link_state',state);
-          sessionStorage.setItem('line_link_purpose','linelinkage');
-          var redirectUri=window.location.origin+'/';
-          var url='https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2009934823&redirect_uri='+encodeURIComponent(redirectUri)+'&state='+state+'&scope=profile%20openid%20phone';
-          window.location.replace(url);
-        }},
-          e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'#fff'},e('path',{d:'M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.07 9.436-6.975C23.176 14.393 24 12.458 24 10.314'})),
-          'LINEで連携する'
-        ),
-        e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'8px'},onClick:function(){
-          db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lineLinked:false}).catch(function(){});
-          setConsentState('roomselect');
-        }},'スキップする')
-      )
-    );
-  }
-
 
 
   // ルーム作成/参加画面
