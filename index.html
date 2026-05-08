@@ -3110,16 +3110,9 @@ function App(){
         e('button',{style:{width:'100%',background:canSubmit?'linear-gradient(135deg,#c9983a,#e8b86d)':'#1e2035',border:'none',borderRadius:'10px',padding:'14px',color:canSubmit?'#0d0d1a':'#4b5563',fontWeight:700,fontSize:'15px',cursor:canSubmit?'pointer':'default'},disabled:!canSubmit,onClick:function(){
           if(!canSubmit)return;
           var uName=userName.trim();
-          var newData=Object.assign({},data);
-          // 既存フォルダは維持しつつ、ユーザー名のフォルダを先頭に追加
-          var alreadyExists=(newData.folders||[]).some(function(f){return f.name===uName;});
-          if(!alreadyExists){
-            newData.folders=[{id:uid(),name:uName,castIds:[]}].concat(newData.folders||[]);
-          }
           var isLineUser=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId.includes('line');}));
           db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
-          setData(newData);
-          if(user)saveToDB(user.uid,newData);
+          setUserName(uName);
           setConsentState(isLineUser?'roomselect':'linelinkage');
         }},'登録する')
       )
