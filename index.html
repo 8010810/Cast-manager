@@ -364,6 +364,9 @@ function HomeScreen(p){
   return e('div',null,
     // 在籍情報 + 月売上
     e('div',{style:{background:'linear-gradient(135deg,#1a1a3e,#12122a)',border:'1px solid #2d2d4e',borderRadius:'16px',padding:'18px',marginBottom:'20px'}},
+      p.roomName&&e('div',{style:{textAlign:'center',marginBottom:'16px',paddingBottom:'16px',borderBottom:'1px solid rgba(232,184,109,0.1)'}},
+        e('div',{style:{fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",fontSize:'24px',fontWeight:300,letterSpacing:'0.25em',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}},p.roomName)
+      ),
       e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'12px'}},(now.getMonth()+1)+'月 チーム状況'),
       e('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px',marginBottom:'12px'}},
         e('div',{style:{background:'#0d0d1a',borderRadius:'8px',padding:'10px',textAlign:'center',border:'1px solid #1e2035'}},
@@ -2807,7 +2810,29 @@ function RoomSelectScreen(p){
   useEffect(function(){
     var params=new URLSearchParams(window.location.search);
     var joinCode=params.get('join');
-    if(joinCode){setInviteInput(joinCode);setMode('join');window.history.replaceState({},'','/');}
+    if(joinCode){
+      window.history.replaceState({},'','/');
+      // 自動で参加処理を実行
+      setInviteInput(joinCode.toUpperCase());
+      setLoading(true);setErr('');
+      var code=joinCode.trim().toUpperCase();
+      p.db.collection('rooms').where('inviteCode','==',code).limit(1).get().then(function(snap){
+        if(snap.empty){setErr('招待コードが見つかりません');setLoading(false);setMode('join');setInviteInput(code);return;}
+        var roomDoc=snap.docs[0];var rid=roomDoc.id;var rd=roomDoc.data();
+        var now=new Date().toISOString();
+        p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).get().then(function(mem){
+          var role=mem.exists?mem.data().role:'member';
+          return p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).set({role:role,userName:p.userName||'',joinedAt:now},{merge:true})
+            .then(function(){return p.db.collection('users').doc(p.user.uid).collection('rooms').doc(rid).set({name:rd.name,role:role,inviteCode:code,joinedAt:now},{merge:true});})
+            .then(function(){return p.db.collection('rooms').doc(rid).collection('data').doc('main').get();})
+            .then(function(dataDoc){
+              var d=dataDoc.exists?dataDoc.data():{};
+              setLoading(false);
+              p.onRoomReady(rid,role,{id:rid,name:rd.name,inviteCode:code},d);
+            });
+        });
+      }).catch(function(e2){setErr('参加に失敗しました');setLoading(false);setMode('join');setInviteInput(code);});
+    }
   },[]);
 
   var WRAP={minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'};
@@ -3148,6 +3173,51 @@ function App(){
       );
     }
 
+    // 招待ページ
+    if(settingsPage==='invite'){
+      var invCode=currentRoom&&currentRoom.inviteCode||'';
+      var invUrl=invCode?('https://cast-manager-seven.vercel.app/?join='+invCode):'';
+      return e('div',{style:SETTINGS_OVERLAY_STYLE},
+        e('div',{style:SETTINGS_HEADER},
+          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
+          e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'招待'),
+          e('div',{style:{width:'40px'}})
+        ),
+        e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'24px 18px'})},
+          invCode
+            ?e('div',null,
+              e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'20px',marginBottom:'16px',textAlign:'center'}},
+                e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'8px'}},'招待コード'),
+                e('div',{style:{fontSize:'36px',fontWeight:700,color:'#e8b86d',letterSpacing:'0.3em',fontFamily:"'Cormorant Garamond',serif"}},invCode),
+                e('button',{style:{marginTop:'12px',background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 16px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){
+                  if(navigator.clipboard){navigator.clipboard.writeText(invCode);}
+                  var el=document.createElement('textarea');el.value=invCode;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
+                }},'コードをコピー')
+              ),
+              invUrl&&e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'20px',marginBottom:'16px',textAlign:'center'}},
+                e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'12px'}},'QRコード（カメラで読み取り）'),
+                e('div',{id:'invite-qr',style:{display:'flex',justifyContent:'center',marginBottom:'12px'}}),
+                e('div',{style:{fontSize:'11px',color:'#6b7280',wordBreak:'break-all'}},invUrl),
+                React.createElement(function(){
+                  React.useEffect(function(){
+                    var el=document.getElementById('invite-qr');
+                    if(el&&el.children.length===0&&typeof QRCode!=='undefined'){
+                      new QRCode(el,{text:invUrl,width:160,height:160,colorDark:'#e8b86d',colorLight:'#12122a'});
+                    }
+                  },[]);
+                  return null;
+                })
+              ),
+              e('button',{style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'10px',padding:'12px',color:'#9ca3af',fontSize:'13px',cursor:'pointer'},onClick:function(){
+                if(navigator.share){navigator.share({title:'CAST MANAGER招待',text:'招待コード: '+invCode,url:invUrl});}
+                else{if(navigator.clipboard){navigator.clipboard.writeText(invUrl);}}
+              }},'URLをシェア')
+            )
+            :e('div',{style:{textAlign:'center',color:'#6b7280',padding:'40px 0'}},'ルームに参加後に利用できます')
+        )
+      );
+    }
+
     // プライバシーポリシーページ
     if(settingsPage==='privacy'){
       return e('div',{style:SETTINGS_OVERLAY_STYLE},
@@ -3173,6 +3243,7 @@ function App(){
         e('div',{style:{padding:'20px 18px'}},
           [
             {label:'プロフィール',action:function(){setSettingsPage('profile');}},
+            {label:'招待',action:function(){setSettingsPage('invite');}},
             {label:'利用規約',action:function(){setSettingsPage('terms');}},
             {label:'プライバシーポリシー',action:function(){setSettingsPage('privacy');}},
           ].map(function(item,i){
@@ -3250,8 +3321,6 @@ function App(){
         ),
       isHomeLayer
         ?e('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},
-          e('img',{src:user.photoURL||'',style:{width:'28px',height:'28px',borderRadius:'50%',border:'1px solid #2d2d4e'},onError:function(ev){ev.target.style.display='none';}}),
-          e('span',{style:{color:'#9ca3af',fontSize:'12px'}},user.displayName||user.email),
           e('button',{style:{background:'transparent',border:'none',padding:'4px',cursor:'pointer',color:'#9ca3af',display:'flex',alignItems:'center'},onClick:function(){setSettingsPage('settings');}},
             e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
               e('circle',{cx:12,cy:12,r:3}),
@@ -3311,7 +3380,7 @@ function App(){
 
     // メインコンテンツ
     e('main',{style:S.main},
-      isHomeLayer&&e(HomeScreen,{data:data,onNavigate:navigate}),
+      isHomeLayer&&e(HomeScreen,{data:data,onNavigate:navigate,roomName:currentRoom&&currentRoom.name||''}),
       layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
       layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
