@@ -2904,6 +2904,7 @@ function RoomSelectScreen(p){
 function App(){
   var s1=useState(null);var user=s1[0];var setUser=s1[1];
   var unsubAuthRef=React.useRef(null); // onAuthStateChangedのunsubscribe関数
+  var unsubAttRef=React.useRef(null); // 勤怠リスナーのunsubscribe関数
   var s2=useState(null);var data=s2[0];var setData=s2[1];
   var s3=useState(true);var loading=s3[0];var setLoading=s3[1];
   // navStack: ['home', 'mycast', ...] スタック方式
@@ -2956,7 +2957,6 @@ function App(){
   }
 
     useEffect(function(){
-    var unsubAtt=null;
     // LINE認証完了を別タブから受け取る
     function onLineMessage(ev){
       if(ev.data&&ev.data.type==='line_auth_done'){
@@ -2968,7 +2968,7 @@ function App(){
     unsubAuthRef.current=null;
     var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);
-      if(unsubAtt){unsubAtt();unsubAtt=null;}
+      if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
       if(!u){
         window._castManagerDeleting=false;
         setConsentState('loading');
@@ -3004,19 +3004,20 @@ function App(){
             setRoomRole(roomInfo.role||'member');
             setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
             loadRoomData(roomInfo.roomId);
+            var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
+            var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
+            if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+            unsubAttRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('attendance').doc(ts).onSnapshot(function(doc){
+              if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+            },function(){});
           }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
         }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
-        var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
-        var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
-        unsubAtt=db.collection('users').doc(u.uid).collection('attendance').doc(ts).onSnapshot(function(doc){
-          if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-        },function(){});
       }else{
         setData(null);setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});setLoading(false);
       }
     });
     unsubAuthRef.current=unsubAuth;
-    return function(){unsubAuthRef.current=null;unsubAuth();if(unsubAtt)unsubAtt();};
+    return function(){unsubAuthRef.current=null;unsubAuth();if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}};
   },[]);
 
 
@@ -3028,12 +3029,14 @@ function App(){
       if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
       setData(nd);
     }).catch(function(){});
-    var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
-    var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
-    db.collection('users').doc(user.uid).collection('attendance').doc(ts).get()
-      .then(function(doc){
-        if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-      }).catch(function(){});
+    if(roomId){
+      var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
+      var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
+      db.collection('rooms').doc(roomId).collection('attendance').doc(ts).get()
+        .then(function(doc){
+          if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+        }).catch(function(){});
+    }
     if(showToast)notify('更新しました','success');
   }
   function loadRoomData(rid){
@@ -3298,6 +3301,12 @@ function App(){
         if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
         setData(nd);
         db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
+        var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+        var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
+        if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+        unsubAttRef.current=db.collection('rooms').doc(rid).collection('attendance').doc(tsR).onSnapshot(function(doc){
+          if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+        },function(){});
         setConsentState('done');
       }
     });
@@ -3395,7 +3404,7 @@ function App(){
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
       layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
       layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
-      layer==='attendance'&&e(AttendancePage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',attData:attData,setAttData:setAttData}),
+      layer==='attendance'&&e(AttendancePage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',roomId:roomId||'',attData:attData,setAttData:setAttData}),
       layer==='visit'&&e(VisitPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
         castPage==='input'&&e(InputPage,{castId:selectedCast,data:data,persist:persist,notify:notify}),
@@ -3466,12 +3475,12 @@ function AttendancePage(p){
   var s19=useState(p.attData&&p.attData.confirmTypes?p.attData.confirmTypes:{});var confirmTypes=s19[0];var setConfirmTypes=s19[1];
 
   useEffect(function(){
-    if(!p.uid)return;
-    db.collection('users').doc(p.uid).collection('attendance').doc('settings').get()
+    if(!p.roomId)return;
+    db.collection('rooms').doc(p.roomId).collection('attendance').doc('settings').get()
       .then(function(doc){if(doc.exists){var d=doc.data();if(d.timeSetting){setTimeSetting(d.timeSetting);setSettingHour(String(d.timeSetting.startHour));setSettingIntv(String(d.timeSetting.interval));}if(d.absenceData)setAbsenceData(d.absenceData);}}).catch(function(){});
-    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).get()
+    db.collection('rooms').doc(p.roomId).collection('attendance').doc(todayStr).get()
       .then(function(doc){if(doc.exists){var d=doc.data();var s=d.status||{};var st=d.scheduledTime||{};var ec=d.extraCasts||[];var ct=d.confirmTypes||{};setAttStatus(s);setScheduledTime(st);setExtraCasts(ec);setConfirmTypes(ct);if(p.setAttData)p.setAttData({status:s,scheduledTime:st,extraCasts:ec,confirmTypes:ct});}}).catch(function(){});
-  },[p.uid]);
+  },[p.roomId]);
 
   // p.attDataが外から更新された時にローカルstateを同期
   useEffect(function(){
@@ -3485,15 +3494,15 @@ function AttendancePage(p){
   useEffect(function(){if(editTarget)setEditTime(editTarget.time||'');},[editTarget]);
 
   function saveSettings(ts,ad){
-    if(!p.uid)return;
-    db.collection('users').doc(p.uid).collection('attendance').doc('settings').set({timeSetting:ts,absenceData:ad});
+    if(!p.roomId)return;
+    db.collection('rooms').doc(p.roomId).collection('attendance').doc('settings').set({timeSetting:ts,absenceData:ad});
   }
   function saveAll(ns,nst,nec,nct){
     var status=ns||attStatus;var schTime=nst||scheduledTime;var ec=nec||extraCasts;var ct=nct||confirmTypes;
     setAttStatus(status);setScheduledTime(schTime);setExtraCasts(ec);setConfirmTypes(ct);
     if(p.setAttData)p.setAttData({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
-    if(!p.uid)return;
-    db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
+    if(!p.roomId)return;
+    db.collection('rooms').doc(p.roomId).collection('attendance').doc(todayStr).set({status:status,scheduledTime:schTime,extraCasts:ec,confirmTypes:ct});
   }
   function getAtt(castId){return attStatus[castId]||{status:'未通過',time:''};}
 
@@ -3773,7 +3782,7 @@ function AttendancePage(p){
               var nad=updateAbsences(castId,currentStatus,editTime,absenceData,confirmTypes);
               setAbsenceData(nad);saveSettings(timeSetting,nad);
               setAttStatus(ns);setExtraCasts(extraCasts);
-              if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:ns,scheduledTime:scheduledTime,extraCasts:extraCasts,confirmTypes:confirmTypes});
+              if(p.roomId)db.collection('rooms').doc(p.roomId).collection('attendance').doc(todayStr).set({status:ns,scheduledTime:scheduledTime,extraCasts:extraCasts,confirmTypes:confirmTypes});
               setEditTarget(null);setEditMode(false);
             }},'保存'),
           e('button',{style:btnCancel,onClick:function(){setEditTarget(null);}},'キャンセル')
@@ -3968,9 +3977,9 @@ function AttendancePage(p){
                           var nad5=updateAbsences(c.id,'当欠',absTime2,absenceData,nct);
                           setAbsenceData(nad5);saveSettings(timeSetting,nad5);
                           setAttStatus(ns3);
-                          if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:ns3,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct});
+                          if(p.roomId)db.collection('rooms').doc(p.roomId).collection('attendance').doc(todayStr).set({status:ns3,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct});
                         } else {
-                          if(p.uid)db.collection('users').doc(p.uid).collection('attendance').doc(todayStr).set({status:attStatus,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct});
+                          if(p.roomId)db.collection('rooms').doc(p.roomId).collection('attendance').doc(todayStr).set({status:attStatus,scheduledTime:nst,extraCasts:extraCasts,confirmTypes:nct});
                         }
                       }
                     }
