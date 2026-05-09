@@ -3350,10 +3350,71 @@ function App(){
           e('div',{style:{height:'1px',background:'rgba(232,184,109,0.05)',margin:'12px 0'}}),
           e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'8px',paddingLeft:'2px'}},'危険な操作'),
           roomRole==='admin'&&currentRoom&&e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
-            if(confirm('ルーム「'+currentRoom.name+'」を削除しますか？\nすべてのキャストデータが失われます。\nこの操作は取り消せません。')){
-              executeDeleteRoom(roomId);
-            }
+            if(!confirm('ルーム「'+currentRoom.name+'」を削除しますか？\nすべてのキャストデータが失われます。\nこの操作は取り消せません。'))return;
+            var rid=roomId;
+            Promise.all([
+              db.collection('rooms').doc(rid).collection('data').doc('main').delete(),
+              db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
+              db.collection('rooms').doc(rid).delete(),
+              db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
+            ]).then(function(){
+              var remaining=roomsList.filter(function(r){return r.roomId!==rid;});
+              setRoomsList(remaining);
+              if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+              if(remaining.length>0){
+                var next=remaining[0];
+                loadFromRoom(next.roomId).then(function(d){
+                  var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+                  if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+                  setRoomId(next.roomId);setRoomRole(next.role||'member');
+                  setCurrentRoom({id:next.roomId,name:next.name,inviteCode:next.inviteCode||''});
+                  setData(nd);
+                  db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:next.roomId}).catch(function(){});
+                  var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+                  var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
+                  unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
+                    if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+                  },function(){});
+                  notify('ルームを削除しました');setSettingsPage(null);goHome();
+                }).catch(function(){notify('削除後の切替に失敗しました','error');});
+              }else{
+                setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
+                setConsentState('roomselect');setSettingsPage(null);
+              }
+            }).catch(function(){notify('削除に失敗しました','error');});
           }},'ルームを削除する（管理者のみ）'),
+          roomRole!=='admin'&&currentRoom&&e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
+            if(!confirm('ルーム「'+currentRoom.name+'」から退室しますか？'))return;
+            var rid=roomId;
+            Promise.all([
+              db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
+              db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
+            ]).then(function(){
+              var remaining=roomsList.filter(function(r){return r.roomId!==rid;});
+              setRoomsList(remaining);
+              if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+              if(remaining.length>0){
+                var next=remaining[0];
+                loadFromRoom(next.roomId).then(function(d){
+                  var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+                  if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+                  setRoomId(next.roomId);setRoomRole(next.role||'member');
+                  setCurrentRoom({id:next.roomId,name:next.name,inviteCode:next.inviteCode||''});
+                  setData(nd);
+                  db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:next.roomId}).catch(function(){});
+                  var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+                  var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
+                  unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
+                    if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+                  },function(){});
+                  notify('退室しました');setSettingsPage(null);goHome();
+                }).catch(function(){notify('退室後の切替に失敗しました','error');});
+              }else{
+                setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
+                setConsentState('roomselect');setSettingsPage(null);
+              }
+            }).catch(function(){notify('退室に失敗しました','error');});
+          }},'ルームを退室する'),
           e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer'},onClick:function(){
             if(confirm('アカウントを削除しますか？\nすべてのデータが完全に削除されます。\nこの操作は取り消せません。')){
               executeDeleteAccount();
