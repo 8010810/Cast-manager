@@ -3181,11 +3181,20 @@ function App(){
     window._castManagerDeleting=true; // 削除中フラグ
     var userRef=db.collection('users').doc(uid);
     function deleteFirestoreData(){
-      return Promise.all([
-        userRef.collection('data').doc('main').delete().catch(function(){}),
-        userRef.collection('meta').doc('consent').delete().catch(function(){}),
-        userRef.collection('attendance').doc('settings').delete().catch(function(){})
-      ]).then(function(){return userRef.delete().catch(function(){});});
+      // まず所属ルーム一覧を取得し、各ルームのメンバードキュメントも削除する
+      return userRef.collection('rooms').get().catch(function(){return{docs:[]};}).then(function(roomSnap){
+        var memberDeletes=roomSnap.docs.map(function(rd){
+          return db.collection('rooms').doc(rd.id).collection('members').doc(uid).delete().catch(function(){});
+        });
+        var roomSubDeletes=roomSnap.docs.map(function(rd){return rd.ref.delete().catch(function(){});});
+        return Promise.all(memberDeletes.concat(roomSubDeletes));
+      }).then(function(){
+        return Promise.all([
+          userRef.collection('data').doc('main').delete().catch(function(){}),
+          userRef.collection('meta').doc('consent').delete().catch(function(){}),
+          userRef.collection('attendance').doc('settings').delete().catch(function(){})
+        ]);
+      }).then(function(){return userRef.delete().catch(function(){});});
     }
     deleteFirestoreData().then(function(){
       return auth.currentUser.delete();
