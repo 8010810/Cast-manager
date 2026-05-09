@@ -3022,8 +3022,8 @@ function App(){
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){
-    if(!user)return;
-    loadFromDB(user.uid).then(function(d){
+    if(!user||!roomId)return;
+    loadFromRoom(roomId).then(function(d){
       var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
       if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
       setData(nd);
