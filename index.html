@@ -3476,10 +3476,12 @@ function AttendancePage(p){
 
   useEffect(function(){
     if(!p.roomId)return;
-    db.collection('rooms').doc(p.roomId).collection('attendance').doc('settings').get()
-      .then(function(doc){if(doc.exists){var d=doc.data();if(d.timeSetting){setTimeSetting(d.timeSetting);setSettingHour(String(d.timeSetting.startHour));setSettingIntv(String(d.timeSetting.interval));}if(d.absenceData)setAbsenceData(d.absenceData);}}).catch(function(){});
+    var unsubSettings=db.collection('rooms').doc(p.roomId).collection('attendance').doc('settings').onSnapshot(function(doc){
+      if(doc.exists){var d=doc.data();if(d.timeSetting){setTimeSetting(d.timeSetting);setSettingHour(String(d.timeSetting.startHour));setSettingIntv(String(d.timeSetting.interval));}if(d.absenceData)setAbsenceData(d.absenceData);}
+    },function(){});
     db.collection('rooms').doc(p.roomId).collection('attendance').doc(todayStr).get()
       .then(function(doc){if(doc.exists){var d=doc.data();var s=d.status||{};var st=d.scheduledTime||{};var ec=d.extraCasts||[];var ct=d.confirmTypes||{};setAttStatus(s);setScheduledTime(st);setExtraCasts(ec);setConfirmTypes(ct);if(p.setAttData)p.setAttData({status:s,scheduledTime:st,extraCasts:ec,confirmTypes:ct});}}).catch(function(){});
+    return function(){unsubSettings();};
   },[p.roomId]);
 
   // p.attDataが外から更新された時にローカルstateを同期
