@@ -3199,7 +3199,7 @@ function App(){
             if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
           },function(){});
           setSettingsPage(null);
-          goHome();
+          setNavStack(['home']);setSubBack(null);
         }).catch(function(){notify('切り替えに失敗しました','error');});
       }
       function createSettingsRoom(){
@@ -3228,7 +3228,7 @@ function App(){
             },function(){});
             setSettRoomName('');setSettRoomLoading(false);
             notify(rn+' を作成しました');
-            setSettingsPage(null);goHome();
+            setSettingsPage(null);setNavStack(['home']);setSubBack(null);
           })
           .catch(function(){setSettRoomLoading(false);notify('作成に失敗しました','error');});
       }
@@ -3375,7 +3375,7 @@ function App(){
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
                   },function(){});
-                  notify('ルームを削除しました');setSettingsPage(null);goHome();
+                  notify('ルームを削除しました');setSettingsPage(null);setNavStack(['home']);setSubBack(null);
                 }).catch(function(){notify('削除後の切替に失敗しました','error');});
               }else{
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
@@ -3407,7 +3407,7 @@ function App(){
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
                   },function(){});
-                  notify('退室しました');setSettingsPage(null);goHome();
+                  notify('退室しました');setSettingsPage(null);setNavStack(['home']);setSubBack(null);
                 }).catch(function(){notify('退室後の切替に失敗しました','error');});
               }else{
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
