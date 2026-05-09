@@ -2573,6 +2573,108 @@ function CastViewerPage(){
 
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
+function StoreSettingsPage(p){
+  var useState=React.useState,useEffect=React.useEffect;var e=React.createElement;
+  var OVERLAY={position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',flexDirection:'column'};
+  var HDR={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(232,184,109,0.1)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
+  var PANEL={background:'#0d0d1a',flex:1,overflowY:'auto',padding:'20px 18px 40px'};
+  var INP={width:'100%',background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'10px',padding:'11px 14px',color:'#f3f4f6',fontSize:'14px',marginBottom:'10px',boxSizing:'border-box'};
+  var SEC={fontSize:'12px',color:'#6b7280',fontWeight:700,letterSpacing:'0.06em',marginBottom:'10px',marginTop:'4px'};
+  var CARD={background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px 16px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between'};
+
+  var s0=useState('');var openDate=s0[0];var setOpenDate=s0[1];
+  var s1=useState('');var address=s1[0];var setAddress=s1[1];
+  var s2=useState(false);var storeLoading=s2[0];var setStoreLoading=s2[1];
+  var s3=useState([]);var members=s3[0];var setMembers=s3[1];
+  var s4=useState(false);var membersLoading=s4[0];var setMembersLoading=s4[1];
+  var s5=useState(null);var promotingId=s5[0];var setPromotingId=s5[1];
+
+  useEffect(function(){
+    if(!p.roomId)return;
+    // 店舗情報読み込み
+    p.db.collection('rooms').doc(p.roomId).get().then(function(doc){
+      if(doc.exists){var d=doc.data();setOpenDate(d.openDate||'');setAddress(d.address||'');}
+    }).catch(function(){});
+    // メンバー一覧読み込み
+    setMembersLoading(true);
+    p.db.collection('rooms').doc(p.roomId).collection('members').get().then(function(snap){
+      var list=[];
+      snap.forEach(function(d){list.push(Object.assign({uid:d.id},d.data()));});
+      list.sort(function(a,b){
+        if(a.role==='admin'&&b.role!=='admin')return -1;
+        if(a.role!=='admin'&&b.role==='admin')return 1;
+        return(a.userName||'').localeCompare(b.userName||'','ja');
+      });
+      setMembers(list);setMembersLoading(false);
+    }).catch(function(){setMembersLoading(false);});
+  },[p.roomId]);
+
+  function saveStore(){
+    if(!p.roomId)return;
+    setStoreLoading(true);
+    p.db.collection('rooms').doc(p.roomId).update({openDate:openDate,address:address})
+      .then(function(){setStoreLoading(false);p.notify('保存しました');})
+      .catch(function(){setStoreLoading(false);p.notify('保存に失敗しました');});
+  }
+
+  function promoteToAdmin(targetUid,targetName){
+    if(!confirm(targetName+'さんに管理者権限を付与しますか？'))return;
+    setPromotingId(targetUid);
+    Promise.all([
+      p.db.collection('rooms').doc(p.roomId).collection('members').doc(targetUid).update({role:'admin'}),
+      p.db.collection('users').doc(targetUid).collection('rooms').doc(p.roomId).update({role:'admin'}),
+    ]).then(function(){
+      setMembers(function(prev){
+        var updated=prev.map(function(m){return m.uid===targetUid?Object.assign({},m,{role:'admin'}):m;});
+        return updated.sort(function(a,b){
+          if(a.role==='admin'&&b.role!=='admin')return -1;
+          if(a.role!=='admin'&&b.role==='admin')return 1;
+          return(a.userName||'').localeCompare(b.userName||'','ja');
+        });
+      });
+      setPromotingId(null);p.notify(targetName+'さんを管理者にしました');
+    }).catch(function(){setPromotingId(null);p.notify('権限付与に失敗しました');});
+  }
+
+  return e('div',{style:OVERLAY},
+    e('div',{style:HDR},
+      e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:p.onBack},'‹ 戻る'),
+      e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'店舗情報・メンバー'),
+      e('div',{style:{width:'40px'}})
+    ),
+    e('div',{style:PANEL},
+      // 店舗情報セクション
+      e('div',{style:SEC},'店舗情報'),
+      e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'開店日'),
+      e('input',{type:'date',style:INP,value:openDate,onChange:function(ev){setOpenDate(ev.target.value);}}),
+      e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'住所'),
+      e('input',{type:'text',style:INP,placeholder:'例: 東京都新宿区歌舞伎町1-1-1',value:address,onChange:function(ev){setAddress(ev.target.value);}}),
+      e('button',{style:{width:'100%',background:'linear-gradient(135deg,#d4a017,#e8b86d)',border:'none',borderRadius:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',padding:'12px',cursor:storeLoading?'not-allowed':'pointer',opacity:storeLoading?0.6:1,marginBottom:'28px'},onClick:saveStore,disabled:storeLoading},storeLoading?'保存中...':'保存'),
+      // メンバーセクション
+      e('div',{style:SEC},'メンバー'),
+      membersLoading
+        ?e('div',{style:{color:'#6b7280',fontSize:'13px',padding:'12px 0'}},'読み込み中...')
+        :members.length===0
+          ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'12px 0'}},'メンバーが見つかりません')
+          :members.map(function(m){
+            var isAdmin=m.role==='admin';
+            var isSelf=m.uid===p.user.uid;
+            var promoting=promotingId===m.uid;
+            return e('div',{key:m.uid,style:CARD},
+              e('div',null,
+                e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+                  e('span',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},m.userName||'名前未設定'),
+                  isSelf&&e('span',{style:{fontSize:'10px',color:'#6b7280',background:'#1e2035',borderRadius:'10px',padding:'1px 7px'}},'自分')
+                ),
+                e('span',{style:{fontSize:'11px',color:isAdmin?'#e8b86d':'#6b7280',marginTop:'2px',display:'block'}},isAdmin?'管理者':'メンバー')
+              ),
+              !isAdmin&&p.roomRole==='admin'&&e('button',{style:{background:'transparent',border:'1px solid #e8b86d44',borderRadius:'8px',padding:'6px 12px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:promoting?'not-allowed':'pointer',opacity:promoting?0.5:1,whiteSpace:'nowrap'},onClick:function(){if(!promoting)promoteToAdmin(m.uid,m.userName||'このユーザー');},disabled:promoting},promoting?'付与中...':'管理者にする')
+            );
+          })
+    )
+  );
+}
+
 function ProfileSettingsPage(p){
   var useState=React.useState,useEffect=React.useEffect;var e=React.createElement;
   var s0=useState(p.userName||'');var editName=s0[0];var setEditName=s0[1];
@@ -3181,6 +3283,16 @@ function App(){
       );
     }
 
+    // 店舗情報・メンバーページ
+    if(settingsPage==='store'){
+      return e(StoreSettingsPage,{
+        roomId:roomId,roomRole:roomRole,currentRoom:currentRoom,
+        user:user,userName:userName,db:db,
+        onBack:function(){setSettingsPage('settings');},
+        notify:notify
+      });
+    }
+
     // ルームページ
     if(settingsPage==='room'){
       function switchToRoom(r){
@@ -3333,6 +3445,7 @@ function App(){
         e('div',{style:{padding:'20px 18px'}},
           [
             {label:'プロフィール',action:function(){setSettingsPage('profile');}},
+            {label:'店舗情報・メンバー',action:function(){setSettingsPage('store');}},
             {label:'ルーム',action:function(){setSettingsPage('room');}},
             {label:'招待',action:function(){setSettingsPage('invite');}},
             {label:'利用規約',action:function(){setSettingsPage('terms');}},
