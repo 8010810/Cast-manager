@@ -2620,20 +2620,19 @@ function StoreSettingsPage(p){
   function promoteToAdmin(targetUid,targetName){
     if(!confirm(targetName+'さんに管理者権限を付与しますか？'))return;
     setPromotingId(targetUid);
-    Promise.all([
-      p.db.collection('rooms').doc(p.roomId).collection('members').doc(targetUid).update({role:'admin'}),
-      p.db.collection('users').doc(targetUid).collection('rooms').doc(p.roomId).update({role:'admin'}),
-    ]).then(function(){
-      setMembers(function(prev){
-        var updated=prev.map(function(m){return m.uid===targetUid?Object.assign({},m,{role:'admin'}):m;});
-        return updated.sort(function(a,b){
-          if(a.role==='admin'&&b.role!=='admin')return -1;
-          if(a.role!=='admin'&&b.role==='admin')return 1;
-          return(a.userName||'').localeCompare(b.userName||'','ja');
+    p.db.collection('rooms').doc(p.roomId).collection('members').doc(targetUid).update({role:'admin'})
+      .then(function(){
+        p.db.collection('users').doc(targetUid).collection('rooms').doc(p.roomId).update({role:'admin'}).catch(function(){});
+        setMembers(function(prev){
+          var updated=prev.map(function(m){return m.uid===targetUid?Object.assign({},m,{role:'admin'}):m;});
+          return updated.sort(function(a,b){
+            if(a.role==='admin'&&b.role!=='admin')return -1;
+            if(a.role!=='admin'&&b.role==='admin')return 1;
+            return(a.userName||'').localeCompare(b.userName||'','ja');
+          });
         });
-      });
-      setPromotingId(null);p.notify(targetName+'さんを管理者にしました');
-    }).catch(function(){setPromotingId(null);p.notify('権限付与に失敗しました');});
+        setPromotingId(null);p.notify(targetName+'さんを管理者にしました');
+      }).catch(function(){setPromotingId(null);p.notify('権限付与に失敗しました');});
   }
 
   return e('div',{style:OVERLAY},
@@ -3007,6 +3006,7 @@ function App(){
   var s1=useState(null);var user=s1[0];var setUser=s1[1];
   var unsubAuthRef=React.useRef(null); // onAuthStateChangedのunsubscribe関数
   var unsubAttRef=React.useRef(null); // 勤怠リスナーのunsubscribe関数
+  var unsubRoleRef=React.useRef(null); // ロール変更リスナーのunsubscribe関数
   var s2=useState(null);var data=s2[0];var setData=s2[1];
   var s3=useState(true);var loading=s3[0];var setLoading=s3[1];
   // navStack: ['home', 'mycast', ...] スタック方式
@@ -3073,6 +3073,7 @@ function App(){
     var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);
       if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+      if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
       if(!u){
         window._castManagerDeleting=false;
         setConsentState('loading');
@@ -3114,6 +3115,10 @@ function App(){
             unsubAttRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('attendance').doc(ts).onSnapshot(function(doc){
               if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
             },function(){});
+            if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+            unsubRoleRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('members').doc(u.uid).onSnapshot(function(doc){
+              if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
+            },function(){});
           }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
         }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
       }else{
@@ -3121,7 +3126,7 @@ function App(){
       }
     });
     unsubAuthRef.current=unsubAuth;
-    return function(){unsubAuthRef.current=null;unsubAuth();if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}};
+    return function(){unsubAuthRef.current=null;unsubAuth();if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}};
   },[]);
 
 
@@ -3310,6 +3315,10 @@ function App(){
           unsubAttRef.current=db.collection('rooms').doc(r.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
             if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
           },function(){});
+          if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+          unsubRoleRef.current=db.collection('rooms').doc(r.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
+            if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
+          },function(){});
           setSettingsPage(null);
           setNavStack(['home']);setSubBack(null);
         }).catch(function(){notify('切り替えに失敗しました','error');});
@@ -3474,6 +3483,7 @@ function App(){
               var remaining=roomsList.filter(function(r){return r.roomId!==rid;});
               setRoomsList(remaining);
               if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+              if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
               if(remaining.length>0){
                 var next=remaining[0];
                 loadFromRoom(next.roomId).then(function(d){
@@ -3487,6 +3497,9 @@ function App(){
                   var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+                  },function(){});
+                  unsubRoleRef.current=db.collection('rooms').doc(next.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
+                    if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
                   },function(){});
                   notify('ルームを削除しました');setSettingsPage(null);setNavStack(['home']);setSubBack(null);
                 }).catch(function(){notify('削除後の切替に失敗しました','error');});
@@ -3506,6 +3519,7 @@ function App(){
               var remaining=roomsList.filter(function(r){return r.roomId!==rid;});
               setRoomsList(remaining);
               if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+              if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
               if(remaining.length>0){
                 var next=remaining[0];
                 loadFromRoom(next.roomId).then(function(d){
@@ -3519,6 +3533,9 @@ function App(){
                   var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+                  },function(){});
+                  unsubRoleRef.current=db.collection('rooms').doc(next.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
+                    if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
                   },function(){});
                   notify('退室しました');setSettingsPage(null);setNavStack(['home']);setSubBack(null);
                 }).catch(function(){notify('退室後の切替に失敗しました','error');});
@@ -3565,6 +3582,10 @@ function App(){
         if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
         unsubAttRef.current=db.collection('rooms').doc(rid).collection('attendance').doc(tsR).onSnapshot(function(doc){
           if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+        },function(){});
+        if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+        unsubRoleRef.current=db.collection('rooms').doc(rid).collection('members').doc(user.uid).onSnapshot(function(doc){
+          if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
         },function(){});
         setConsentState('done');
       }
