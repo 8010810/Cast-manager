@@ -1807,18 +1807,21 @@ function MiniApp(){
   var isCastLayer=layer==='cast';
 
   useEffect(function(){
+    var unsubData=null;
     var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);
+      if(unsubData){unsubData();unsubData=null;}
       if(u){
         setLoading(true);
-        loadFromDB(u.uid).then(function(d){
+        unsubData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
+          var d=doc.exists?doc.data():{};
           var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
           if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
           setData(nd);setLoading(false);
-        }).catch(function(){setLoading(false);});
+        },function(){setLoading(false);});
       }else{setData(null);setLoading(false);}
     });
-    return unsubAuth;
+    return function(){unsubAuth();if(unsubData){unsubData();}};
   },[]);
 
   useEffect(function(){
@@ -1829,26 +1832,8 @@ function MiniApp(){
     return unsubRooms;
   },[user]);
 
-  // ページ遷移時にデータ再取得
-  useEffect(function(){
-    if(!user||layer==='home')return;
-    loadFromDB(user.uid).then(function(d){
-      var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-      if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-      setData(nd);
-    }).catch(function(){});
-  },[layer,user]);
-
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
-  function refreshData(showToast){
-    if(!user)return;
-    loadFromDB(user.uid).then(function(d){
-      var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-      if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-      setData(nd);
-    }).catch(function(){});
-    if(showToast)notify('更新しました','success');
-  }
+  function refreshData(showToast){if(showToast)notify('更新しました','success');}
   function persist(next){setData(next);if(user)saveToDB(user.uid,next);}
   function navigate(pg){setNavStack(function(st){return [...st,pg];});setSubBack(null);refreshData();}
   function goHome(){setNavStack(['home']);setSubBack(null);refreshData();}

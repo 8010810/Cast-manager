@@ -3212,30 +3212,39 @@ function App(){
     if(user&&roomId){
       saveToRoom(roomId,next);
       var myFolder=(next.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===user.uid;});
-      if(myFolder&&myFolder.castIds&&myFolder.castIds.length>0){
+      if(myFolder){
         var miniRef=db.collection('users').doc(user.uid).collection('data').doc('main');
         miniRef.get().then(function(doc){
           var md=doc.exists?doc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
+          // キャスト同期
           var miniCasts=md.casts||[];
-          myFolder.castIds.forEach(function(castId){
+          (myFolder.castIds||[]).forEach(function(castId){
             var cast=(next.casts||[]).find(function(c){return c.id===castId;});
             if(cast){
               var idx=miniCasts.findIndex(function(c){return c.id===castId;});
               if(idx>=0){miniCasts[idx]=cast;}else{miniCasts.push(cast);}
             }
           });
-          // update()はドット記法でネスト構造を正しく更新できる
-          // set({merge:true})はドット記法を解釈せずリテラルキーになるためNG
-          var upd={casts:miniCasts};
-          myFolder.castIds.forEach(function(castId){
+          // フォルダ同期: ownerUidで紐付けたstd.連携フォルダを作成/更新
+          var miniFolders=(md.folders||[]).slice();
+          if(miniFolders.length===0){miniFolders=[{id:uid(),name:'新入店',castIds:[]}];}
+          var linkedIdx=miniFolders.findIndex(function(f){return f.ownerUid===user.uid;});
+          if(linkedIdx>=0){
+            miniFolders[linkedIdx]=Object.assign({},miniFolders[linkedIdx],{name:myFolder.name,castIds:(myFolder.castIds||[]).slice()});
+          }else{
+            miniFolders.push({id:uid(),name:myFolder.name,castIds:(myFolder.castIds||[]).slice(),ownerUid:user.uid});
+          }
+          // update()でドット記法による部分更新（set({merge:true})はドット記法を解釈しない）
+          var upd={casts:miniCasts,folders:miniFolders};
+          (myFolder.castIds||[]).forEach(function(castId){
             upd['records.'+castId]=next.records[castId]||[];
             upd['customers.'+castId]=next.customers[castId]||[];
           });
           if(doc.exists){
             miniRef.update(upd).catch(function(){});
           }else{
-            var full={casts:miniCasts,records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
-            myFolder.castIds.forEach(function(castId){
+            var full={casts:miniCasts,records:{},customers:{},folders:miniFolders,shifts:{},visits:[],quota:{}};
+            (myFolder.castIds||[]).forEach(function(castId){
               full.records[castId]=next.records[castId]||[];
               full.customers[castId]=next.customers[castId]||[];
             });
