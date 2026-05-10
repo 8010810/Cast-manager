@@ -660,10 +660,12 @@ function CastListPage(p){
     var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
     // 派遣の場合は「派遣」フォルダ、なければ作成
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
-    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(p.data.folders[0]||{}).id||'';
+    var myPersonalFolder=(p.data.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===p.uid;});
+    var defaultFid=myPersonalFolder?myPersonalFolder.id:(p.data.folders.find(function(f){return!f.isDispatch&&f.name!=='派遣';})||p.data.folders[0]||{}).id||'';
+    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(newFolder||defaultFid);
     var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
     var newFolders=(p.data.folders||[]).map(function(f){
-      var shouldAdd=isDispatch?f.id===initFid:newFolder?f.id===newFolder:f.name==='新入店';
+      var shouldAdd=f.id===initFid;
       if(shouldAdd)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});
       return f;
     });
@@ -1816,7 +1818,6 @@ function MiniApp(){
         unsubData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
           var d=doc.exists?doc.data():{};
           var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-          if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
           setData(nd);setLoading(false);
         },function(){setLoading(false);});
       }else{setData(null);setLoading(false);}
@@ -2126,20 +2127,14 @@ function MiniApp(){
     header,toastEl,
     e('div',{style:{paddingTop:'0'}},
       layer==='mycast'&&(function(){
-        var folders=data.folders||[];
-        var mainFolder=folders[0];
-        if(!mainFolder)return e('div',{style:{padding:'32px',textAlign:'center',color:'#6b7280'}},'フォルダがありません');
-        var dispatchFolder=folders.find(function(f){return f.name==='派遣';});
-        var commonProps2={data:data,onOpenCast:openCast,notify:notify,uid:user?user.uid:'',onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){},persist:persist};
-        var mainCasts=(data.casts||[]).filter(function(c){return (mainFolder.castIds||[]).includes(c.id);});
-        if(dispatchFolder){
-          var dispCasts=(data.casts||[]).filter(function(c){return (dispatchFolder.castIds||[]).includes(c.id);});
-          return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
-            e(FolderDetail,Object.assign({},commonProps2,{folder:mainFolder,folderCasts:mainCasts})),
-            e(FolderDetail,Object.assign({},commonProps2,{folder:dispatchFolder,folderCasts:dispCasts}))
-          );
-        }
-        return e(FolderDetail,Object.assign({},commonProps2,{folder:mainFolder,folderCasts:mainCasts}));
+        var myUid=user?user.uid:'';
+        var myFolder=(data.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===myUid;});
+        if(!myFolder)return e('div',{style:{padding:'32px',textAlign:'center',color:'#6b7280'}},'自分のフォルダがまだ同期されていません');
+        var folderCasts=(data.casts||[]).filter(function(c){return(myFolder.castIds||[]).includes(c.id);});
+        var commonProps2={data:data,onOpenCast:openCast,notify:notify,uid:myUid,onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){},persist:persist};
+        return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
+          e(FolderDetail,Object.assign({},commonProps2,{key:myFolder.id,folder:myFolder,folderCasts:folderCasts}))
+        );
       })(),
       layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack})),
