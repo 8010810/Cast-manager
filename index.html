@@ -3196,12 +3196,53 @@ function App(){
     }
     if(showToast)notify('更新しました','success');
   }
-  function loadRoomData(rid){
+  function doMiniSync(rid,rName,nextData){
+    if(!user)return;
+    var myFolder=(nextData.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===user.uid;});
+    if(!myFolder)return;
+    var miniRef=db.collection('users').doc(user.uid).collection('data').doc('main');
+    miniRef.get().then(function(doc){
+      var md=doc.exists?doc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
+      var miniCasts=md.casts||[];
+      (myFolder.castIds||[]).forEach(function(castId){
+        var cast=(nextData.casts||[]).find(function(c){return c.id===castId;});
+        if(cast){
+          var idx=miniCasts.findIndex(function(c){return c.id===castId;});
+          if(idx>=0){miniCasts[idx]=cast;}else{miniCasts.push(cast);}
+        }
+      });
+      var miniFolders=(md.folders||[]).slice();
+      var linkedIdx=miniFolders.findIndex(function(f){return f.ownerUid===user.uid&&f.roomId===rid;});
+      var folderName=rName||myFolder.name;
+      if(linkedIdx>=0){
+        miniFolders[linkedIdx]=Object.assign({},miniFolders[linkedIdx],{name:folderName,castIds:(myFolder.castIds||[]).slice()});
+      }else{
+        miniFolders.push({id:uid(),name:folderName,castIds:(myFolder.castIds||[]).slice(),ownerUid:user.uid,roomId:rid});
+      }
+      var upd={casts:miniCasts,folders:miniFolders};
+      (myFolder.castIds||[]).forEach(function(castId){
+        upd['records.'+castId]=nextData.records[castId]||[];
+        upd['customers.'+castId]=nextData.customers[castId]||[];
+      });
+      if(doc.exists){
+        miniRef.update(upd).catch(function(){});
+      }else{
+        var full={casts:miniCasts,records:{},customers:{},folders:miniFolders,shifts:{},visits:[],quota:{}};
+        (myFolder.castIds||[]).forEach(function(castId){
+          full.records[castId]=nextData.records[castId]||[];
+          full.customers[castId]=nextData.customers[castId]||[];
+        });
+        miniRef.set(full).catch(function(){});
+      }
+    }).catch(function(){});
+  }
+  function loadRoomData(rid,rName){
     if(!rid){setLoading(false);return;}
     loadFromRoom(rid).then(function(d){
       var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
       if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
       setData(nd);setLoading(false);setConsentState('done');
+      doMiniSync(rid,rName||'',nd);
     }).catch(function(){
       var empty={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}};
       setData(empty);setLoading(false);setConsentState('done');
@@ -3211,48 +3252,7 @@ function App(){
     setData(next);
     if(user&&roomId){
       saveToRoom(roomId,next);
-      var myFolder=(next.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===user.uid;});
-      if(myFolder){
-        var miniRef=db.collection('users').doc(user.uid).collection('data').doc('main');
-        miniRef.get().then(function(doc){
-          var md=doc.exists?doc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
-          // キャスト同期
-          var miniCasts=md.casts||[];
-          (myFolder.castIds||[]).forEach(function(castId){
-            var cast=(next.casts||[]).find(function(c){return c.id===castId;});
-            if(cast){
-              var idx=miniCasts.findIndex(function(c){return c.id===castId;});
-              if(idx>=0){miniCasts[idx]=cast;}else{miniCasts.push(cast);}
-            }
-          });
-          // フォルダ同期: このルーム専用のリンクフォルダをroomId+ownerUidで識別
-          var miniFolders=(md.folders||[]).slice();
-          if(miniFolders.length===0){miniFolders=[{id:uid(),name:'新入店',castIds:[]}];}
-          var linkedIdx=miniFolders.findIndex(function(f){return f.ownerUid===user.uid&&f.roomId===roomId;});
-          var folderName=(currentRoom&&currentRoom.name)||myFolder.name;
-          if(linkedIdx>=0){
-            miniFolders[linkedIdx]=Object.assign({},miniFolders[linkedIdx],{name:folderName,castIds:(myFolder.castIds||[]).slice()});
-          }else{
-            miniFolders.push({id:uid(),name:folderName,castIds:(myFolder.castIds||[]).slice(),ownerUid:user.uid,roomId:roomId});
-          }
-          // update()でドット記法による部分更新（set({merge:true})はドット記法を解釈しない）
-          var upd={casts:miniCasts,folders:miniFolders};
-          (myFolder.castIds||[]).forEach(function(castId){
-            upd['records.'+castId]=next.records[castId]||[];
-            upd['customers.'+castId]=next.customers[castId]||[];
-          });
-          if(doc.exists){
-            miniRef.update(upd).catch(function(){});
-          }else{
-            var full={casts:miniCasts,records:{},customers:{},folders:miniFolders,shifts:{},visits:[],quota:{}};
-            (myFolder.castIds||[]).forEach(function(castId){
-              full.records[castId]=next.records[castId]||[];
-              full.customers[castId]=next.customers[castId]||[];
-            });
-            miniRef.set(full).catch(function(){});
-          }
-        }).catch(function(){});
-      }
+      doMiniSync(roomId,(currentRoom&&currentRoom.name)||'',next);
     }
   }
   function openCast(id,backFn){
