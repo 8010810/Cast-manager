@@ -3135,32 +3135,39 @@ function App(){
           setStoreName(cd.storeName||'');
           setIsLineUser(!!(cd.isLineUser));
           if(!cd.userName){clearTimeout(authTimeout);setConsentState('username');setLoading(false);return;}
-          // ルーム一覧取得
-          db.collection('users').doc(u.uid).collection('rooms').get().then(function(snap){
-            clearTimeout(authTimeout);
-            var rooms=[];
-            snap.forEach(function(d){rooms.push(Object.assign({roomId:d.id},d.data()));});
-            setRoomsList(rooms);
-            if(rooms.length===0){
-              setConsentState('roomselect');setLoading(false);return;
-            }
-            var lastRoomId=cd.lastRoomId||rooms[0].roomId;
-            var roomInfo=rooms.find(function(r){return r.roomId===lastRoomId;})||rooms[0];
-            setRoomId(roomInfo.roomId);
-            setRoomRole(roomInfo.role||'member');
-            setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
-            loadRoomData(roomInfo.roomId);
-            var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
-            var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
-            if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
-            unsubAttRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('attendance').doc(ts).onSnapshot(function(doc){
-              if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-            },function(){});
-            if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
-            unsubRoleRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('members').doc(u.uid).onSnapshot(function(doc){
-              if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-            },function(){});
-          }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
+          // ルーム一覧取得（失敗・空の場合は最大2回リトライ）
+          function tryLoadRooms(attempt){
+            db.collection('users').doc(u.uid).collection('rooms').get().then(function(snap){
+              var rooms=[];
+              snap.forEach(function(d){rooms.push(Object.assign({roomId:d.id},d.data()));});
+              if(rooms.length===0&&attempt<3){
+                setTimeout(function(){tryLoadRooms(attempt+1);},1500);return;
+              }
+              clearTimeout(authTimeout);
+              setRoomsList(rooms);
+              if(rooms.length===0){setConsentState('roomselect');setLoading(false);return;}
+              var lastRoomId=cd.lastRoomId||rooms[0].roomId;
+              var roomInfo=rooms.find(function(r){return r.roomId===lastRoomId;})||rooms[0];
+              setRoomId(roomInfo.roomId);
+              setRoomRole(roomInfo.role||'member');
+              setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
+              loadRoomData(roomInfo.roomId);
+              var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
+              var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
+              if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+              unsubAttRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('attendance').doc(ts).onSnapshot(function(doc){
+                if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+              },function(){});
+              if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+              unsubRoleRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('members').doc(u.uid).onSnapshot(function(doc){
+                if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
+              },function(){});
+            }).catch(function(){
+              if(attempt<3){setTimeout(function(){tryLoadRooms(attempt+1);},1500);return;}
+              clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
+            });
+          }
+          tryLoadRooms(1);
         }).catch(function(){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);});
       }else{
         setData(null);setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});setLoading(false);
@@ -3217,12 +3224,23 @@ function App(){
               if(idx>=0){miniCasts[idx]=cast;}else{miniCasts.push(cast);}
             }
           });
+          // update()はドット記法でネスト構造を正しく更新できる
+          // set({merge:true})はドット記法を解釈せずリテラルキーになるためNG
           var upd={casts:miniCasts};
           myFolder.castIds.forEach(function(castId){
             upd['records.'+castId]=next.records[castId]||[];
             upd['customers.'+castId]=next.customers[castId]||[];
           });
-          miniRef.set(upd,{merge:true}).catch(function(){});
+          if(doc.exists){
+            miniRef.update(upd).catch(function(){});
+          }else{
+            var full={casts:miniCasts,records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
+            myFolder.castIds.forEach(function(castId){
+              full.records[castId]=next.records[castId]||[];
+              full.customers[castId]=next.customers[castId]||[];
+            });
+            miniRef.set(full).catch(function(){});
+          }
         }).catch(function(){});
       }
     }
