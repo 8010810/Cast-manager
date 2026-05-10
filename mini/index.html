@@ -1830,9 +1830,27 @@ function MiniApp(){
   function handleSignOut(){fbSignOut().then(function(){setData(null);setNavStack(['home']);});}
   function handleDeleteAccount(){
     if(!user)return;
-    auth.currentUser.delete().then(function(){setData(null);setNavStack(['home']);}).catch(function(e){
-      if(e.code==='auth/requires-recent-login'){alert('再ログインが必要です。一度ログアウトして再度ログインしてください。');}
-      else{alert('削除に失敗しました: '+e.message);}
+    var uid2=user.uid;
+    var userRef=db.collection('users').doc(uid2);
+    Promise.all([
+      userRef.collection('data').doc('main').delete().catch(function(){}),
+      userRef.collection('meta').doc('consent').delete().catch(function(){})
+    ]).then(function(){
+      if(!auth.currentUser)return auth.signOut().catch(function(){});
+      return auth.currentUser.delete().catch(function(e){
+        if(e.code==='auth/requires-recent-login'){
+          var provider=new firebase.auth.GoogleAuthProvider();
+          return auth.currentUser.reauthenticateWithPopup(provider).then(function(){
+            return auth.currentUser?auth.currentUser.delete().catch(function(){return auth.signOut();}):auth.signOut();
+          }).catch(function(){return auth.signOut();});
+        }
+        return auth.signOut();
+      });
+    }).then(function(){
+      setData(null);setNavStack(['home']);
+    }).catch(function(){
+      auth.signOut().catch(function(){});
+      setData(null);setNavStack(['home']);
     });
   }
   function goBack(){
