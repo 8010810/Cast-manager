@@ -3604,7 +3604,7 @@ function App(){
                 }).catch(function(){notify('削除後の切替に失敗しました','error');});
               }else{
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
-                setConsentState('roomselect');setSettingsPage(null);
+                setSettingsPage(null);window.location.href='https://cast-manager-mini.vercel.app/';
               }
             }).catch(function(){notify('削除に失敗しました','error');});
           }},'ルームを削除する（管理者のみ）'),
@@ -3640,7 +3640,7 @@ function App(){
                 }).catch(function(){notify('退室後の切替に失敗しました','error');});
               }else{
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
-                setConsentState('roomselect');setSettingsPage(null);
+                setSettingsPage(null);window.location.href='https://cast-manager-mini.vercel.app/';
               }
             }).catch(function(){notify('退室に失敗しました','error');});
           }},'ルームを退室する'),
