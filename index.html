@@ -80,6 +80,35 @@ var todayStr=function(){var d=new Date();if(d.getHours()<3)d.setDate(d.getDate()
 var yen=function(n){return n==null?'--':'¥'+Number(n).toLocaleString();};
 var fmtDate=function(s){if(!s)return'';var p=s.split('-');return p[0]+'/'+p[1]+'/'+p[2];};
 var uid=function(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);};
+// ─── Mini personal cast helper ───────────────────────────────────────────────
+// When a user creates or joins a room, this ensures they have a personal cast
+// entry in the room (with ownerUid) and a matching folder, and that the session
+// is registered in users/{uid}/mini/data for cross-room aggregation.
+function setupPersonalCastInRoom(db,userUid,userName,roomId,roomName,roomData,uidFn,onDone){
+  var casts=roomData.casts||[];
+  var folders=roomData.folders||[];
+  var existing=casts.find(function(c){return c.ownerUid===userUid;});
+  var miniRef=db.collection('users').doc(userUid).collection('mini').doc('data');
+  function ensureMiniSession(castId,castName){
+    miniRef.get().then(function(doc){
+      var ex=doc.exists?doc.data():{sessions:[],records:{},customers:{}};
+      var sessions=ex.sessions||[];
+      if(!sessions.find(function(s){return s.roomId===roomId;})){
+        miniRef.set({sessions:sessions.concat([{roomId:roomId,roomName:roomName,castId:castId,castName:castName,joinedAt:new Date().toISOString(),active:true}])},{merge:true}).catch(function(){});
+      }
+    }).catch(function(){});
+  }
+  if(existing){ensureMiniSession(existing.id,existing.name);onDone(roomData,existing.id);return;}
+  var castId=uidFn();
+  var castName=userName||'メンバー';
+  var newCast={id:castId,name:castName,ownerUid:userUid,birthday:'',memo:'',monthlyTargets:{},contractShift:'',realName:'',hometown:'',height:'',isDispatch:false,folderHistory:[]};
+  var newCasts=casts.concat([newCast]);
+  var newFolders=folders.concat([{id:uidFn(),name:castName,castIds:[castId]}]);
+  var updated=Object.assign({},roomData,{casts:newCasts,folders:newFolders});
+  db.collection('rooms').doc(roomId).collection('data').doc('main').set({casts:newCasts,folders:newFolders},{merge:true}).catch(function(){});
+  ensureMiniSession(castId,castName);
+  onDone(updated,castId);
+}
 var calcAge=function(birthday){
   if(!birthday)return null;
   var parts=birthday.split('-');
@@ -351,6 +380,10 @@ function HomeScreen(p){
     visit:e('svg',{width:36,height:36,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
       e('path',{d:'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z'}),e('circle',{cx:12,cy:10,r:3})
     ),
+    mini:e('svg',{width:36,height:36,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
+      e('path',{d:'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'}),e('circle',{cx:12,cy:7,r:4}),
+      e('polyline',{points:'16 11 12 15 8 11'})
+    ),
   };
   var pages=[
     {key:'mycast',label:'MG実績',desc:'キャスト別管理'},
@@ -359,6 +392,7 @@ function HomeScreen(p){
     {key:'shift',label:'シフト管理',desc:'出勤カレンダー'},
     {key:'attendance',label:'勤怠管理',desc:'出勤・通過状況'},
     {key:'visit',label:'来店予定',desc:'同伴・来店管理'},
+    {key:'mini',label:'My実績',desc:'個人累計実績'},
   ];
 
   return e('div',null,
@@ -2868,12 +2902,18 @@ function RoomSelectScreen(p){
     var rid=p.db.collection('rooms').doc().id;
     var now=new Date().toISOString();
     var roomData={name:roomName.trim(),ownerUid:p.user.uid,createdAt:now,inviteCode:inviteCode};
-    var initData={casts:[],records:{},customers:{},folders:[{id:p.uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}};
+    var personalCastId=p.uid();
+    var castName=p.userName||'オーナー';
+    var personalCast={id:personalCastId,name:castName,ownerUid:p.user.uid,birthday:'',memo:'',monthlyTargets:{},contractShift:'',realName:'',hometown:'',height:'',isDispatch:false,folderHistory:[]};
+    var initData={casts:[personalCast],records:{},customers:{},folders:[{id:p.uid(),name:'新入店',castIds:[]},{id:p.uid(),name:castName,castIds:[personalCastId]}],shifts:{},visits:[],quota:{}};
     p.db.collection('rooms').doc(rid).set(roomData)
       .then(function(){return p.db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
-      .then(function(){return p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).set({role:'admin',userName:p.userName||'',joinedAt:now});})
+      .then(function(){return p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).set({role:'admin',userName:p.userName||'',castId:personalCastId,joinedAt:now});})
       .then(function(){return p.db.collection('users').doc(p.user.uid).collection('rooms').doc(rid).set({name:roomName.trim(),role:'admin',inviteCode:inviteCode,joinedAt:now});})
       .then(function(){
+        p.db.collection('users').doc(p.user.uid).collection('mini').doc('data').set({
+          sessions:[{roomId:rid,roomName:roomName.trim(),castId:personalCastId,castName:castName,joinedAt:now,active:true}]
+        },{merge:true}).catch(function(){});
         setLoading(false);
         p.onRoomReady(rid,'admin',{id:rid,name:roomName.trim(),inviteCode:inviteCode},initData);
       }).catch(function(e2){setErr('作成に失敗しました: '+e2.message);setLoading(false);});
@@ -2900,8 +2940,11 @@ function RoomSelectScreen(p){
           .then(function(){return p.db.collection('rooms').doc(rid).collection('data').doc('main').get();})
           .then(function(dataDoc){
             var d=dataDoc.exists?dataDoc.data():{};
-            setLoading(false);
-            p.onRoomReady(rid,role,{id:rid,name:rd.name,inviteCode:actualCode},d);
+            setupPersonalCastInRoom(p.db,p.user.uid,p.userName||'',rid,rd.name,d,p.uid,function(ud,castId){
+              p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).update({castId:castId}).catch(function(){});
+              setLoading(false);
+              p.onRoomReady(rid,role,{id:rid,name:rd.name,inviteCode:actualCode},ud);
+            });
           });
       });
     }).catch(function(e2){setErr('参加に失敗しました: '+e2.message);setLoading(false);});
@@ -2928,8 +2971,11 @@ function RoomSelectScreen(p){
             .then(function(){return p.db.collection('rooms').doc(rid).collection('data').doc('main').get();})
             .then(function(dataDoc){
               var d=dataDoc.exists?dataDoc.data():{};
-              setLoading(false);
-              p.onRoomReady(rid,role,{id:rid,name:rd.name,inviteCode:code},d);
+              setupPersonalCastInRoom(p.db,p.user.uid,p.userName||'',rid,rd.name,d,p.uid,function(ud,castId){
+                p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).update({castId:castId}).catch(function(){});
+                setLoading(false);
+                p.onRoomReady(rid,role,{id:rid,name:rd.name,inviteCode:code},ud);
+              });
             });
         });
       }).catch(function(e2){setErr('参加に失敗しました');setLoading(false);setMode('join');setInviteInput(code);});
@@ -3159,7 +3205,26 @@ function App(){
       setData(empty);setLoading(false);setConsentState('done');
     });
   }
-  function persist(next){setData(next);if(user&&roomId)saveToRoom(roomId,next);}
+  function persist(next){
+    setData(next);
+    if(user&&roomId){
+      saveToRoom(roomId,next);
+      // Sync personal cast records to mini (fire-and-forget)
+      var myCast=(next.casts||[]).find(function(c){return c.ownerUid&&c.ownerUid===user.uid;});
+      if(myCast){
+        var miniKey=roomId+'_'+myCast.id;
+        var myRecs=next.records[myCast.id]||[];
+        var myCusts=next.customers[myCast.id]||[];
+        var miniUpd={};miniUpd['records.'+miniKey]=myRecs;miniUpd['customers.'+miniKey]=myCusts;
+        db.collection('users').doc(user.uid).collection('mini').doc('data').update(miniUpd)
+          .catch(function(){
+            var d={sessions:[],records:{},customers:{}};
+            d.records[miniKey]=myRecs;d.customers[miniKey]=myCusts;
+            db.collection('users').doc(user.uid).collection('mini').doc('data').set(d,{merge:true}).catch(function(){});
+          });
+      }
+    }
+  }
   function openCast(id,backFn){
     setSC(id);setCastPage('input');
     navigate('cast');
@@ -3192,7 +3257,8 @@ function App(){
         return Promise.all([
           userRef.collection('data').doc('main').delete().catch(function(){}),
           userRef.collection('meta').doc('consent').delete().catch(function(){}),
-          userRef.collection('attendance').doc('settings').delete().catch(function(){})
+          userRef.collection('attendance').doc('settings').delete().catch(function(){}),
+          userRef.collection('mini').doc('data').delete().catch(function(){})
         ]);
       }).then(function(){return userRef.delete().catch(function(){});});
     }
@@ -3339,12 +3405,18 @@ function App(){
         var now=new Date().toISOString();
         var inviteCode=generateInviteCode();
         var rid=db.collection('rooms').doc().id;
-        var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}};
+        var sPersonalCastId=uid();
+        var sCastName=userName||'オーナー';
+        var sPersonalCast={id:sPersonalCastId,name:sCastName,ownerUid:user.uid,birthday:'',memo:'',monthlyTargets:{},contractShift:'',realName:'',hometown:'',height:'',isDispatch:false,folderHistory:[]};
+        var initData={casts:[sPersonalCast],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:sCastName,castIds:[sPersonalCastId]}],shifts:{},visits:[],quota:{}};
         db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode})
           .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
-          .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName,joinedAt:now});})
+          .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName,castId:sPersonalCastId,joinedAt:now});})
           .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now});})
           .then(function(){
+            db.collection('users').doc(user.uid).collection('mini').doc('data').set({
+              sessions:[{roomId:rid,roomName:rn,castId:sPersonalCastId,castName:sCastName,joinedAt:now,active:true}]
+            },{merge:true}).catch(function(){});
             setRoomId(rid);setRoomRole('admin');
             setCurrentRoom({id:rid,name:rn,inviteCode:inviteCode});
             setRoomsList(function(prev){return prev.concat([{roomId:rid,name:rn,role:'admin',inviteCode:inviteCode}]);});
@@ -3605,7 +3677,7 @@ function App(){
   var isCastLayer=layer==='cast';
   var isHomeLayer=layer==='home';
   var isSubPage=layer!=='home';
-  var pageTitle=layer==='mycast'?'MG実績':layer==='sales'?'売上管理':layer==='castlist'?'キャスト一覧':layer==='shift'?'シフト管理':layer==='attendance'?'勤怠管理':'';
+  var pageTitle=layer==='mycast'?'MG実績':layer==='sales'?'売上管理':layer==='castlist'?'キャスト一覧':layer==='shift'?'シフト管理':layer==='attendance'?'勤怠管理':layer==='mini'?'My実績':'';
 
   return e('div',{style:S.root},
     toast&&e('div',{style:Object.assign({},S.toast,{background:toast.type==='error'?'#7f1d1d':'#14532d'})},toast.msg),
@@ -3702,6 +3774,7 @@ function App(){
       layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
       layer==='attendance'&&e(AttendancePage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',roomId:roomId||'',attData:attData,setAttData:setAttData}),
       layer==='visit'&&e(VisitPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
+      layer==='mini'&&e(MiniPage,{db:db,uid:user?user.uid:'',notify:notify,userName:userName}),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
         castPage==='input'&&e(InputPage,{castId:selectedCast,data:data,persist:persist,notify:notify}),
         castPage==='chart'&&e(ChartPage,{castId:selectedCast,data:data}),
@@ -3733,6 +3806,177 @@ if(isViewCast){
 }
 
 
+
+// ─── My実績（mini）ページ ──────────────────────────────────────────────────────
+function MiniPage(p){
+  var e=React.createElement;
+  var useState=React.useState;
+  var useEffect=React.useEffect;
+  var useMemo=React.useMemo;
+  var now=new Date();
+  var s1=useState(null);var miniData=s1[0];var setMiniData=s1[1];
+  var s2=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var selMonth=s2[0];var setSelMonth=s2[1];
+
+  useEffect(function(){
+    if(!p.db||!p.uid)return;
+    var unsub=p.db.collection('users').doc(p.uid).collection('mini').doc('data').onSnapshot(function(doc){
+      setMiniData(doc.exists?doc.data():{sessions:[],records:{},customers:{}});
+    },function(){setMiniData({sessions:[],records:{},customers:{}});});
+    return function(){unsub();};
+  },[p.uid]);
+
+  var sessions=useMemo(function(){return(miniData&&miniData.sessions)||[];},[miniData]);
+  var allRecords=useMemo(function(){return(miniData&&miniData.records)||{};},[miniData]);
+
+  var monthRecords=useMemo(function(){
+    var arr=[];
+    sessions.forEach(function(session){
+      var key=session.roomId+'_'+session.castId;
+      (allRecords[key]||[]).filter(function(r){return r.date&&r.date.startsWith(selMonth);})
+        .forEach(function(r){arr.push(Object.assign({},r,{roomName:session.roomName}));});
+    });
+    return arr.sort(function(a,b){return b.date.localeCompare(a.date);});
+  },[sessions,allRecords,selMonth]);
+
+  var stats=useMemo(function(){
+    return monthRecords.reduce(function(acc,r){
+      acc.sales+=Number(r.sales||0);
+      acc.nominations+=Number(r.nominations||0);
+      acc.companions+=Number(r.companions||0);
+      acc.floorCount+=Number(r.floorCount||0);
+      return acc;
+    },{sales:0,nominations:0,companions:0,floorCount:0});
+  },[monthRecords]);
+
+  var roomBreakdown=useMemo(function(){
+    return sessions.map(function(session){
+      var key=session.roomId+'_'+session.castId;
+      var recs=(allRecords[key]||[]).filter(function(r){return r.date&&r.date.startsWith(selMonth);});
+      return{session:session,count:recs.length,sales:recs.reduce(function(s,r){return s+Number(r.sales||0);},0),nominations:recs.reduce(function(s,r){return s+Number(r.nominations||0);},0)};
+    }).filter(function(b){return b.count>0;});
+  },[sessions,allRecords,selMonth]);
+
+  var monthHistory=useMemo(function(){
+    var months=[];
+    for(var i=11;i>=0;i--){
+      var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      var m=d.getFullYear()+'-'+pad(d.getMonth()+1);
+      var sales=0;
+      sessions.forEach(function(session){
+        var key=session.roomId+'_'+session.castId;
+        (allRecords[key]||[]).filter(function(r){return r.date&&r.date.startsWith(m);})
+          .forEach(function(r){sales+=Number(r.sales||0);});
+      });
+      months.push({month:m,label:(d.getMonth()+1)+'月',sales:sales});
+    }
+    return months;
+  },[sessions,allRecords]);
+
+  var maxSales=useMemo(function(){return Math.max.apply(null,monthHistory.map(function(m){return m.sales;}).concat([1]));},[monthHistory]);
+
+  function prevMonth(){
+    var pts=selMonth.split('-');
+    var d=new Date(Number(pts[0]),Number(pts[1])-2,1);
+    setSelMonth(d.getFullYear()+'-'+pad(d.getMonth()+1));
+  }
+  function nextMonth(){
+    var pts=selMonth.split('-');
+    var d=new Date(Number(pts[0]),Number(pts[1]),1);
+    setSelMonth(d.getFullYear()+'-'+pad(d.getMonth()+1));
+  }
+
+  var selPts=selMonth.split('-');
+  var selLabel=Number(selPts[0])+'年'+Number(selPts[1])+'月';
+  var CARD={background:'linear-gradient(145deg,#12122a,#0f0f20)',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px',textAlign:'center'};
+
+  return e('div',{style:{paddingBottom:'80px'}},
+    e('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',padding:'16px 16px 8px',gap:'2px'}},
+      e('div',{style:{color:'#e8b86d',fontSize:'10px',letterSpacing:'0.15em'}},'PERSONAL'),
+      e('div',{style:{color:'#f3f4f6',fontSize:'18px',fontWeight:700}},'My実績')
+    ),
+    !miniData
+      ?e('div',{style:{padding:'60px',textAlign:'center',color:'#6b7280',fontSize:'14px'}},'読み込み中...')
+      :sessions.length===0
+        ?e('div',{style:{padding:'60px 24px',textAlign:'center'}},
+          e('div',{style:{color:'#6b7280',fontSize:'14px',marginBottom:'8px'}},'個人実績がまだありません'),
+          e('div',{style:{color:'#4b5563',fontSize:'12px',lineHeight:'1.8'}},'ルームを作成または参加すると'+'\n'+'自動で個人フォルダが生成されます')
+        )
+        :e('div',null,
+          e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 20px',background:'#12122a',margin:'0 16px 16px',borderRadius:'12px',border:'1px solid #1e2035'}},
+            e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',fontSize:'22px',cursor:'pointer',padding:'0 8px',lineHeight:1},onClick:prevMonth},'‹'),
+            e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'15px'}},selLabel),
+            e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',fontSize:'22px',cursor:'pointer',padding:'0 8px',lineHeight:1},onClick:nextMonth},'›')
+          ),
+          e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'10px',padding:'0 16px',marginBottom:'16px'}},
+            e('div',{style:Object.assign({},CARD,{border:'1px solid rgba(232,184,109,0.25)'})},
+              e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'月売上'),
+              e('div',{style:{color:'#e8b86d',fontSize:'18px',fontWeight:700}},stats.sales>=10000?Math.round(stats.sales/10000)+'万':yen(stats.sales))
+            ),
+            e('div',{style:CARD},
+              e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'指名数'),
+              e('div',{style:{color:'#f3f4f6',fontSize:'18px',fontWeight:700}},stats.nominations)
+            ),
+            e('div',{style:CARD},
+              e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'同伴数'),
+              e('div',{style:{color:'#f3f4f6',fontSize:'18px',fontWeight:700}},stats.companions)
+            ),
+            e('div',{style:CARD},
+              e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'場内数'),
+              e('div',{style:{color:'#f3f4f6',fontSize:'18px',fontWeight:700}},stats.floorCount)
+            )
+          ),
+          e('div',{style:{margin:'0 16px 16px',background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px'}},
+            e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'10px'}},'月別売上推移（過去12ヶ月）'),
+            e('div',{style:{display:'flex',alignItems:'flex-end',gap:'3px',height:'72px'}},
+              monthHistory.map(function(m){
+                var h=maxSales>0?Math.max(2,Math.round((m.sales/maxSales)*64)):2;
+                var isSel=m.month===selMonth;
+                return e('div',{key:m.month,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'},onClick:function(){setSelMonth(m.month);}},
+                  e('div',{style:{width:'100%',height:h+'px',background:isSel?'#e8b86d':m.sales>0?'rgba(232,184,109,0.35)':'#1e2035',borderRadius:'2px 2px 0 0',transition:'all 0.15s'}}),
+                  e('div',{style:{color:isSel?'#e8b86d':'#374151',fontSize:'8px',whiteSpace:'nowrap'}},m.label)
+                );
+              })
+            )
+          ),
+          roomBreakdown.length>1&&e('div',{style:{margin:'0 16px 16px'}},
+            e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'8px'}},'ルーム別内訳'),
+            roomBreakdown.map(function(b){
+              return e('div',{key:b.session.roomId,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'12px 14px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
+                e('div',null,
+                  e('div',{style:{color:'#f3f4f6',fontSize:'13px',fontWeight:600}},b.session.roomName),
+                  e('div',{style:{color:'#6b7280',fontSize:'11px'}},b.count+'日分の記録')
+                ),
+                e('div',{style:{textAlign:'right'}},
+                  e('div',{style:{color:'#e8b86d',fontSize:'14px',fontWeight:700}},b.sales>=10000?Math.round(b.sales/10000)+'万':yen(b.sales)),
+                  e('div',{style:{color:'#9ca3af',fontSize:'11px'}},'指名 '+b.nominations)
+                )
+              );
+            })
+          ),
+          e('div',{style:{margin:'0 16px'}},
+            e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'8px'}},selLabel+'の記録'),
+            monthRecords.length===0
+              ?e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'24px',textAlign:'center',color:'#4b5563',fontSize:'13px'}},'この月の記録はありません')
+              :monthRecords.map(function(r,i){
+                return e('div',{key:i,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'12px 14px',marginBottom:'8px'}},
+                  e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
+                    e('div',null,
+                      e('div',{style:{color:'#f3f4f6',fontSize:'13px',fontWeight:600}},r.date),
+                      sessions.length>1&&e('div',{style:{color:'#6b7280',fontSize:'10px',marginTop:'1px'}},r.roomName)
+                    ),
+                    e('div',{style:{color:'#e8b86d',fontSize:'14px',fontWeight:700}},yen(r.sales))
+                  ),
+                  e('div',{style:{display:'flex',gap:'14px'}},
+                    e('span',{style:{color:'#9ca3af',fontSize:'11px'}},'指名 '+Number(r.nominations||0)),
+                    e('span',{style:{color:'#9ca3af',fontSize:'11px'}},'同伴 '+Number(r.companions||0)),
+                    e('span',{style:{color:'#9ca3af',fontSize:'11px'}},'場内 '+Number(r.floorCount||0))
+                  )
+                );
+              })
+          )
+        )
+  );
+}
 
 function AttendancePage(p){
   var e=React.createElement;
