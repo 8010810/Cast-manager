@@ -3119,9 +3119,11 @@ function App(){
       if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
       if(!u){
         window._castManagerDeleting=false;
-        setConsentState('loading');
-        setData(null);
-        setLoading(false);
+        setConsentState('loading');setData(null);setLoading(false);
+        setUserName('');setStoreName('');setIsLineUser(false);
+        setRoomId(null);setRoomRole('member');setCurrentRoom(null);setRoomsList([]);
+        setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});
+        setSubBack(null);setNavStack(['home']);setSC(null);setSettingsPage(null);setDeletingAccount(false);
       }
       if(u){
         // 削除処理中はログイン画面のまま待機
@@ -3141,38 +3143,52 @@ function App(){
           setStoreName(cd.storeName||'');
           setIsLineUser(!!(cd.isLineUser));
           if(!cd.userName){clearTimeout(authTimeout);setConsentState('username');setLoading(false);return;}
-          // ルーム一覧取得（失敗・空の場合は最大2回リトライ）
+          // ルーム一覧取得（サーバー3回→キャッシュ1回のフォールバック付き）
+          function applyRooms(rooms){
+            clearTimeout(authTimeout);
+            setRoomsList(rooms);
+            if(rooms.length===0){setConsentState('roomselect');setLoading(false);return;}
+            var lastRoomId=cd.lastRoomId||rooms[0].roomId;
+            var roomInfo=rooms.find(function(r){return r.roomId===lastRoomId;})||rooms[0];
+            setRoomId(roomInfo.roomId);
+            setRoomRole(roomInfo.role||'member');
+            setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
+            loadRoomData(roomInfo.roomId,roomInfo.name||'');
+            var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
+            var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
+            if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+            unsubAttRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('attendance').doc(ts).onSnapshot(function(doc){
+              if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+            },function(){});
+            if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+            unsubRoleRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('members').doc(u.uid).onSnapshot(function(doc){
+              if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
+            },function(){});
+          }
+          function tryLoadRoomsFromCache(){
+            db.collection('users').doc(u.uid).collection('rooms').get({source:'cache'}).then(function(snap){
+              if(gen!==currentAuthGen){clearTimeout(authTimeout);return;}
+              var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
+              if(rooms.length>0){applyRooms(rooms);}
+              else{clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);}
+            }).catch(function(){
+              if(gen!==currentAuthGen){clearTimeout(authTimeout);return;}
+              clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
+            });
+          }
           function tryLoadRooms(attempt){
             db.collection('users').doc(u.uid).collection('rooms').get().then(function(snap){
               if(gen!==currentAuthGen){clearTimeout(authTimeout);return;}
-              var rooms=[];
-              snap.forEach(function(d){rooms.push(Object.assign({roomId:d.id},d.data()));});
+              var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
               if(rooms.length===0&&attempt<3){
                 setTimeout(function(){if(gen===currentAuthGen)tryLoadRooms(attempt+1);},1500);return;
               }
-              clearTimeout(authTimeout);
-              setRoomsList(rooms);
-              if(rooms.length===0){setConsentState('roomselect');setLoading(false);return;}
-              var lastRoomId=cd.lastRoomId||rooms[0].roomId;
-              var roomInfo=rooms.find(function(r){return r.roomId===lastRoomId;})||rooms[0];
-              setRoomId(roomInfo.roomId);
-              setRoomRole(roomInfo.role||'member');
-              setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
-              loadRoomData(roomInfo.roomId,roomInfo.name||'');
-              var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
-              var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
-              if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
-              unsubAttRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('attendance').doc(ts).onSnapshot(function(doc){
-                if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-              },function(){});
-              if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
-              unsubRoleRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('members').doc(u.uid).onSnapshot(function(doc){
-                if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-              },function(){});
+              if(rooms.length===0){tryLoadRoomsFromCache();return;}
+              applyRooms(rooms);
             }).catch(function(){
               if(gen!==currentAuthGen){clearTimeout(authTimeout);return;}
               if(attempt<3){setTimeout(function(){if(gen===currentAuthGen)tryLoadRooms(attempt+1);},1500);return;}
-              clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
+              tryLoadRoomsFromCache();
             });
           }
           tryLoadRooms(1);
@@ -3276,21 +3292,24 @@ function App(){
       },0);
     }
   }
-  function handleSignOut(){fbSignOut().then(function(){setData(null);setNavStack(['home']);setSC(null);});}
+  function handleSignOut(){
+    fbSignOut().then(function(){
+      setData(null);setNavStack(['home']);setSC(null);setSubBack(null);setSettingsPage(null);
+    });
+  }
   function handleDeleteAccount(){
     if(!user)return;
     setDeletingAccount(true);
   }
   function executeDeleteAccount(){
     if(!user)return;
-    var uid=user.uid;
-    window._castManagerDeleting=true; // 削除中フラグ
-    var userRef=db.collection('users').doc(uid);
+    var uid2=user.uid;
+    window._castManagerDeleting=true;
+    var userRef=db.collection('users').doc(uid2);
     function deleteFirestoreData(){
-      // まず所属ルーム一覧を取得し、各ルームのメンバードキュメントも削除する
       return userRef.collection('rooms').get().catch(function(){return{docs:[]};}).then(function(roomSnap){
         var memberDeletes=roomSnap.docs.map(function(rd){
-          return db.collection('rooms').doc(rd.id).collection('members').doc(uid).delete().catch(function(){});
+          return db.collection('rooms').doc(rd.id).collection('members').doc(uid2).delete().catch(function(){});
         });
         var roomSubDeletes=roomSnap.docs.map(function(rd){return rd.ref.delete().catch(function(){});});
         return Promise.all(memberDeletes.concat(roomSubDeletes));
@@ -3302,31 +3321,32 @@ function App(){
         ]);
       }).then(function(){return userRef.delete().catch(function(){});});
     }
-    deleteFirestoreData().then(function(){
-      return auth.currentUser.delete();
-    }).then(function(){
+    function doDeleteAuth(){
+      if(!auth.currentUser)return auth.signOut().catch(function(){});
+      return auth.currentUser.delete().catch(function(e){
+        if(e.code==='auth/requires-recent-login'){
+          // LINEユーザーは再認証できないのでサインアウトのみ
+          if(isLineUser)return auth.signOut();
+          // Googleユーザーは再認証してから削除
+          var provider=new firebase.auth.GoogleAuthProvider();
+          return auth.currentUser.reauthenticateWithPopup(provider).then(function(){
+            return auth.currentUser?auth.currentUser.delete().catch(function(){return auth.signOut();}):auth.signOut();
+          }).catch(function(){return auth.signOut();});
+        }
+        return auth.signOut();
+      });
+    }
+    // onAuthStateChangedはアンサブしない — 削除後のnullイベントで自動的にstateリセット
+    deleteFirestoreData().then(doDeleteAuth).then(function(){
       window._castManagerDeleting=false;
-      // onAuthStateChangedをアンサブしてから全stateリセット
-      if(unsubAuthRef.current){unsubAuthRef.current();unsubAuthRef.current=null;}
-      setUser(null);
-      setData(null);
-      setConsentState('loading');
       setDeletingAccount(false);
-      setSettingsPage(null);
-      setNavStack(['home']);
-      setSC(null);
-    }).catch(function(e){
-      // Firestoreデータは削除済みなのでAuth削除が失敗してもログイン画面へ
-      // (次回ログイン時に新規登録フローになる)
+      setLoading(false);
+      // onAuthStateChanged(null)が発火してuser/data/consentState等をリセットする
+    }).catch(function(){
       window._castManagerDeleting=false;
-      if(unsubAuthRef.current){unsubAuthRef.current();unsubAuthRef.current=null;}
-      setUser(null);
-      setData(null);
-      setConsentState('loading');
       setDeletingAccount(false);
-      setSettingsPage(null);
-      setNavStack(['home']);
-      setSC(null);
+      setLoading(false);
+      auth.signOut().catch(function(){});
     });
   }
     if(loading)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...'));
