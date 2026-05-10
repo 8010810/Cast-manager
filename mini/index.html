@@ -1801,6 +1801,7 @@ function MiniApp(){
   var s6=useState(null);var toast=s6[0];var setToast=s6[1];
   var s7=useState(null);var subBack=s7[0];var setSubBack=s7[1];
   var s8=useState(null);var appOpenFolder=s8[0];var setAppOpenFolder=s8[1];
+  var s_rl=useState([]);var roomsList=s_rl[0];var setRoomsList=s_rl[1];
 
   var layer=navStack[navStack.length-1]||'home';
   var isCastLayer=layer==='cast';
@@ -1819,6 +1820,14 @@ function MiniApp(){
     });
     return unsubAuth;
   },[]);
+
+  useEffect(function(){
+    if(!user){setRoomsList([]);return;}
+    var unsubRooms=db.collection('users').doc(user.uid).collection('rooms').onSnapshot(function(snap){
+      setRoomsList(snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());}));
+    },function(){});
+    return unsubRooms;
+  },[user]);
 
   // ページ遷移時にデータ再取得
   useEffect(function(){
@@ -1989,6 +1998,36 @@ function MiniApp(){
           e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'20px 18px',lineHeight:1.8,fontSize:'13px',color:'#9ca3af'})},e('p',null,'（利用規約の内容をここに入れてください）'))
         );
       }
+      if(settingsPage==='room'){
+        return e('div',{style:SETTINGS_OVERLAY_STYLE},
+          e('div',{style:SETTINGS_HEADER},
+            e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
+            e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'ルーム'),
+            e('div',{style:{width:'40px'}})
+          ),
+          e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'20px 18px'})},
+            e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'アプリ'),
+            e('button',{style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(232,184,109,0.08)',border:'1px solid rgba(232,184,109,0.3)',borderRadius:'12px',padding:'16px',marginBottom:'16px',cursor:'pointer',textAlign:'left'},onClick:function(){window.location.href='/';}},
+              e('div',null,
+                e('div',{style:{fontWeight:700,fontSize:'14px',color:'#e8b86d'}},'CAST MANAGER'),
+                e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},'店舗管理アプリ')
+              ),
+              e('span',{style:{color:'#e8b86d',fontSize:'16px'}},'›')
+            ),
+            e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'参加中のルーム'),
+            roomsList.length===0
+              ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'12px 0'}},'参加中のルームはありません')
+              :roomsList.map(function(r){
+                return e('div',{key:r.roomId,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
+                  e('div',null,
+                    e('div',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},r.name),
+                    e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},r.role==='admin'?'管理者':'メンバー')
+                  )
+                );
+              })
+          )
+        );
+      }
       if(settingsPage==='privacy'){
         return e('div',{style:SETTINGS_OVERLAY_STYLE},
           e('div',{style:SETTINGS_HEADER},e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'プライバシーポリシー'),e('div',{style:{width:'40px'}})),
@@ -2003,7 +2042,7 @@ function MiniApp(){
         ),
         e('div',{style:SETTINGS_PANEL},
           e('div',{style:{padding:'20px 18px'}},
-            [{label:'プロフィール',action:function(){setSettingsPage('profile');}},{label:'利用規約',action:function(){setSettingsPage('terms');}},{label:'プライバシーポリシー',action:function(){setSettingsPage('privacy');}}].map(function(item,i){
+            [{label:'プロフィール',action:function(){setSettingsPage('profile');}},{label:'ルーム',action:function(){setSettingsPage('room');}},{label:'利用規約',action:function(){setSettingsPage('terms');}},{label:'プライバシーポリシー',action:function(){setSettingsPage('privacy');}}].map(function(item,i){
               return e('div',{key:i,style:{background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'},onClick:item.action},
                 e('span',{style:{fontSize:'15px',color:'#f3f4f6'}},item.label),e('span',{style:{color:'#6b7280',fontSize:'16px'}},'›')
               );
