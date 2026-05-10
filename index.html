@@ -3068,10 +3068,34 @@ function App(){
   var s_srn=useState('');var settRoomName=s_srn[0];var setSettRoomName=s_srn[1];
   var s_srl=useState(false);var settRoomLoading=s_srl[0];var setSettRoomLoading=s_srl[1];
 
+  var s_mm=useState(false);var isMiniMode=s_mm[0];var setIsMiniMode=s_mm[1];
+
   var layer=navStack[navStack.length-1]||'home';
 
   function navigate(pg){setNavStack(function(st){return [...st,pg];});setSubBack(null);refreshData();}
   function goHome(){setNavStack(['home']);setSubBack(null);refreshData();}
+  function switchToRoom(r){
+    loadFromRoom(r.roomId).then(function(d){
+      var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+      if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+      setRoomId(r.roomId);setRoomRole(r.role||'member');
+      setCurrentRoom({id:r.roomId,name:r.name,inviteCode:r.inviteCode||''});
+      setData(nd);
+      db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:r.roomId}).catch(function(){});
+      var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+      var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
+      if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
+      unsubAttRef.current=db.collection('rooms').doc(r.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
+        if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
+      },function(){});
+      if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+      unsubRoleRef.current=db.collection('rooms').doc(r.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
+        if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
+      },function(){});
+      setSettingsPage(null);setIsMiniMode(false);
+      setNavStack(['home']);setSubBack(null);
+    }).catch(function(){notify('切り替えに失敗しました','error');});
+  }
   function goBack(){
     if(subBack){
       var sbFn=subBack();
@@ -3330,6 +3354,19 @@ function App(){
 
   if(!data&&consentState==='done')return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'データを読み込み中...'));
 
+  if(isMiniMode){
+    var linkedGoogle_m=!!(user&&user.providerData&&user.providerData.some(function(pr){return pr.providerId==='google.com';}));
+    var linkedLine_m=isLineUser||(user&&user.providerData&&user.providerData.some(function(pr){return pr.providerId==='oidc.line'||pr.providerId.includes('line');}));
+    return e(MiniScreen,{
+      user:user,userName:userName,setUserName:setUserName,storeName:storeName,
+      linkedGoogle:linkedGoogle_m,linkedLine:linkedLine_m,
+      db:db,roomsList:roomsList,
+      notify:notify,
+      onSwitchRoom:switchToRoom,
+      onSignOut:handleSignOut,
+      onDeleteAccount:executeDeleteAccount
+    });
+  }
 
   // 設定画面
   if(settingsPage){
@@ -3369,29 +3406,6 @@ function App(){
 
     // ルームページ
     if(settingsPage==='room'){
-      function switchToRoom(r){
-        loadFromRoom(r.roomId).then(function(d){
-          var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-          if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-          setRoomId(r.roomId);
-          setRoomRole(r.role||'member');
-          setCurrentRoom({id:r.roomId,name:r.name,inviteCode:r.inviteCode||''});
-          setData(nd);
-          db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:r.roomId}).catch(function(){});
-          var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
-          var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
-          if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
-          unsubAttRef.current=db.collection('rooms').doc(r.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
-            if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-          },function(){});
-          if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
-          unsubRoleRef.current=db.collection('rooms').doc(r.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
-            if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-          },function(){});
-          setSettingsPage(null);
-          setNavStack(['home']);setSubBack(null);
-        }).catch(function(){notify('切り替えに失敗しました','error');});
-      }
       function createSettingsRoom(){
         var rn=settRoomName.trim();
         if(!rn||settRoomLoading)return;
@@ -3434,6 +3448,13 @@ function App(){
         ),
         e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'20px 18px'})},
           e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'参加中のルーム'),
+          e('button',{style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(167,139,250,0.08)',border:'1px solid rgba(167,139,250,0.3)',borderRadius:'12px',padding:'16px',marginBottom:'8px',cursor:'pointer',textAlign:'left'},onClick:function(){setIsMiniMode(true);setSettingsPage(null);}},
+            e('div',null,
+              e('div',{style:{fontWeight:700,fontSize:'14px',color:'#a78bfa'}},'CAST MANAGER mini'),
+              e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},'個人実績アプリ')
+            ),
+            e('span',{style:{color:'#a78bfa',fontSize:'16px'}},'›')
+          ),
           roomsList.length===0
             ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'12px 0'}},'参加中のルームはありません')
             :roomsList.map(function(r){
@@ -3794,6 +3815,266 @@ if(isViewCast){
   },100);
 }else{
   ReactDOM.createRoot(document.getElementById('root')).render(e(App,null));
+}
+
+// ─── CAST MANAGER mini スクリーン ────────────────────────────────────────────
+function MiniScreen(p){
+  // p: {user, userName, setUserName, storeName, linkedGoogle, linkedLine,
+  //      db, roomsList, notify, onSwitchRoom, onSignOut, onDeleteAccount}
+  var e=React.createElement;
+  var useState=React.useState;
+  var useEffect=React.useEffect;
+  var useMemo=React.useMemo;
+  var now=new Date();
+
+  var s1=useState(null);var miniPage=s1[0];var setMiniPage=s1[1];
+  var s2=useState(null);var miniData=s2[0];var setMiniData=s2[1];
+  var s3=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var selMonth=s3[0];var setSelMonth=s3[1];
+  var s4=useState(null);var mToast=s4[0];var setMToast=s4[1];
+
+  function mNotify(msg,type){setMToast({msg:msg,type:type||'success'});setTimeout(function(){setMToast(null);},2800);}
+
+  useEffect(function(){
+    if(!p.db||!p.user)return;
+    var unsub=p.db.collection('users').doc(p.user.uid).collection('mini').doc('data').onSnapshot(function(doc){
+      setMiniData(doc.exists?doc.data():{sessions:[],records:{},customers:{}});
+    },function(){setMiniData({sessions:[],records:{},customers:{}});});
+    return function(){unsub();};
+  },[p.user&&p.user.uid]);
+
+  var sessions=useMemo(function(){return(miniData&&miniData.sessions)||[];},[miniData]);
+  var allRecs=useMemo(function(){return(miniData&&miniData.records)||{};},[miniData]);
+
+  var roomNames=useMemo(function(){
+    var m={};sessions.forEach(function(s){m[s.roomId]=s.roomName;});return m;
+  },[sessions]);
+
+  var monthRecords=useMemo(function(){
+    var arr=[];
+    Object.keys(allRecs).forEach(function(k){
+      var rId=k.split('_')[0];
+      (allRecs[k]||[]).filter(function(r){return r.date&&r.date.startsWith(selMonth);})
+        .forEach(function(r){arr.push(Object.assign({},r,{roomName:roomNames[rId]||''}));});
+    });
+    return arr.sort(function(a,b){return b.date.localeCompare(a.date);});
+  },[allRecs,roomNames,selMonth]);
+
+  var stats=useMemo(function(){
+    return monthRecords.reduce(function(acc,r){
+      acc.sales+=Number(r.sales||0);acc.nominations+=Number(r.nominations||0);
+      acc.companions+=Number(r.companions||0);acc.floorCount+=Number(r.floorCount||0);
+      return acc;
+    },{sales:0,nominations:0,companions:0,floorCount:0});
+  },[monthRecords]);
+
+  var monthHistory=useMemo(function(){
+    var months=[];
+    for(var i=11;i>=0;i--){
+      var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+      var m=d.getFullYear()+'-'+pad(d.getMonth()+1);
+      var sales=0;
+      Object.keys(allRecs).forEach(function(k){
+        (allRecs[k]||[]).filter(function(r){return r.date&&r.date.startsWith(m);})
+          .forEach(function(r){sales+=Number(r.sales||0);});
+      });
+      months.push({month:m,label:(d.getMonth()+1)+'月',sales:sales});
+    }
+    return months;
+  },[allRecs]);
+
+  var maxSales=useMemo(function(){return Math.max.apply(null,monthHistory.map(function(m){return m.sales;}).concat([1]));},[monthHistory]);
+
+  var roomBreakdown=useMemo(function(){
+    var byRoom={};
+    Object.keys(allRecs).forEach(function(k){
+      var rId=k.split('_')[0];
+      if(!byRoom[rId]){byRoom[rId]={roomName:roomNames[rId]||'',sales:0,nominations:0,count:0};}
+      (allRecs[k]||[]).filter(function(r){return r.date&&r.date.startsWith(selMonth);}).forEach(function(r){
+        byRoom[rId].sales+=Number(r.sales||0);byRoom[rId].nominations+=Number(r.nominations||0);byRoom[rId].count++;
+      });
+    });
+    return Object.keys(byRoom).map(function(id){return Object.assign({roomId:id},byRoom[id]);}).filter(function(b){return b.count>0;});
+  },[allRecs,roomNames,selMonth]);
+
+  function prevMonth(){var pts=selMonth.split('-');var d=new Date(Number(pts[0]),Number(pts[1])-2,1);setSelMonth(d.getFullYear()+'-'+pad(d.getMonth()+1));}
+  function nextMonth(){var pts=selMonth.split('-');var d=new Date(Number(pts[0]),Number(pts[1]),1);setSelMonth(d.getFullYear()+'-'+pad(d.getMonth()+1));}
+
+  var selPts=selMonth.split('-');
+  var selLabel=Number(selPts[0])+'年'+Number(selPts[1])+'月';
+
+  var SOV={position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',flexDirection:'column'};
+  var SPN={background:'#0d0d1a',flex:1,overflowY:'auto',padding:'0 0 40px 0'};
+  var SHD={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(167,139,250,0.15)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
+  var CARD={background:'linear-gradient(145deg,#12122a,#0f0f20)',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px',textAlign:'center'};
+
+  // --- settings: profile ---
+  if(miniPage==='profile'){
+    return e(ProfileSettingsPage,{
+      user:p.user,userName:p.userName,setUserName:p.setUserName,storeName:p.storeName,
+      linkedGoogle:p.linkedGoogle,linkedLine:p.linkedLine,
+      onBack:function(){setMiniPage('settings');},
+      db:p.db,
+      notify:function(msg){mNotify(msg);},
+      refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().catch(function(){});}
+    });
+  }
+
+  // --- settings overlay ---
+  if(miniPage==='settings'||miniPage==='room'||miniPage==='terms'||miniPage==='privacy'){
+    var sTitle=miniPage==='room'?'ルーム':miniPage==='terms'?'利用規約':miniPage==='privacy'?'プライバシーポリシー':'設定';
+    var sBack=miniPage==='settings'?function(){setMiniPage(null);}:function(){setMiniPage('settings');};
+    var sClose=miniPage==='settings'?'✕ 閉じる':'‹ 戻る';
+    var sContent;
+
+    if(miniPage==='room'){
+      sContent=e('div',{style:Object.assign({},SPN,{padding:'20px 18px'})},
+        e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'参加中のルーム'),
+        e('div',{style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(167,139,250,0.12)',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'12px',padding:'16px',marginBottom:'8px'}},
+          e('div',null,
+            e('div',{style:{fontWeight:700,fontSize:'14px',color:'#a78bfa'}},'CAST MANAGER mini'),
+            e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},'個人実績アプリ')
+          ),
+          e('span',{style:{fontSize:'11px',color:'#a78bfa',fontWeight:700,background:'rgba(167,139,250,0.2)',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'20px',padding:'3px 10px'}},'現在のモード')
+        ),
+        p.roomsList.length===0
+          ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'12px 0'}},'参加中のルームはありません')
+          :p.roomsList.map(function(r){
+            return e('button',{key:r.roomId,style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'8px',cursor:'pointer',textAlign:'left'},onClick:function(){p.onSwitchRoom(r);}},
+              e('div',null,
+                e('div',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},r.name),
+                e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},r.role==='admin'?'管理者':'メンバー')
+              ),
+              e('span',{style:{color:'#6b7280',fontSize:'16px'}},'›')
+            );
+          })
+      );
+    } else if(miniPage==='terms'){
+      sContent=e('div',{style:Object.assign({},SPN,{padding:'20px 18px',lineHeight:1.8,fontSize:'13px',color:'#9ca3af'})},e('p',null,'（利用規約の内容をここに入れてください）'));
+    } else if(miniPage==='privacy'){
+      sContent=e('div',{style:Object.assign({},SPN,{padding:'20px 18px',lineHeight:1.8,fontSize:'13px',color:'#9ca3af'})},e('p',null,'（プライバシーポリシーの内容をここに入れてください）'));
+    } else {
+      sContent=e('div',{style:SPN},
+        e('div',{style:{padding:'20px 18px'}},
+          [{label:'プロフィール',action:function(){setMiniPage('profile');}},
+           {label:'ルーム',action:function(){setMiniPage('room');}},
+           {label:'利用規約',action:function(){setMiniPage('terms');}},
+           {label:'プライバシーポリシー',action:function(){setMiniPage('privacy');}},
+          ].map(function(item,i){
+            return e('div',{key:i,style:{background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer'},onClick:item.action},
+              e('span',{style:{fontSize:'15px',color:'#f3f4f6'}},item.label),
+              e('span',{style:{color:'#6b7280',fontSize:'16px'}},'›')
+            );
+          }),
+          e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
+          e('button',{style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'12px',padding:'16px',color:'#f87171',fontSize:'15px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
+            if(confirm('ログアウトしますか？')){p.onSignOut();}
+          }},'ログアウト'),
+          e('div',{style:{height:'1px',background:'rgba(232,184,109,0.05)',margin:'12px 0'}}),
+          e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'8px',paddingLeft:'2px'}},'危険な操作'),
+          e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer'},onClick:function(){
+            if(confirm('アカウントを削除しますか？\nすべてのデータが完全に削除されます。\nこの操作は取り消せません。')){p.onDeleteAccount();}
+          }},'アカウントを削除する')
+        )
+      );
+    }
+    return e('div',{style:SOV},
+      e('div',{style:SHD},
+        e('button',{style:{background:'transparent',border:'none',color:'#a78bfa',cursor:'pointer',fontSize:'13px'},onClick:sBack},sClose),
+        e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},sTitle),
+        e('div',{style:{width:'40px'}})
+      ),
+      sContent
+    );
+  }
+
+  // --- main mini home ---
+  var hasData=Object.keys(allRecs).length>0;
+  return e('div',{style:{minHeight:'100vh',background:'#0d0d1a'}},
+    mToast&&e('div',{style:{position:'fixed',top:'calc(20px + env(safe-area-inset-top))',left:'50%',transform:'translateX(-50%)',background:mToast.type==='error'?'#7f1d1d':'#14532d',color:'#f3f4f6',padding:'10px 20px',borderRadius:'20px',fontSize:'13px',fontWeight:600,zIndex:1000,maxWidth:'80vw',textAlign:'center',pointerEvents:'none',whiteSpace:'nowrap'}},mToast.msg),
+    e('header',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'14px 18px',borderBottom:'1px solid rgba(167,139,250,0.15)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',position:'sticky',top:0,zIndex:100,paddingTop:'calc(14px + env(safe-area-inset-top))'}},
+      e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+        e('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',style:{flexShrink:0}},
+          e('path',{d:'M12 2 L22 12 L12 22 L2 12 Z',fill:'rgba(167,139,250,0.12)',stroke:'#a78bfa',strokeWidth:'1.2',strokeLinejoin:'round'}),
+          e('path',{d:'M12 5 L19 12 L12 19 L5 12 Z',fill:'rgba(167,139,250,0.18)',stroke:'rgba(167,139,250,0.6)',strokeWidth:'0.8',strokeLinejoin:'round'})
+        ),
+        e('span',{style:{fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",fontWeight:300,letterSpacing:'0.18em',fontSize:'13px',background:'linear-gradient(135deg,#a78bfa,#c4b5fd)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}},'CAST MANAGER mini')
+      ),
+      e('button',{style:{background:'transparent',border:'none',padding:'4px',cursor:'pointer',color:'#9ca3af',display:'flex',alignItems:'center'},onClick:function(){setMiniPage('settings');}},
+        e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
+          e('circle',{cx:12,cy:12,r:3}),
+          e('path',{d:'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'})
+        )
+      )
+    ),
+    e('main',{style:{paddingBottom:'40px'}},
+      !miniData
+        ?e('div',{style:{padding:'60px',textAlign:'center',color:'#6b7280',fontSize:'14px'}},'読み込み中...')
+        :!hasData
+          ?e('div',{style:{padding:'60px 24px',textAlign:'center'}},
+            e('div',{style:{color:'#6b7280',fontSize:'14px',marginBottom:'8px'}},'個人実績がまだありません'),
+            e('div',{style:{color:'#4b5563',fontSize:'12px',lineHeight:'1.8'}},'std.のMG実績で個人フォルダにキャストを追加して\n売上を入力すると自動で反映されます')
+          )
+          :e('div',null,
+            e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 20px',background:'#12122a',margin:'16px',borderRadius:'12px',border:'1px solid #1e2035'}},
+              e('button',{style:{background:'transparent',border:'none',color:'#a78bfa',fontSize:'22px',cursor:'pointer',padding:'0 8px',lineHeight:1},onClick:prevMonth},'‹'),
+              e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'15px'}},selLabel),
+              e('button',{style:{background:'transparent',border:'none',color:'#a78bfa',fontSize:'22px',cursor:'pointer',padding:'0 8px',lineHeight:1},onClick:nextMonth},'›')
+            ),
+            e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'10px',padding:'0 16px',marginBottom:'16px'}},
+              e('div',{style:Object.assign({},CARD,{border:'1px solid rgba(167,139,250,0.25)'})},
+                e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'月売上'),
+                e('div',{style:{color:'#a78bfa',fontSize:'18px',fontWeight:700}},stats.sales>=10000?Math.round(stats.sales/10000)+'万':yen(stats.sales))
+              ),
+              e('div',{style:CARD},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'指名数'),e('div',{style:{color:'#f3f4f6',fontSize:'18px',fontWeight:700}},stats.nominations)),
+              e('div',{style:CARD},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'同伴数'),e('div',{style:{color:'#f3f4f6',fontSize:'18px',fontWeight:700}},stats.companions)),
+              e('div',{style:CARD},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},'場内数'),e('div',{style:{color:'#f3f4f6',fontSize:'18px',fontWeight:700}},stats.floorCount))
+            ),
+            e('div',{style:{margin:'0 16px 16px',background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px'}},
+              e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'10px'}},'月別売上推移（過去12ヶ月）'),
+              e('div',{style:{display:'flex',alignItems:'flex-end',gap:'3px',height:'72px'}},
+                monthHistory.map(function(m){
+                  var h=maxSales>0?Math.max(2,Math.round((m.sales/maxSales)*64)):2;
+                  var isSel=m.month===selMonth;
+                  return e('div',{key:m.month,style:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:'4px',cursor:'pointer'},onClick:function(){setSelMonth(m.month);}},
+                    e('div',{style:{width:'100%',height:h+'px',background:isSel?'#a78bfa':m.sales>0?'rgba(167,139,250,0.35)':'#1e2035',borderRadius:'2px 2px 0 0',transition:'all 0.15s'}}),
+                    e('div',{style:{color:isSel?'#a78bfa':'#374151',fontSize:'8px',whiteSpace:'nowrap'}},m.label)
+                  );
+                })
+              )
+            ),
+            roomBreakdown.length>1&&e('div',{style:{margin:'0 16px 16px'}},
+              e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'8px'}},'ルーム別内訳'),
+              roomBreakdown.map(function(b,i){
+                return e('div',{key:i,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'12px 14px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
+                  e('div',null,e('div',{style:{color:'#f3f4f6',fontSize:'13px',fontWeight:600}},b.roomName),e('div',{style:{color:'#6b7280',fontSize:'11px'}},b.count+'日分の記録')),
+                  e('div',{style:{textAlign:'right'}},e('div',{style:{color:'#a78bfa',fontSize:'14px',fontWeight:700}},b.sales>=10000?Math.round(b.sales/10000)+'万':yen(b.sales)),e('div',{style:{color:'#9ca3af',fontSize:'11px'}},'指名 '+b.nominations))
+                );
+              })
+            ),
+            e('div',{style:{margin:'0 16px'}},
+              e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'8px'}},selLabel+'の記録'),
+              monthRecords.length===0
+                ?e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'24px',textAlign:'center',color:'#4b5563',fontSize:'13px'}},'この月の記録はありません')
+                :monthRecords.map(function(r,i){
+                  return e('div',{key:i,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'12px 14px',marginBottom:'8px'}},
+                    e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
+                      e('div',null,
+                        e('div',{style:{color:'#f3f4f6',fontSize:'13px',fontWeight:600}},r.date),
+                        Object.keys(roomNames).length>1&&e('div',{style:{color:'#6b7280',fontSize:'10px',marginTop:'1px'}},r.roomName)
+                      ),
+                      e('div',{style:{color:'#a78bfa',fontSize:'14px',fontWeight:700}},yen(r.sales))
+                    ),
+                    e('div',{style:{display:'flex',gap:'14px'}},
+                      e('span',{style:{color:'#9ca3af',fontSize:'11px'}},'指名 '+Number(r.nominations||0)),
+                      e('span',{style:{color:'#9ca3af',fontSize:'11px'}},'同伴 '+Number(r.companions||0)),
+                      e('span',{style:{color:'#9ca3af',fontSize:'11px'}},'場内 '+Number(r.floorCount||0))
+                    )
+                  );
+                })
+            )
+          )
+    )
+  );
 }
 
 function AttendancePage(p){
