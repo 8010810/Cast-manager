@@ -3225,14 +3225,15 @@ function App(){
               if(idx>=0){miniCasts[idx]=cast;}else{miniCasts.push(cast);}
             }
           });
-          // フォルダ同期: ownerUidで紐付けたstd.連携フォルダを作成/更新
+          // フォルダ同期: このルーム専用のリンクフォルダをroomId+ownerUidで識別
           var miniFolders=(md.folders||[]).slice();
           if(miniFolders.length===0){miniFolders=[{id:uid(),name:'新入店',castIds:[]}];}
-          var linkedIdx=miniFolders.findIndex(function(f){return f.ownerUid===user.uid;});
+          var linkedIdx=miniFolders.findIndex(function(f){return f.ownerUid===user.uid&&f.roomId===roomId;});
+          var folderName=(currentRoom&&currentRoom.name)||myFolder.name;
           if(linkedIdx>=0){
-            miniFolders[linkedIdx]=Object.assign({},miniFolders[linkedIdx],{name:myFolder.name,castIds:(myFolder.castIds||[]).slice()});
+            miniFolders[linkedIdx]=Object.assign({},miniFolders[linkedIdx],{name:folderName,castIds:(myFolder.castIds||[]).slice()});
           }else{
-            miniFolders.push({id:uid(),name:myFolder.name,castIds:(myFolder.castIds||[]).slice(),ownerUid:user.uid});
+            miniFolders.push({id:uid(),name:folderName,castIds:(myFolder.castIds||[]).slice(),ownerUid:user.uid,roomId:roomId});
           }
           // update()でドット記法による部分更新（set({merge:true})はドット記法を解釈しない）
           var upd={casts:miniCasts,folders:miniFolders};
