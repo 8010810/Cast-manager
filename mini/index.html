@@ -1739,30 +1739,59 @@ function MiniApp(){
   var isCastLayer=layer==='cast';
 
   useEffect(function(){
-    // std.からの遷移時: ?uid= が現在のminiセッションと異なればサインアウトして正しいアカウントで入り直す
     var fromUid=new URLSearchParams(window.location.search).get('uid');
-    if(fromUid)window.history.replaceState({},''  ,window.location.pathname);
+    if(fromUid){
+      window.history.replaceState({},'',window.location.pathname);
+      sessionStorage.setItem('mini_expected_uid',fromUid);
+    } else {
+      sessionStorage.removeItem('mini_expected_uid');
+    }
     var unsubData=null;
+    var autoSignInAttempted=false;
+
+    function tryAutoSignIn(){
+      if(autoSignInAttempted)return;
+      autoSignInAttempted=true;
+      var provider=new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({'prompt':'none'});
+      auth.signInWithPopup(provider).catch(function(){
+        sessionStorage.removeItem('mini_expected_uid');
+        setUser(null);setLoading(false);
+      });
+    }
+
     var unsubAuth=auth.onAuthStateChanged(function(u){
-      if(fromUid){
-        if(u&&u.uid!==fromUid){
-          // アカウント不一致 → サインアウトしてログイン画面へ
-          fromUid=null;
-          if(unsubData){unsubData();unsubData=null;}
-          auth.signOut();
-          return;
-        }
-        fromUid=null; // 一致 or uなし → 以降はチェック不要
+      var expectedUid=sessionStorage.getItem('mini_expected_uid');
+      if(u&&expectedUid&&u.uid!==expectedUid){
+        sessionStorage.removeItem('mini_expected_uid');
+        autoSignInAttempted=false;
+        if(unsubData){unsubData();unsubData=null;}
+        auth.signOut();
+        return;
+      }
+      if(u&&expectedUid&&u.uid===expectedUid){
+        sessionStorage.removeItem('mini_expected_uid');
+      }
+      if(!u&&expectedUid){
+        tryAutoSignIn();
+        return;
       }
       setUser(u);
       if(unsubData){unsubData();unsubData=null;}
       if(u){
         setLoading(true);
+        var consentDone=false,dataDone=false;
+        function checkAllDone(){if(consentDone&&dataDone)setLoading(false);}
+        db.collection('users').doc(u.uid).collection('meta').doc('consent').get().then(function(doc){
+          if(!doc.exists||!doc.data().agreedAt){setConsentState('needed');}
+          else{var cd=doc.data();setUserName(cd.userName||'');setConsentState(cd.userName?'done':'username');}
+          consentDone=true;checkAllDone();
+        }).catch(function(){setConsentState('needed');consentDone=true;checkAllDone();});
         unsubData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
           var d=doc.exists?doc.data():{};
           var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-          setData(nd);setLoading(false);
-        },function(){setLoading(false);});
+          setData(nd);dataDone=true;checkAllDone();
+        },function(){dataDone=true;checkAllDone();});
       }else{setData(null);setLoading(false);}
     });
     return function(){unsubAuth();if(unsubData){unsubData();}};
