@@ -1772,15 +1772,8 @@ function MiniApp(){
     var autoSignInAttempted=false;
     var unsubRooms=null;
 
-    // Handle result from signInWithRedirect (fires on page load after Google redirect)
-    auth.getRedirectResult().catch(function(){
-      sessionStorage.removeItem('mini_redirect_pending');
-      sessionStorage.removeItem('mini_expected_uid');
-    });
-
     function tryAutoSignIn(){
       if(autoSignInAttempted)return;
-      if(sessionStorage.getItem('mini_redirect_pending'))return;
       autoSignInAttempted=true;
       var provider=new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({'prompt':'none'});
@@ -1819,7 +1812,14 @@ function MiniApp(){
         return;
       }
       if(u&&expectedUid&&u.uid===expectedUid){sessionStorage.removeItem('mini_expected_uid');}
-      if(!u&&expectedUid){tryAutoSignIn();return;}
+      if(!u&&expectedUid){
+        var rp=sessionStorage.getItem('mini_redirect_pending');
+        if(!rp){tryAutoSignIn();return;}       // 初回: リダイレクト開始して待機
+        if(rp==='1'){sessionStorage.setItem('mini_redirect_pending','2');return;} // リダイレクト処理中: 待機
+        // rp==='2': リダイレクト後もu=null → 失敗 → フラグクリアしてログイン画面へ
+        sessionStorage.removeItem('mini_redirect_pending');
+        sessionStorage.removeItem('mini_expected_uid');
+      }
       sessionStorage.removeItem('mini_redirect_pending');
       setUser(u);cleanupRooms();
       if(u){
