@@ -674,7 +674,10 @@ function CastListPage(p){
     var castFolderName=getCastFolder(detail);
     return e('div',null,
       e('div',{style:S.pageTitle},
-        e('div',{style:{flex:1}}),
+        e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center'},onClick:function(){setDetail(null);setEditCast(null);}},
+          e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'15 18 9 12 15 6'}))
+        ),
+        e('div',{style:{flex:1,textAlign:'center',fontWeight:700,fontSize:'15px',color:'#f3f4f6'}},cast.name),
         e('div',{style:{display:'flex',gap:'8px'}},
           !isEditing&&e('button',{style:S.btnEdit,onClick:function(){
             var cf=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(detail);});
