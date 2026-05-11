@@ -2012,16 +2012,9 @@ function MiniApp(){
                         var oldName=userName;
                         db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName}).catch(function(){});
                         setUserName(uName);setEditingName(false);
-                        if(oldName&&oldName!==uName){
-                          (roomsList||[]).forEach(function(room){
-                            db.collection('rooms').doc(room.roomId).collection('data').doc('main').get().then(function(dd){
-                              if(!dd.exists)return;
-                              var folders=(dd.data().folders||[]);
-                              var hasChange=false;
-                              var updated=folders.map(function(f){if(f.name===oldName&&(!f.ownerUid||f.ownerUid===user.uid)){hasChange=true;return Object.assign({},f,{name:uName});}return f;});
-                              if(hasChange){db.collection('rooms').doc(room.roomId).collection('data').doc('main').set({folders:updated},{merge:true}).catch(function(){});}
-                            }).catch(function(){});
-                          });
+                        if(oldName&&oldName!==uName&&data){
+                          var updatedFolders=(data.folders||[]).map(function(f){return f.name===oldName&&(!f.ownerUid||f.ownerUid===user.uid)?Object.assign({},f,{name:uName}):f;});
+                          persist(Object.assign({},data,{folders:updatedFolders}));
                         }
                       }},'保存')
                     )

@@ -2677,18 +2677,9 @@ function ProfileSettingsPage(p){
     p.setUserName(newName);
     setEditingName(false);
     p.notify('ユーザー名を更新しました');
-    if(oldName&&oldName!==newName){
-      p.db.collection('users').doc(p.user.uid).collection('rooms').get().then(function(snap){
-        snap.docs.forEach(function(rd){
-          p.db.collection('rooms').doc(rd.id).collection('data').doc('main').get().then(function(dd){
-            if(!dd.exists)return;
-            var folders=(dd.data().folders||[]);
-            var hasChange=false;
-            var updated=folders.map(function(f){if(f.name===oldName&&(!f.ownerUid||f.ownerUid===p.user.uid)){hasChange=true;return Object.assign({},f,{name:newName});}return f;});
-            if(hasChange){p.db.collection('rooms').doc(rd.id).collection('data').doc('main').set({folders:updated},{merge:true}).catch(function(){});}
-          }).catch(function(){});
-        });
-      }).catch(function(){});
+    if(oldName&&oldName!==newName&&p.data&&p.persist){
+      var updatedFolders=(p.data.folders||[]).map(function(f){return f.name===oldName&&(!f.ownerUid||f.ownerUid===p.user.uid)?Object.assign({},f,{name:newName}):f;});
+      p.persist(Object.assign({},p.data,{folders:updatedFolders}));
     }
   }
   function saveEmail(){
@@ -3301,7 +3292,7 @@ function App(){
 
     // プロフィールページ
     if(settingsPage==='profile'){
-      return e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});}});
+      return e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});},data:data,persist:persist});
     }
     // 利用規約ページ
     if(settingsPage==='terms'){
