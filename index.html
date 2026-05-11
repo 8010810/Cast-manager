@@ -2671,10 +2671,25 @@ function ProfileSettingsPage(p){
 
   function saveName(){
     if(!editName.trim())return;
-    p.db.collection('users').doc(p.user.uid).collection('meta').doc('consent').update({userName:editName.trim()});
-    p.setUserName(editName.trim());
+    var newName=editName.trim();
+    var oldName=p.userName;
+    p.db.collection('users').doc(p.user.uid).collection('meta').doc('consent').update({userName:newName});
+    p.setUserName(newName);
     setEditingName(false);
     p.notify('ユーザー名を更新しました');
+    if(oldName&&oldName!==newName){
+      p.db.collection('users').doc(p.user.uid).collection('rooms').get().then(function(snap){
+        snap.docs.forEach(function(rd){
+          p.db.collection('rooms').doc(rd.id).collection('data').doc('main').get().then(function(dd){
+            if(!dd.exists)return;
+            var folders=(dd.data().folders||[]);
+            var hasChange=false;
+            var updated=folders.map(function(f){if(f.ownerUid===p.user.uid&&f.name===oldName){hasChange=true;return Object.assign({},f,{name:newName});}return f;});
+            if(hasChange){p.db.collection('rooms').doc(rd.id).collection('data').doc('main').set({folders:updated},{merge:true}).catch(function(){});}
+          }).catch(function(){});
+        });
+      }).catch(function(){});
+    }
   }
   function saveEmail(){
     if(!editEmail.trim())return;
@@ -2929,6 +2944,7 @@ function App(){
   var unsubAttRef=React.useRef(null);
   var unsubRoleRef=React.useRef(null);
   var unsubRoomsListRef=React.useRef(null);
+  var unsubConsentRef=React.useRef(null);
   var s2=useState(null);var data=s2[0];var setData=s2[1];
   var s3=useState(true);var loading=s3[0];var setLoading=s3[1];
   // navStack: ['home', 'mycast', ...] スタック方式
@@ -3009,6 +3025,7 @@ function App(){
     var unsubAuth=auth.onAuthStateChanged(function(u){
       var gen=++currentAuthGen;
       setUser(u);
+      if(unsubConsentRef.current){unsubConsentRef.current();unsubConsentRef.current=null;}
       if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
       if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
       if(unsubRoomsListRef.current){unsubRoomsListRef.current();unsubRoomsListRef.current=null;}
@@ -3030,10 +3047,16 @@ function App(){
           setLoading(false);setConsentState('roomselect');
         },10000);
         // 同意状態確認
-        db.collection('users').doc(u.uid).collection('meta').doc('consent').get().then(function(doc){
+        var firstConsentSnap=true;
+        unsubConsentRef.current=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
           if(gen!==currentAuthGen){clearTimeout(authTimeout);return;}
-          if(!doc.exists||!doc.data().agreedAt){clearTimeout(authTimeout);setConsentState('needed');setLoading(false);return;}
+          if(!doc.exists||!doc.data().agreedAt){
+            if(firstConsentSnap){firstConsentSnap=false;clearTimeout(authTimeout);setConsentState('needed');setLoading(false);}
+            return;
+          }
           var cd=doc.data();
+          if(!firstConsentSnap){if(cd.userName){setUserName(cd.userName);setStoreName(cd.storeName||'');}return;}
+          firstConsentSnap=false;
           setUserName(cd.userName||'');
           setStoreName(cd.storeName||'');
           if(!cd.userName){clearTimeout(authTimeout);setConsentState('username');setLoading(false);return;}
@@ -3070,7 +3093,7 @@ function App(){
             if(gen!==currentAuthGen)return;
             clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
           });
-        }).catch(function(){
+        },function(){
           if(gen!==currentAuthGen){clearTimeout(authTimeout);return;}
           clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
         });
@@ -3079,7 +3102,7 @@ function App(){
       }
     });
     unsubAuthRef.current=unsubAuth;
-    return function(){unsubAuthRef.current=null;unsubAuth();if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}if(unsubRoomsListRef.current){unsubRoomsListRef.current();unsubRoomsListRef.current=null;}};
+    return function(){unsubAuthRef.current=null;unsubAuth();if(unsubConsentRef.current){unsubConsentRef.current();unsubConsentRef.current=null;}if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}if(unsubRoomsListRef.current){unsubRoomsListRef.current();unsubRoomsListRef.current=null;}};
   },[]);
 
 
