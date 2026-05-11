@@ -716,11 +716,6 @@ function CastListPage(p){
                 e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:f[0]==='height'?'例: 165':'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
               );
             }),
-            e('label',{style:S.label},'所属フォルダ'),
-            e('select',{style:{...S.input,appearance:'none'},value:editForm.folderId||'',onChange:function(ev){setEditForm(function(fm){return{...fm,folderId:ev.target.value};})}},
-              e('option',{value:''},'変更しない'),
-              folders.map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
-            ),
             e('label',{style:S.label},'メモ'),
             e('textarea',{style:{...S.input,minHeight:'70px',resize:'vertical',fontFamily:'inherit'},value:editForm.memo||'',onChange:function(ev){setEditForm(function(fm){return{...fm,memo:ev.target.value};})},placeholder:'メモ...'}),
             e('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
