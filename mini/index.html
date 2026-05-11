@@ -167,7 +167,10 @@ function LoginScreen(){
 
   return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center',padding:'20px'}},
     e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'36px 28px',maxWidth:'360px',width:'100%',textAlign:'center'}},
-      e('div',{style:{fontSize:'32px',marginBottom:'8px'}},'✦'),
+      e('svg',{width:36,height:36,viewBox:'0 0 24 24',fill:'none',style:{margin:'0 auto 8px',display:'block'}},
+        e('path',{d:'M12 2 L22 12 L12 22 L2 12 Z',fill:'rgba(232,184,109,0.15)',stroke:'#e8b86d',strokeWidth:'1.2',strokeLinejoin:'round'}),
+        e('path',{d:'M12 5 L19 12 L12 19 L5 12 Z',fill:'rgba(232,184,109,0.25)',stroke:'rgba(232,184,109,0.7)',strokeWidth:'0.8',strokeLinejoin:'round'})
+      ),
       e('div',{style:{textAlign:'center',marginBottom:'4px'}},
         e('h1',{style:{fontSize:'26px',fontWeight:300,fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",letterSpacing:'0.3em',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a,#e8b86d)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',margin:0}},'CAST MANAGER'),
         e('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,rgba(232,184,109,0.6),transparent)',margin:'8px auto 0',width:'80%'}})
