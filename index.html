@@ -1722,7 +1722,11 @@ function InputPage(p){
   var now=new Date();var autoWorkDays=calcWorkDays(p.data.records,p.castId,now.getFullYear()+'-'+pad(now.getMonth()+1));
   return e('div',{style:{animation:'pageFadeIn 1.4s ease both',maxWidth:'520px',margin:'0 auto'}},
     e('div',{style:{display:'flex',marginBottom:'20px',borderRadius:'10px',overflow:'hidden',border:'1px solid #1e2035'}},
-      [['daily','📋 日次データ'],['guest','👥 来店顧客']].map(function(item){return e('button',{key:item[0],onClick:function(){setTab(item[0]);},style:{flex:1,padding:'11px 0',fontSize:'14px',fontWeight:600,border:'none',cursor:'pointer',background:tab===item[0]?'#1e2035':'transparent',color:tab===item[0]?'#e8b86d':'#6b7280',borderRight:item[0]==='daily'?'1px solid #1e2035':'none'}},item[1]);})
+      (function(){
+        var iconDaily=e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2'}),e('rect',{x:9,y:3,width:6,height:4,rx:1}),e('line',{x1:9,y1:12,x2:15,y2:12}),e('line',{x1:9,y1:16,x2:12,y2:16}));
+        var iconGuest=e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2'}),e('circle',{cx:9,cy:7,r:4}),e('path',{d:'M23 21v-2a4 4 0 0 0-3-3.87'}),e('path',{d:'M16 3.13a4 4 0 0 1 0 7.75'}));
+        return [['daily','日次データ',iconDaily],['guest','来店顧客',iconGuest]].map(function(item){return e('button',{key:item[0],onClick:function(){setTab(item[0]);},style:{flex:1,padding:'11px 0',fontSize:'14px',fontWeight:600,border:'none',cursor:'pointer',background:tab===item[0]?'#1e2035':'transparent',color:tab===item[0]?'#e8b86d':'#6b7280',borderRight:item[0]==='daily'?'1px solid #1e2035':'none'}},e('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',gap:'5px'}},item[2],item[1]));});
+      })()
     ),
     e('label',{style:S.label},'日付'),e('input',{type:'date',style:S.input,value:form.date,onChange:function(ev){handleDateChange(ev.target.value);}}),
     tab==='daily'&&e(Fragment,null,
