@@ -2183,8 +2183,11 @@ function MiniApp(){
             ?e('div',{style:{padding:'32px',textAlign:'center',color:'#6b7280'}},'自分のフォルダがまだ同期されていません')
             :myFolders.map(function(myFolder){
               var folderCasts=(data.casts||[]).filter(function(c){return(myFolder.castIds||[]).includes(c.id);});
+              var folderLabel=myFolder._roomId
+                ?((roomsList.find(function(r){return r.roomId===myFolder._roomId;})||{}).name||myFolder.name)
+                :(userName||myFolder.name);
               return e('div',{key:myFolder.id},
-                multi&&e('div',{style:{padding:'12px 0 6px',color:'#e8b86d',fontSize:'13px',fontWeight:700,borderBottom:'1px solid #1e2035',marginBottom:'8px'}},myFolder.name),
+                multi&&e('div',{style:{padding:'12px 0 6px',color:'#e8b86d',fontSize:'13px',fontWeight:700,borderBottom:'1px solid #1e2035',marginBottom:'8px'}},folderLabel),
                 e(FolderDetail,Object.assign({},commonProps2,{folder:myFolder,folderCasts:folderCasts,hideHeader:true}))
               );
             })
