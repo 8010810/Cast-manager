@@ -1751,6 +1751,10 @@ function MiniApp(){
   var s8=useState(null);var appOpenFolder=s8[0];var setAppOpenFolder=s8[1];
   var s_rl=useState([]);var roomsList=s_rl[0];var setRoomsList=s_rl[1];
   var s_mr=useState(null);var selMycastRoom=s_mr[0];var setSelMycastRoom=s_mr[1];
+  var s_ty=useState(String(new Date().getFullYear()));var targetYear=s_ty[0];var setTargetYear=s_ty[1];
+  var s_tc=useState(null);var targetCast=s_tc[0];var setTargetCast=s_tc[1];
+  var s_etmk=useState(null);var editTargetMK=s_etmk[0];var setEditTargetMK=s_etmk[1];
+  var s_tin=useState('');var targetInput=s_tin[0];var setTargetInput=s_tin[1];
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
@@ -2115,6 +2119,65 @@ function MiniApp(){
 
   var toastEl=toast&&e('div',{style:{position:'fixed',top:'calc(16px + env(safe-area-inset-top))',left:'50%',transform:'translateX(-50%)',zIndex:1000,background:toast.type==='error'?'#ef4444':'#22c55e',color:'#fff',padding:'10px 20px',borderRadius:'10px',fontSize:'13px',fontWeight:600,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,0.4)',animation:'pageFadeIn 0.3s ease both'}},toast.msg);
 
+  // 月別目標売上設定ページ
+  if(layer==='target'){
+    var nowYear=new Date().getFullYear();
+    var targetYears=[String(nowYear),String(nowYear-1)];
+    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive;});
+    var targetCastObj=activeCastsT.find(function(c){return c.id===targetCast;})||null;
+    function saveTargetForCast(cid,mk){
+      var val=targetInput===''?0:Number(targetInput);
+      if(isNaN(val))return;
+      var updatedCasts=(data.casts||[]).map(function(c){
+        if(c.id!==cid)return c;
+        var mt=Object.assign({},c.monthlyTargets||{});
+        if(val===0){delete mt[mk];}else{mt[mk]=val;}
+        return Object.assign({},c,{monthlyTargets:mt});
+      });
+      persist(Object.assign({},data,{casts:updatedCasts}));
+      setEditTargetMK(null);setTargetInput('');
+    }
+    return e('div',{style:S.root},
+      header,toastEl,
+      e('div',{style:{padding:'16px',animation:'pageFadeIn 1.4s ease both'}},
+        e('div',{style:S.pageTitle},
+          e('button',{style:{background:'transparent',border:'none',padding:'2px 4px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center',minWidth:'40px'},onClick:goHome},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'15 18 9 12 15 6'}))),
+          e('h1',{style:{fontSize:'15px',fontWeight:700,color:'#e8b86d',fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.1em',flex:1,textAlign:'center'}},'月別目標売上設定'),
+          e('div',{style:{minWidth:'40px'}})
+        ),
+        e('div',{style:{display:'flex',gap:'6px',marginBottom:'14px'}},
+          targetYears.map(function(y){return e('button',{key:y,style:Object.assign({},y===targetYear?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 12px'}),onClick:function(){setTargetYear(y);setEditTargetMK(null);}},y+'年');})
+        ),
+        e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'8px'}},'キャストを選択して月別目標を設定'),
+        e('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'14px'}},
+          activeCastsT.map(function(c){return e('button',{key:c.id,style:Object.assign({},c.id===targetCast?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 12px'}),onClick:function(){setTargetCast(c.id===targetCast?null:c.id);setEditTargetMK(null);setTargetInput('');}},c.name);})
+        ),
+        targetCastObj&&e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px'}},
+          Array.from({length:12},function(_,i){
+            var mk=targetYear+'-'+pad(i+1);
+            var mt=getMonthlyTarget(targetCastObj,mk);
+            var isEdit=editTargetMK===mk;
+            var nowM3=new Date();
+            var isCurrent=mk===nowM3.getFullYear()+'-'+pad(nowM3.getMonth()+1);
+            return e('div',{key:mk,style:{display:'flex',alignItems:'center',gap:'8px',padding:'7px 0',borderBottom:'1px solid #1e2035'}},
+              e('span',{style:{color:isCurrent?'#e8b86d':'#9ca3af',fontSize:'13px',minWidth:'44px',fontWeight:isCurrent?700:400}},(i+1)+'月'+(isCurrent?'◀':'')),
+              isEdit
+                ?e(Fragment,null,
+                    e('input',{type:'number',style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#e5e7eb',fontSize:'13px',padding:'4px 8px',flex:1,outline:'none'},value:targetInput,autoFocus:true,onChange:function(ev){setTargetInput(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')saveTargetForCast(targetCast,mk);}}),
+                    e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'6px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,padding:'4px 10px',cursor:'pointer'},onClick:function(){saveTargetForCast(targetCast,mk);}},'保存'),
+                    e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'16px',cursor:'pointer',padding:'0 2px'},onClick:function(){setEditTargetMK(null);setTargetInput('');}},e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2.5,strokeLinecap:'round'},e('line',{x1:18,y1:6,x2:6,y2:18}),e('line',{x1:6,y1:6,x2:18,y2:18})))
+                  )
+                :e(Fragment,null,
+                    e('span',{style:{color:mt>0?'#e5e7eb':'#4b5563',fontSize:'13px',flex:1}},mt>0?yen(mt):'未設定'),
+                    e('button',{style:S.bdEditBtn,onClick:function(){setEditTargetMK(mk);setTargetInput(mt>0?String(mt):'');}},mt>0?'変更':'設定')
+                  )
+            );
+          })
+        )
+      )
+    );
+  }
+
   // ホーム画面
   if(layer==='home'){
     // 今月の売上データ（ログインユーザー自身のキャスト）
@@ -2186,6 +2249,16 @@ function MiniApp(){
           )
         ),
         bdSection,
+        e('button',{style:{width:'100%',background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:'pointer',marginBottom:'16px',boxSizing:'border-box'},onClick:function(){navigate('target');}},
+          e('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},
+            e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('circle',{cx:12,cy:12,r:10}),e('circle',{cx:12,cy:12,r:6}),e('circle',{cx:12,cy:12,r:2})),
+            e('div',{style:{textAlign:'left'}},
+              e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'2px'}},'月別目標売上設定'),
+              e('div',{style:{fontSize:'13px',color:allTargetThisMonth>0?'#e8b86d':'#4b5563',fontWeight:700}},allTargetThisMonth>0?yen(allTargetThisMonth):'目標未設定')
+            )
+          ),
+          e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#6b7280',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'9 18 15 12 9 6'}))
+        ),
         e('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px'}},
           pages.map(function(pg,idx){
             return e('div',{key:pg.key,className:'card-hover',style:{background:'linear-gradient(145deg,#141428,#0f0f22)',border:'1px solid rgba(232,184,109,0.15)',borderRadius:'16px',padding:'24px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'12px',minHeight:'120px',boxShadow:'0 2px 20px rgba(0,0,0,0.4)',transition:'transform 0.2s,box-shadow 0.2s,border-color 0.2s',animation:'pageFadeIn 1.4s ease both',animationDelay:(idx*0.08)+'s'},onClick:function(){navigate(pg.key);}},
