@@ -2105,7 +2105,7 @@ function MiniApp(){
 
   return e('div',{style:S.root},
     header,toastEl,
-    e('div',{style:{paddingTop:'0'}},
+    e('div',{style:S.main},
       layer==='mycast'&&(function(){
         var myUid=user?user.uid:'';
         var myFolders=(data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===myUid;});
