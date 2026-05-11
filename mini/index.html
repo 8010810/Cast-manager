@@ -1746,6 +1746,8 @@ function MiniApp(){
   var s_cs=useState('loading');var consentState=s_cs[0];var setConsentState=s_cs[1];
   var s_un=useState('');var userName=s_un[0];var setUserName=s_un[1];
   var s_sp=useState(null);var settingsPage=s_sp[0];var setSettingsPage=s_sp[1];
+  var s_en=useState(false);var editingName=s_en[0];var setEditingName=s_en[1];
+  var s_ea=useState('');var editNameVal=s_ea[0];var setEditNameVal=s_ea[1];
   var s3=useState(['home']);var navStack=s3[0];var setNavStack=s3[1];
   var s4=useState(null);var selectedCast=s4[0];var setSC=s4[1];
   var s5=useState('input');var castPage=s5[0];var setCastPage=s5[1];
@@ -1994,14 +1996,22 @@ function MiniApp(){
           e('div',{style:SETTINGS_PANEL},
             e('div',{style:{padding:'20px 18px'}},
               e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'12px'}},
-                e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'6px'}},'ユーザー名'),
-                e('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
-                  e('input',{style:{flex:1,background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'8px 12px',color:'#f3f4f6',fontSize:'14px',outline:'none'},value:userName,onChange:function(ev){setUserName(ev.target.value);}}),
-                  e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'8px',padding:'8px 14px',color:'#0d0d1a',fontWeight:700,fontSize:'13px',cursor:'pointer'},onClick:function(){
-                    var uName=userName.trim();if(!uName)return;
-                    db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName}).catch(function(){});
-                  }},'保存')
-                )
+                e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
+                  e('div',{style:{fontSize:'11px',color:'#6b7280'}},'ユーザー名'),
+                  editingName
+                    ?e('div',{style:{display:'flex',gap:'6px'}},
+                      e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditingName(false);setEditNameVal(userName);}},'キャンセル'),
+                      e('button',{style:{background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',padding:'5px 12px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){
+                        var uName=editNameVal.trim();if(!uName)return;
+                        db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName}).catch(function(){});
+                        setUserName(uName);setEditingName(false);
+                      }},'保存')
+                    )
+                    :e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditingName(true);setEditNameVal(userName);}},'変更')
+                ),
+                editingName
+                  ?e('input',{style:{width:'100%',boxSizing:'border-box',background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'10px 12px',color:'#e5e7eb',fontSize:'14px',outline:'none'},value:editNameVal,onChange:function(ev){setEditNameVal(ev.target.value);},autoFocus:true})
+                  :e('div',{style:{fontSize:'15px',color:'#f3f4f6',fontWeight:600}},userName||'未設定')
               ),
               e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'12px'}},
                 e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'6px'}},'メールアドレス'),
