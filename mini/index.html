@@ -1082,7 +1082,8 @@ function ShiftPage(p){
       e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(selShiftFolder==='all'?'#e8b86d':'#374151'),background:selShiftFolder==='all'?'#e8b86d22':'transparent',color:selShiftFolder==='all'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:selShiftFolder==='all'?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder('all');}},'全員'),
       (p.data.folders||[]).map(function(f){
         var active=selShiftFolder===f.id;
-        return e('button',{key:f.id,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder(f.id);}},f.name);
+        var label=f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:f.name;
+        return e('button',{key:f.id,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelShiftFolder(f.id);}},label);
       })
     ),
     // 週/月切替
@@ -2194,7 +2195,7 @@ function MiniApp(){
         );
       })(),
       layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}})),
-      layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack})),
+      layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList})),
       layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack})),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
         castPage==='input'&&e(InputPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
