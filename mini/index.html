@@ -663,7 +663,8 @@ function CastListPage(p){
 
   function getCastFolder(castId){
     var f=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(castId);});
-    return f?f.name:null;
+    if(!f)return null;
+    return f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:f.name;
   }
 
   if(detail){
@@ -2204,7 +2205,7 @@ function MiniApp(){
             })
         );
       })(),
-      layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}})),
+      layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomsList:roomsList})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList})),
       layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack})),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
