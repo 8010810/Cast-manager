@@ -1798,8 +1798,21 @@ function MiniApp(){
   var isCastLayer=layer==='cast';
 
   useEffect(function(){
+    // std.からの遷移時: ?uid= が現在のminiセッションと異なればサインアウトして正しいアカウントで入り直す
+    var fromUid=new URLSearchParams(window.location.search).get('uid');
+    if(fromUid)window.history.replaceState({},''  ,window.location.pathname);
     var unsubData=null;
     var unsubAuth=auth.onAuthStateChanged(function(u){
+      if(fromUid){
+        if(u&&u.uid!==fromUid){
+          // アカウント不一致 → サインアウトしてログイン画面へ
+          fromUid=null;
+          if(unsubData){unsubData();unsubData=null;}
+          auth.signOut();
+          return;
+        }
+        fromUid=null; // 一致 or uなし → 以降はチェック不要
+      }
       setUser(u);
       if(unsubData){unsubData();unsubData=null;}
       if(u){
