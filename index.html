@@ -970,7 +970,7 @@ function SalesPage(p){
               e('span',{style:{color:mk===tm?'#e8b86d':'#9ca3af',fontSize:'13px',minWidth:'52px',fontWeight:mk===tm?700:400}},label+(mk===tm?'◀':'')),
               isEdit
                 ?e(Fragment,null,
-                  e('input',{type:'number',style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#e5e7eb',fontSize:'13px',padding:'4px 8px',flex:1,outline:'none'},value:targetInput,autoFocus:true,onChange:function(ev){setTargetInput(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')saveTargetForCast(targetCast,mk);}}),
+                  e('input',{type:'number',style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#e5e7eb',fontSize:'13px',padding:'4px 8px',flex:1,maxWidth:'140px',minWidth:0,outline:'none'},value:targetInput,autoFocus:true,onChange:function(ev){setTargetInput(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')saveTargetForCast(targetCast,mk);}}),
                   e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'6px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,padding:'4px 10px',cursor:'pointer'},onClick:function(){saveTargetForCast(targetCast,mk);}},'保存'),
                   e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setEditTargetMK(null);}},'✗')
                 )
