@@ -2,6 +2,9 @@
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/cast-view.html", "dest": "/cast-view.html" },
+    { "src": "/mini/api/(.*)", "dest": "/mini/api/$1" },
+    { "src": "/mini", "dest": "/mini/index.html" },
+    { "src": "/mini/(.*)", "dest": "/mini/$1" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
