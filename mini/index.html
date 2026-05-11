@@ -1734,6 +1734,7 @@ function MiniApp(){
   var s7=useState(null);var subBack=s7[0];var setSubBack=s7[1];
   var s8=useState(null);var appOpenFolder=s8[0];var setAppOpenFolder=s8[1];
   var s_rl=useState([]);var roomsList=s_rl[0];var setRoomsList=s_rl[1];
+  var s_room=useState(null);var roomId=s_room[0];var setRoomId=s_room[1];
 
   var layer=navStack[navStack.length-1]||'home';
   var isCastLayer=layer==='cast';
@@ -1780,18 +1781,27 @@ function MiniApp(){
       if(unsubData){unsubData();unsubData=null;}
       if(u){
         setLoading(true);
-        var consentDone=false,dataDone=false;
-        function checkAllDone(){if(consentDone&&dataDone)setLoading(false);}
         db.collection('users').doc(u.uid).collection('meta').doc('consent').get().then(function(doc){
+          var rid=null;
           if(!doc.exists||!doc.data().agreedAt){setConsentState('needed');}
-          else{var cd=doc.data();setUserName(cd.userName||'');setConsentState(cd.userName?'done':'username');}
-          consentDone=true;checkAllDone();
-        }).catch(function(){setConsentState('needed');consentDone=true;checkAllDone();});
-        unsubData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
-          var d=doc.exists?doc.data():{};
-          var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
-          setData(nd);dataDone=true;checkAllDone();
-        },function(){dataDone=true;checkAllDone();});
+          else{var cd=doc.data();setUserName(cd.userName||'');setConsentState(cd.userName?'done':'username');rid=cd.lastRoomId||null;}
+          setRoomId(rid);
+          var dataRef=rid
+            ?db.collection('rooms').doc(rid).collection('data').doc('main')
+            :db.collection('users').doc(u.uid).collection('data').doc('main');
+          unsubData=dataRef.onSnapshot(function(doc){
+            var d=doc.exists?doc.data():{};
+            var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+            setData(nd);setLoading(false);
+          },function(){setLoading(false);});
+        }).catch(function(){
+          setConsentState('needed');setRoomId(null);
+          unsubData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
+            var d=doc.exists?doc.data():{};
+            var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+            setData(nd);setLoading(false);
+          },function(){setLoading(false);});
+        });
       }else{setData(null);setLoading(false);}
     });
     return function(){unsubAuth();if(unsubData){unsubData();}};
@@ -1807,7 +1817,14 @@ function MiniApp(){
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){if(showToast)notify('更新しました','success');}
-  function persist(next){setData(next);if(user)saveToDB(user.uid,next);}
+  function persist(next){
+    setData(next);
+    if(user){
+      if(roomId){
+        db.collection('rooms').doc(roomId).collection('data').doc('main').set({casts:next.casts,records:next.records,customers:next.customers,folders:next.folders||[],shifts:next.shifts||{},visits:next.visits||[],quota:next.quota||{}}).catch(function(e){console.error('Save error:',e);});
+      }else{saveToDB(user.uid,next);}
+    }
+  }
   function navigate(pg){setNavStack(function(st){return [...st,pg];});setSubBack(null);refreshData();}
   function goHome(){setNavStack(['home']);setSubBack(null);refreshData();}
   function handleSignOut(){fbSignOut().then(function(){setData(null);setNavStack(['home']);});}
@@ -1887,7 +1904,7 @@ function MiniApp(){
             var alreadyExists=(newData.folders||[]).some(function(f){return f.name===uName;});
             if(!alreadyExists){newData.folders=[{id:uid(),name:uName,castIds:[]}].concat(newData.folders||[]);}
             db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
-            setData(newData);if(user)saveToDB(user.uid,newData);
+            persist(newData);
             setConsentState('done');
           }},'登録する')
         )
