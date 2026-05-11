@@ -205,17 +205,6 @@ function LoginScreen(){
     setLoading(true);setErr('');
     signInWithGoogle().catch(function(e){setErr('Googleログインに失敗しました');setLoading(false);});
   }
-  function handleLine(){
-    var state=Math.random().toString(36).slice(2);
-    sessionStorage.setItem('line_state',state);
-    var url='https://access.line.me/oauth2/v2.1/authorize?response_type=code'
-      +'&client_id=2009934823'
-      +'&redirect_uri='+encodeURIComponent('https://cast-manager-seven.vercel.app/')
-      +'&state='+state
-      +'&scope=profile%20openid%20phone';
-    // 現在のタブでリダイレクト（同じタブで戻ってくる）
-    window.location.href=url;
-  }
   function handleEmail(){
     if(!email.trim()||!pass.trim()){setErr('メールアドレスとパスワードを入力してください');return;}
     setLoading(true);setErr('');
@@ -230,37 +219,6 @@ function LoginScreen(){
       setErr(msg);setLoading(false);
     });
   }
-
-  // LINE OAuthコールバック処理
-  useEffect(function(){
-    var params=new URLSearchParams(window.location.search);
-    var code=params.get('code');
-    var state=params.get('state');
-    if(!code)return;
-    var savedState=sessionStorage.getItem('line_state');
-    sessionStorage.removeItem('line_state');
-    setLoading(true);
-    fetch('/api/line-auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code,redirectUri:'https://cast-manager-seven.vercel.app/'})})
-      .then(function(r){return r.json();})
-      .then(function(data){
-        if(data.customToken){
-          return auth.signInWithCustomToken(data.customToken).then(function(result){
-            var uid2=result.user.uid;
-            var ph=data.phoneNumber||'';
-            db.collection('users').doc(uid2).collection('meta').doc('consent').set({isLineUser:true,phoneNumber:ph},{merge:true}).catch(function(){});
-          });
-        }else{throw new Error(data.error||'LINE認証失敗');}
-      })
-      .then(function(){
-        window.history.replaceState({},'','/');
-        // 元のタブがあれば閉じる（別タブで開かれた場合）
-        if(window.opener&&!window.opener.closed){
-          window.opener.postMessage({type:'line_auth_done'},'*');
-          window.close();
-        }
-      })
-      .catch(function(e){setErr('LINEログインに失敗しました: '+e.message);setLoading(false);});
-  },[]);
 
   var inp={width:'100%',padding:'12px 14px',borderRadius:'8px',border:'1px solid #2d2d4e',background:'#0d0d1a',color:'#e5e7eb',fontSize:'14px',outline:'none',boxSizing:'border-box',marginBottom:'10px'};
 
@@ -295,22 +253,9 @@ function LoginScreen(){
       ),
 
       // --- Google ---
-      e('button',{style:{width:'100%',padding:'12px',borderRadius:'8px',border:'1px solid #2d2d4e',background:'#1e2035',color:'#e5e7eb',fontSize:'14px',fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px',marginBottom:'8px'},onClick:handleGoogle,disabled:loading},
+      e('button',{style:{width:'100%',padding:'12px',borderRadius:'8px',border:'1px solid #2d2d4e',background:'#1e2035',color:'#e5e7eb',fontSize:'14px',fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},onClick:handleGoogle,disabled:loading},
         e('img',{src:'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',style:{width:'18px',height:'18px'}}),
         isLogin?'Googleでログイン':'Googleで新規登録'
-      ),
-
-      // --- LINE ---
-      e('button',{style:{width:'100%',background:'#06C755',border:'none',borderRadius:'8px',padding:'12px',color:'#fff',fontWeight:700,fontSize:'14px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:'10px'},onClick:handleLine,disabled:loading},
-        e('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'white'},e('path',{d:'M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.07 9.436-6.975C23.176 14.393 24 12.458 24 10.314'})),
-        isLogin?'LINEでログイン':'LINEで新規登録'
-      ),
-
-      e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginTop:'8px',lineHeight:1.6}},
-        e('span',{style:{color:'#fbbf24'}},'⚠️ '),
-        'ホーム画面追加アプリからLINEでログインすると',
-        e('br',null),
-        '別タブで開きます。Safariから直接ご利用ください'
       ),
 
       err&&e('div',{style:{color:'#f87171',fontSize:'12px',marginTop:'14px',textAlign:'left',background:'#7f1d1d22',borderRadius:'8px',padding:'10px 12px'}},err)
@@ -2696,24 +2641,19 @@ function ProfileSettingsPage(p){
   var s3=useState(false);var editingEmail=s3[0];var setEditingEmail=s3[1];
   var s4=useState('');var editPhone=s4[0];var setEditPhone=s4[1];
   var s5=useState(false);var editingPhone=s5[0];var setEditingPhone=s5[1];
-  var s6=useState(false);var isLineUser=s6[0];var setIsLineUser=s6[1];
-  var s7=useState('');var phoneFromDB=s7[0];var setPhoneFromDB=s7[1];
+  var s6=useState('');var phoneFromDB=s6[0];var setPhoneFromDB=s6[1];
 
   useEffect(function(){
     if(!p.user||!p.db)return;
     p.db.collection('users').doc(p.user.uid).collection('meta').doc('consent').get().then(function(doc){
       if(doc.exists){
         var d=doc.data();
-        setIsLineUser(!!(d.isLineUser));
         var ph=d.phoneNumber||(p.user&&p.user.phoneNumber)||'';
         setPhoneFromDB(ph);
         setEditPhone(ph);
       }
     });
   },[p.user&&p.user.uid]);
-
-  var linkedGoogle=!!(p.user&&p.user.providerData&&p.user.providerData.some(function(pr){return pr.providerId==='google.com';}));
-  var linkedLine=isLineUser||p.linkedLine;
 
   var FIELD={background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'10px'};
   var LBL={fontSize:'11px',color:'#6b7280',marginBottom:'6px'};
@@ -2744,22 +2684,6 @@ function ProfileSettingsPage(p){
     setEditingPhone(false);
     p.notify('電話番号を更新しました');
   }
-  function linkGoogle(){
-    var provider=new firebase.auth.GoogleAuthProvider();
-    p.user.linkWithPopup(provider).then(function(){
-      if(p.refreshUser)p.refreshUser();
-      p.notify('Googleと連携しました');
-    }).catch(function(e){p.notify(e.code==='auth/credential-already-in-use'?'このGoogleアカウントは既に使用中です':'連携に失敗しました');});
-  }
-  function linkLine(){
-    var state=Math.random().toString(36).slice(2);
-    sessionStorage.setItem('line_link_state',state);
-    sessionStorage.setItem('line_link_purpose','linelinkage');
-    var redirectUri=window.location.origin+'/';
-    var url='https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=2009934823&redirect_uri='+encodeURIComponent(redirectUri)+'&state='+state+'&scope=profile%20openid%20phone';
-    window.location.replace(url);
-  }
-
   var OVERLAY={position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',flexDirection:'column'};
   var PANEL={background:'#0d0d1a',flex:1,overflowY:'auto'};
   var HDR={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(232,184,109,0.1)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
@@ -2820,35 +2744,6 @@ function ProfileSettingsPage(p){
         editingPhone
           ?e('input',{style:INP,type:'tel',placeholder:'例: 090-0000-0000',value:editPhone,onChange:function(ev){setEditPhone(ev.target.value);},autoFocus:true})
           :e('div',{style:Object.assign({},VAL,{color:phoneFromDB?'#f3f4f6':'#6b7280'})},phoneFromDB||'未設定')
-      ),
-      // 連携サービス
-      e('div',{style:FIELD},
-        e('div',{style:{fontSize:'13px',fontWeight:700,color:'#f3f4f6',marginBottom:'14px'}},'連携サービス'),
-        // Google
-        e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}},
-          e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
-            e('svg',{width:18,height:18,viewBox:'0 0 24 24'},
-              e('path',{d:'M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z',fill:'#4285F4'}),
-              e('path',{d:'M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z',fill:'#34A853'}),
-              e('path',{d:'M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z',fill:'#FBBC05'}),
-              e('path',{d:'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z',fill:'#EA4335'})
-            ),
-            e('span',{style:{fontSize:'14px',color:'#f3f4f6'}},'Google')
-          ),
-          linkedGoogle
-            ?e('span',{style:{fontSize:'12px',color:'#34d399',fontWeight:700}},'連携済み')
-            :e('button',{style:EDIT_BTN,onClick:linkGoogle},'連携')
-        ),
-        // LINE
-        e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
-          e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
-            e('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'#06C755'},e('path',{d:'M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.07 9.436-6.975C23.176 14.393 24 12.458 24 10.314'})),
-            e('span',{style:{fontSize:'14px',color:'#f3f4f6'}},'LINE')
-          ),
-          linkedLine
-            ?e('span',{style:{fontSize:'12px',color:'#34d399',fontWeight:700}},'連携済み')
-            :e('button',{style:EDIT_BTN,onClick:linkLine},'連携')
-        )
       )
     )
   );
@@ -3038,7 +2933,6 @@ function App(){
   var s9=useState('loading');var consentState=s9[0];var setConsentState=s9[1];
   var s10=useState('');var userName=s10[0];var setUserName=s10[1];
   var s_sn=useState('');var storeName=s_sn[0];var setStoreName=s_sn[1];
-  var s_il=useState(false);var isLineUser=s_il[0];var setIsLineUser=s_il[1];
   var s_ri=useState(null);var roomId=s_ri[0];var setRoomId=s_ri[1];
   var s_rr=useState('member');var roomRole=s_rr[0];var setRoomRole=s_rr[1];
   var s_rl=useState([]);var roomsList=s_rl[0];var setRoomsList=s_rl[1]; // [{roomId,name,role}]
@@ -3102,14 +2996,6 @@ function App(){
   }
 
     useEffect(function(){
-    // LINE認証完了を別タブから受け取る
-    function onLineMessage(ev){
-      if(ev.data&&ev.data.type==='line_auth_done'){
-        // 別タブが閉じた後、auth状態が更新されるまで少し待つ
-        setTimeout(function(){auth.currentUser&&auth.currentUser.reload();},500);
-      }
-    }
-    window.addEventListener('message',onLineMessage);
     unsubAuthRef.current=null;
     var currentAuthGen=0;
     var unsubAuth=auth.onAuthStateChanged(function(u){
@@ -3120,7 +3006,7 @@ function App(){
       if(!u){
         window._castManagerDeleting=false;
         setConsentState('loading');setData(null);setLoading(false);
-        setUserName('');setStoreName('');setIsLineUser(false);
+        setUserName('');setStoreName('');
         setRoomId(null);setRoomRole('member');setCurrentRoom(null);setRoomsList([]);
         setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});
         setSubBack(null);setNavStack(['home']);setSC(null);setSettingsPage(null);setDeletingAccount(false);
@@ -3141,7 +3027,6 @@ function App(){
           var cd=doc.data();
           setUserName(cd.userName||'');
           setStoreName(cd.storeName||'');
-          setIsLineUser(!!(cd.isLineUser));
           if(!cd.userName){clearTimeout(authTimeout);setConsentState('username');setLoading(false);return;}
           // ルーム一覧取得（サーバー3回→キャッシュ1回のフォールバック付き）
           function applyRooms(rooms){
@@ -3325,9 +3210,6 @@ function App(){
       if(!auth.currentUser)return auth.signOut().catch(function(){});
       return auth.currentUser.delete().catch(function(e){
         if(e.code==='auth/requires-recent-login'){
-          // LINEユーザーは再認証できないのでサインアウトのみ
-          if(isLineUser)return auth.signOut();
-          // Googleユーザーは再認証してから削除
           var provider=new firebase.auth.GoogleAuthProvider();
           return auth.currentUser.reauthenticateWithPopup(provider).then(function(){
             return auth.currentUser?auth.currentUser.delete().catch(function(){return auth.signOut();}):auth.signOut();
@@ -3385,7 +3267,6 @@ function App(){
         e('button',{style:{width:'100%',background:canSubmit?'linear-gradient(135deg,#c9983a,#e8b86d)':'#1e2035',border:'none',borderRadius:'10px',padding:'14px',color:canSubmit?'#0d0d1a':'#4b5563',fontWeight:700,fontSize:'15px',cursor:canSubmit?'pointer':'default'},disabled:!canSubmit,onClick:function(){
           if(!canSubmit)return;
           var uName=userName.trim();
-          var isLineUser=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId.includes('line');}));
           db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
           setUserName(uName);
           setConsentState('roomselect');
@@ -3404,9 +3285,7 @@ function App(){
 
     // プロフィールページ
     if(settingsPage==='profile'){
-      var linkedGoogle=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId==='google.com';}));
-      var linkedLine=!!(user&&user.providerData&&user.providerData.some(function(p){return p.providerId==='oidc.line'||p.providerId.includes('line');}));
-      return e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,linkedGoogle:linkedGoogle,linkedLine:linkedLine||isLineUser,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});}});
+      return e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});}});
     }
     // 利用規約ページ
     if(settingsPage==='terms'){
