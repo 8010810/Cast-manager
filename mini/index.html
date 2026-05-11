@@ -2163,8 +2163,8 @@ function MiniApp(){
               e('span',{style:{color:isCurrent?'#e8b86d':'#9ca3af',fontSize:'13px',minWidth:'44px',fontWeight:isCurrent?700:400}},(i+1)+'月'+(isCurrent?'◀':'')),
               isEdit
                 ?e(Fragment,null,
-                    e('input',{type:'number',style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#e5e7eb',fontSize:'13px',padding:'4px 8px',flex:1,outline:'none'},value:targetInput,autoFocus:true,onChange:function(ev){setTargetInput(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')saveTargetForCast(targetCast,mk);}}),
-                    e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'6px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,padding:'4px 10px',cursor:'pointer'},onClick:function(){saveTargetForCast(targetCast,mk);}},'保存'),
+                    e('input',{type:'number',style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'6px',color:'#e5e7eb',fontSize:'13px',padding:'4px 8px',width:'100px',minWidth:0,outline:'none'},value:targetInput,autoFocus:true,onChange:function(ev){setTargetInput(ev.target.value);},onKeyDown:function(ev){if(ev.key==='Enter')saveTargetForCast(targetCast,mk);}}),
+                    e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'6px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,padding:'4px 10px',cursor:'pointer',flexShrink:0},onClick:function(){saveTargetForCast(targetCast,mk);}},'保存'),
                     e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'16px',cursor:'pointer',padding:'0 2px'},onClick:function(){setEditTargetMK(null);setTargetInput('');}},e('svg',{width:14,height:14,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2.5,strokeLinecap:'round'},e('line',{x1:18,y1:6,x2:6,y2:18}),e('line',{x1:6,y1:6,x2:18,y2:18})))
                   )
                 :e(Fragment,null,
