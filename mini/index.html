@@ -1773,6 +1773,7 @@ function MiniApp(){
     }
     var autoSignInAttempted=false;
     var unsubRooms=null;
+    var unsubConsent=null;
 
     function tryAutoSignIn(){
       if(autoSignInAttempted)return;
@@ -1784,6 +1785,7 @@ function MiniApp(){
     }
 
     function cleanupRooms(){
+      if(unsubConsent){unsubConsent();unsubConsent=null;}
       if(unsubRooms){unsubRooms();unsubRooms=null;}
       Object.values(unsubDataMapRef.current).forEach(function(fn){fn();});
       unsubDataMapRef.current={};roomDataMapRef.current={};primaryRoomRef.current=null;
@@ -1828,11 +1830,15 @@ function MiniApp(){
         setLoading(true);
         var consentDone=false,roomsReady=false;
         function checkAllDone(){if(consentDone&&roomsReady)setLoading(false);}
-        db.collection('users').doc(u.uid).collection('meta').doc('consent').get().then(function(doc){
-          if(!doc.exists||!doc.data().agreedAt){setConsentState('needed');}
-          else{var cd=doc.data();setUserName(cd.userName||'');setConsentState(cd.userName?'done':'username');}
-          consentDone=true;checkAllDone();
-        }).catch(function(){setConsentState('needed');consentDone=true;checkAllDone();});
+        unsubConsent=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
+          var cd=doc.exists?doc.data():null;
+          if(!cd||!cd.agreedAt){
+            if(!consentDone){setConsentState('needed');consentDone=true;checkAllDone();}
+          }else{
+            setUserName(cd.userName||'');
+            if(!consentDone){setConsentState(cd.userName?'done':'username');consentDone=true;checkAllDone();}
+          }
+        },function(){if(!consentDone){setConsentState('needed');consentDone=true;checkAllDone();}});
         var loadedRids=new Set();
         var firstRoomsSnap=true;
         unsubRooms=db.collection('users').doc(u.uid).collection('rooms').onSnapshot(function(snap){
@@ -2003,8 +2009,20 @@ function MiniApp(){
                       e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditingName(false);setEditNameVal(userName);}},'キャンセル'),
                       e('button',{style:{background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',padding:'5px 12px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){
                         var uName=editNameVal.trim();if(!uName)return;
+                        var oldName=userName;
                         db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName}).catch(function(){});
                         setUserName(uName);setEditingName(false);
+                        if(oldName&&oldName!==uName){
+                          (roomsList||[]).forEach(function(room){
+                            db.collection('rooms').doc(room.roomId).collection('data').doc('main').get().then(function(dd){
+                              if(!dd.exists)return;
+                              var folders=(dd.data().folders||[]);
+                              var hasChange=false;
+                              var updated=folders.map(function(f){if(f.ownerUid===user.uid&&f.name===oldName){hasChange=true;return Object.assign({},f,{name:uName});}return f;});
+                              if(hasChange){db.collection('rooms').doc(room.roomId).collection('data').doc('main').set({folders:updated},{merge:true}).catch(function(){});}
+                            }).catch(function(){});
+                          });
+                        }
                       }},'保存')
                     )
                     :e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditingName(true);setEditNameVal(userName);}},'変更')
