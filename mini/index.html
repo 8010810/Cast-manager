@@ -2062,7 +2062,7 @@ function MiniApp(){
     }
   if(!data){return e('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'#e8b86d'}},'読み込み中...');}
 
-  var headerStyle={position:'sticky',top:0,zIndex:100,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',paddingTop:'calc(12px + env(safe-area-inset-top))',gap:'12px'};
+  var headerStyle={position:'sticky',top:0,zIndex:100,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 18px',paddingTop:'calc(12px + env(safe-area-inset-top))',gap:'12px',height:'56px',boxSizing:'content-box'};
 
   var LOGO_SVG=e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',style:{flexShrink:0}},
     e('path',{d:'M12 2 L22 12 L12 22 L2 12 Z',fill:'rgba(232,184,109,0.12)',stroke:'#e8b86d',strokeWidth:'1.2',strokeLinejoin:'round'}),
@@ -2145,7 +2145,7 @@ function MiniApp(){
 
   return e('div',{style:S.root},
     header,toastEl,
-    e('div',{style:{paddingTop:'0'}},
+    e('div',{style:S.main},
       layer==='mycast'&&(function(){
         var myUid=user?user.uid:'';
         var myFolders=(data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===myUid;});
