@@ -1860,7 +1860,7 @@ function MiniApp(){
             },function(){loadedRids.add(rid);if(firstRoomsSnap&&loadedRids.size>=rooms.length){firstRoomsSnap=false;roomsReady=true;checkAllDone();}});
           });
         },function(){if(firstRoomsSnap){firstRoomsSnap=false;roomsReady=true;checkAllDone();}});
-      }else{setData(null);setLoading(false);}
+      }else{setData(null);setConsentState('done');setLoading(false);}
     });
     return function(){unsubAuth();cleanupRooms();};
   },[]);
