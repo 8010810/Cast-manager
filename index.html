@@ -2684,7 +2684,7 @@ function ProfileSettingsPage(p){
             if(!dd.exists)return;
             var folders=(dd.data().folders||[]);
             var hasChange=false;
-            var updated=folders.map(function(f){if(f.ownerUid===p.user.uid&&f.name===oldName){hasChange=true;return Object.assign({},f,{name:newName});}return f;});
+            var updated=folders.map(function(f){if(f.name===oldName&&(!f.ownerUid||f.ownerUid===p.user.uid)){hasChange=true;return Object.assign({},f,{name:newName});}return f;});
             if(hasChange){p.db.collection('rooms').doc(rd.id).collection('data').doc('main').set({folders:updated},{merge:true}).catch(function(){});}
           }).catch(function(){});
         });

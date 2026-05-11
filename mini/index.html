@@ -2018,7 +2018,7 @@ function MiniApp(){
                               if(!dd.exists)return;
                               var folders=(dd.data().folders||[]);
                               var hasChange=false;
-                              var updated=folders.map(function(f){if(f.ownerUid===user.uid&&f.name===oldName){hasChange=true;return Object.assign({},f,{name:uName});}return f;});
+                              var updated=folders.map(function(f){if(f.name===oldName&&(!f.ownerUid||f.ownerUid===user.uid)){hasChange=true;return Object.assign({},f,{name:uName});}return f;});
                               if(hasChange){db.collection('rooms').doc(room.roomId).collection('data').doc('main').set({folders:updated},{merge:true}).catch(function(){});}
                             }).catch(function(){});
                           });
