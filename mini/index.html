@@ -1735,6 +1735,7 @@ function MiniApp(){
   var s7=useState(null);var subBack=s7[0];var setSubBack=s7[1];
   var s8=useState(null);var appOpenFolder=s8[0];var setAppOpenFolder=s8[1];
   var s_rl=useState([]);var roomsList=s_rl[0];var setRoomsList=s_rl[1];
+  var s_mr=useState(null);var selMycastRoom=s_mr[0];var setSelMycastRoom=s_mr[1];
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
@@ -2173,22 +2174,39 @@ function MiniApp(){
         var myUid=user?user.uid:'';
         var myFolders=(data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===myUid;});
         var commonProps2={data:data,onOpenCast:openCast,notify:notify,uid:myUid,onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){},persist:persist};
-        var multi=myFolders.length>1;
+        // 所属ルームを重複なく取得
+        var myRooms=(function(){
+          var seen=new Set();var result=[];
+          myFolders.forEach(function(f){
+            var rid=f._roomId||'__none__';
+            if(!seen.has(rid)){
+              seen.add(rid);
+              var rName=f._roomId?((roomsList.find(function(r){return r.roomId===f._roomId;})||{}).name||f.name):(userName||f.name);
+              result.push({rid:rid,label:rName});
+            }
+          });
+          return result;
+        })();
+        var multiRoom=myRooms.length>1;
+        var activeRid=multiRoom?(selMycastRoom||myRooms[0].rid):null;
+        var visibleFolders=multiRoom?myFolders.filter(function(f){return(f._roomId||'__none__')===activeRid;}):myFolders;
         return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
           e('div',{style:S.pageTitle},
             e('button',{style:{background:'transparent',border:'none',padding:'2px 4px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center',marginRight:'2px'},onClick:goBack},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'15 18 9 12 15 6'}))),
             e('h1',{style:{...S.h1,flex:1,textAlign:'center'}},'MG実績'),
             e('div',{style:{width:'56px'}})
           ),
+          multiRoom&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px',overflowX:'auto',paddingBottom:'2px'}},
+            myRooms.map(function(r){
+              var active=(selMycastRoom||myRooms[0].rid)===r.rid;
+              return e('button',{key:r.rid,style:{padding:'6px 16px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'13px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setSelMycastRoom(r.rid);}},r.label);
+            })
+          ),
           myFolders.length===0
             ?e('div',{style:{padding:'32px',textAlign:'center',color:'#6b7280'}},'自分のフォルダがまだ同期されていません')
-            :myFolders.map(function(myFolder){
+            :visibleFolders.map(function(myFolder){
               var folderCasts=(data.casts||[]).filter(function(c){return(myFolder.castIds||[]).includes(c.id);});
-              var folderLabel=myFolder._roomId
-                ?((roomsList.find(function(r){return r.roomId===myFolder._roomId;})||{}).name||myFolder.name)
-                :(userName||myFolder.name);
               return e('div',{key:myFolder.id},
-                multi&&e('div',{style:{padding:'12px 0 6px',color:'#e8b86d',fontSize:'13px',fontWeight:700,borderBottom:'1px solid #1e2035',marginBottom:'8px'}},folderLabel),
                 e(FolderDetail,Object.assign({},commonProps2,{folder:myFolder,folderCasts:folderCasts,hideHeader:true}))
               );
             })
