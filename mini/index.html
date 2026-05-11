@@ -2102,9 +2102,22 @@ function MiniApp(){
   }
 
   var commonProps={data:data,persist:persist,notify:notify,uid:user?user.uid:'',onRefresh:function(){refreshData(true);}};
+  var cast=data&&selectedCast?data.casts.find(function(c){return c.id===selectedCast;}):null;
 
   return e('div',{style:S.root},
     header,toastEl,
+    isCastLayer&&cast&&e('div',{style:{position:'sticky',top:'57px',zIndex:99,background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)'}},
+      e('div',{style:{display:'flex',alignItems:'center',padding:'8px 16px',borderBottom:'1px solid rgba(232,184,109,0.15)'}},
+        e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center'},onClick:goBack},
+          e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},
+            e('polyline',{points:'15 18 9 12 15 6'})
+          )
+        ),
+        e('div',{style:{flex:1,textAlign:'center',fontWeight:700,fontSize:'15px',color:'#f3f4f6'}},cast.name),
+        e('div',{style:{width:'32px'}})
+      ),
+      e(CastTabBar,{castPage:castPage,setCastPage:setCastPage})
+    ),
     e('div',{style:S.main},
       layer==='mycast'&&(function(){
         var myUid=user?user.uid:'';
@@ -2135,8 +2148,7 @@ function MiniApp(){
         castPage==='input'&&e(InputPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
         castPage==='chart'&&e(ChartPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
         castPage==='list'&&e(ListPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
-        castPage==='customer'&&e(CustomerPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
-        e(CastTabBar,{castPage:castPage,onChangePage:function(pg){setCastPage(pg);}})
+        castPage==='customers'&&e(CustomerPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}}))
       )
     )
   );
