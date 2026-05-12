@@ -1751,6 +1751,9 @@ function MiniApp(){
   var s8=useState(null);var appOpenFolder=s8[0];var setAppOpenFolder=s8[1];
   var s_rl=useState([]);var roomsList=s_rl[0];var setRoomsList=s_rl[1];
   var s_mr=useState(null);var selMycastRoom=s_mr[0];var setSelMycastRoom=s_mr[1];
+  var s_jri=useState('');var miniJoinInput=s_jri[0];var setMiniJoinInput=s_jri[1];
+  var s_jrl=useState(false);var miniJoinLoading=s_jrl[0];var setMiniJoinLoading=s_jrl[1];
+  var s_jrm=useState('');var miniJoinMsg=s_jrm[0];var setMiniJoinMsg=s_jrm[1];
   var s_ty=useState(String(new Date().getFullYear()));var targetYear=s_ty[0];var setTargetYear=s_ty[1];
   var s_tc=useState(null);var targetCast=s_tc[0];var setTargetCast=s_tc[1];
   var s_etmk=useState(null);var editTargetMK=s_etmk[0];var setEditTargetMK=s_etmk[1];
@@ -1874,6 +1877,29 @@ function MiniApp(){
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){if(showToast)notify('更新しました','success');}
+  function submitMiniJoinRequest(){
+    var code=miniJoinInput.trim().toUpperCase();
+    if(!code){setMiniJoinMsg('招待コードを入力してください');return;}
+    var match=code.match(/[A-Z2-9]{6}/);
+    var actualCode=match?match[0]:code;
+    setMiniJoinLoading(true);setMiniJoinMsg('');
+    db.collection('rooms').where('inviteCode','==',actualCode).limit(1).get().then(function(snap){
+      if(snap.empty){setMiniJoinMsg('招待コードが見つかりません');setMiniJoinLoading(false);return;}
+      var rid=snap.docs[0].id;
+      db.collection('rooms').doc(rid).collection('members').doc(user.uid).get().then(function(mem){
+        if(mem.exists){setMiniJoinMsg('すでに参加済みです');setMiniJoinLoading(false);return;}
+        db.collection('rooms').doc(rid).collection('joinRequests').doc(user.uid).get().then(function(req){
+          if(req.exists){setMiniJoinMsg('申請中です。管理者の承認をお待ちください。');setMiniJoinLoading(false);return;}
+          db.collection('rooms').doc(rid).collection('joinRequests').doc(user.uid).set({
+            uid:user.uid,userName:userName||'',requestedAt:new Date().toISOString(),status:'pending'
+          }).then(function(){
+            setMiniJoinMsg('参加申請を送りました。管理者の承認をお待ちください。');
+            setMiniJoinInput('');setMiniJoinLoading(false);
+          }).catch(function(){setMiniJoinMsg('申請に失敗しました');setMiniJoinLoading(false);});
+        });
+      });
+    }).catch(function(){setMiniJoinMsg('申請に失敗しました');setMiniJoinLoading(false);});
+  }
   function persist(next){
     setData(next);
     if(!user)return;
@@ -2071,7 +2097,14 @@ function MiniApp(){
                     e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},r.role==='admin'?'管理者':'メンバー')
                   )
                 );
-              })
+              }),
+            e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
+            e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'別のルームに参加'),
+            e('input',{style:{width:'100%',background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'10px',padding:'12px 14px',color:'#f3f4f6',fontSize:'14px',marginBottom:'10px',boxSizing:'border-box'},placeholder:'招待コード（例: ABC123）',value:miniJoinInput,onChange:function(ev){setMiniJoinInput(ev.target.value.toUpperCase());setMiniJoinMsg('');},onKeyDown:function(ev){if(ev.key==='Enter')submitMiniJoinRequest();}}),
+            e('button',{style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'10px',color:'#9ca3af',fontWeight:600,fontSize:'14px',padding:'12px',cursor:miniJoinLoading||!miniJoinInput.trim()?'not-allowed':'pointer',opacity:miniJoinLoading||!miniJoinInput.trim()?0.5:1},onClick:submitMiniJoinRequest,disabled:miniJoinLoading||!miniJoinInput.trim()},
+              miniJoinLoading?'申請中...':'参加申請を送る'
+            ),
+            miniJoinMsg&&e('div',{style:{color:miniJoinMsg.includes('失敗')||miniJoinMsg.includes('見つかり')||miniJoinMsg.includes('すでに')?'#f87171':'#34d399',fontSize:'12px',marginTop:'8px',textAlign:'center'}},miniJoinMsg)
           )
         );
       }
