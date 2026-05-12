@@ -599,12 +599,14 @@ function CastListPage(p){
     var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
     // 派遣の場合は「派遣」フォルダ、なければ作成
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
-    var isPersonalTarget=!isDispatch;
+    var selectedFid=newFolder||'__personal__';
+    var selectedFolder=(p.data.folders||[]).find(function(f){return f.id===selectedFid;});
+    var isPersonalTarget=!isDispatch&&(selectedFid==='__personal__'||!!(selectedFolder&&selectedFolder._personal));
     var initFid;var finalCast;var finalFolders;
     if(isDispatch){
       initFid=dispatchFolder?dispatchFolder.id:'dispatch_folder';
     }else{
-      initFid='__personal__';
+      initFid=selectedFid;
     }
     if(isPersonalTarget&&!isDispatch){
       var existPF=(p.data.folders||[]).find(function(f){return f._personal&&f.ownerUid&&f.ownerUid===p.uid;});
@@ -779,7 +781,24 @@ function CastListPage(p){
         ),
       e('label',{style:S.label},'キャスト名 *'),
       e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
-
+      addType==='regular'&&(function(){
+        var pf=(p.data.folders||[]).find(function(f){return f._personal&&f.ownerUid&&f.ownerUid===p.uid;});
+        var opts=[{id:'__personal__',label:pf?pf.name:(p.userName||'自分のフォルダ')}];
+        var roomSeen=new Set();
+        (p.data.folders||[]).forEach(function(f){
+          if(!f._roomId||f.ownerUid||f.isDispatch||f.name==='派遣')return;
+          var rid=f._roomId;if(roomSeen.has(rid))return;roomSeen.add(rid);
+          var room=(p.roomsList||[]).find(function(r){return r.roomId===rid;});
+          opts.push({id:f.id,label:room?room.name:f.name});
+        });
+        if(opts.length<2)return null;
+        return e('div',null,
+          e('label',{style:S.label},'所属フォルダ'),
+          e('select',{style:S.input,value:newFolder||'__personal__',onChange:function(ev){setNewFolder(ev.target.value);}},
+            opts.map(function(o){return e('option',{key:o.id,value:o.id},o.label);})
+          )
+        );
+      })(),
       e('label',{style:S.label},'誕生日'),
       e('input',{type:'date',style:S.input,value:addForm.birthday||'',onChange:function(ev){setAddForm(function(f){return{...f,birthday:ev.target.value};})}}),
       e('label',{style:S.label},'本名'),
@@ -2429,7 +2448,7 @@ function MiniApp(){
             })()
         );
       })(),
-      layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomsList:roomsList})),
+      layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomsList:roomsList,userName:userName})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList})),
       layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack})),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
