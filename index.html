@@ -2553,6 +2553,8 @@ function StoreSettingsPage(p){
   var s2=useState(false);var storeLoading=s2[0];var setStoreLoading=s2[1];
   var s3=useState([]);var members=s3[0];var setMembers=s3[1];
   var s4=useState(false);var membersLoading=s4[0];var setMembersLoading=s4[1];
+  var s6=useState(false);var editingStore=s6[0];var setEditingStore=s6[1];
+  var s7=useState({openDate:'',address:''});var storeOrig=s7[0];var setStoreOrig=s7[1];
   var s5=useState(null);var promotingId=s5[0];var setPromotingId=s5[1];
 
   useEffect(function(){
@@ -2579,7 +2581,7 @@ function StoreSettingsPage(p){
     if(!p.roomId)return;
     setStoreLoading(true);
     p.db.collection('rooms').doc(p.roomId).update({openDate:openDate,address:address})
-      .then(function(){setStoreLoading(false);p.notify('保存しました');})
+      .then(function(){setStoreLoading(false);setEditingStore(false);p.notify('保存しました');})
       .catch(function(){setStoreLoading(false);p.notify('保存に失敗しました');});
   }
 
@@ -2609,12 +2611,31 @@ function StoreSettingsPage(p){
     ),
     e('div',{style:PANEL},
       // 店舗情報セクション
-      e('div',{style:SEC},'店舗情報'),
-      e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'開店日'),
-      e('input',{type:'date',style:INP,value:openDate,onChange:function(ev){setOpenDate(ev.target.value);}}),
-      e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'住所'),
-      e('input',{type:'text',style:INP,placeholder:'例: 東京都新宿区歌舞伎町1-1-1',value:address,onChange:function(ev){setAddress(ev.target.value);}}),
-      e('button',{style:{width:'100%',background:'linear-gradient(135deg,#d4a017,#e8b86d)',border:'none',borderRadius:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',padding:'12px',cursor:storeLoading?'not-allowed':'pointer',opacity:storeLoading?0.6:1,marginBottom:'28px'},onClick:saveStore,disabled:storeLoading},storeLoading?'保存中...':'保存'),
+      e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
+        e('div',{style:SEC,marginBottom:0},'店舗情報'),
+        !editingStore&&e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setStoreOrig({openDate:openDate,address:address});setEditingStore(true);}},'編集')
+      ),
+      editingStore
+        ?e('div',null,
+          e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'開店日'),
+          e('input',{type:'date',style:INP,value:openDate,onChange:function(ev){setOpenDate(ev.target.value);}}),
+          e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'住所'),
+          e('input',{type:'text',style:INP,placeholder:'例: 東京都新宿区歌舞伎町1-1-1',value:address,onChange:function(ev){setAddress(ev.target.value);}}),
+          e('div',{style:{display:'flex',gap:'8px',marginBottom:'28px'}},
+            e('button',{style:{flex:1,background:'transparent',border:'1px solid #374151',borderRadius:'10px',color:'#9ca3af',fontWeight:600,fontSize:'14px',padding:'12px',cursor:'pointer'},onClick:function(){setOpenDate(storeOrig.openDate);setAddress(storeOrig.address);setEditingStore(false);}},'キャンセル'),
+            e('button',{style:{flex:1,background:'linear-gradient(135deg,#d4a017,#e8b86d)',border:'none',borderRadius:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',padding:'12px',cursor:storeLoading?'not-allowed':'pointer',opacity:storeLoading?0.6:1},onClick:saveStore,disabled:storeLoading},storeLoading?'保存中...':'保存')
+          )
+        )
+        :e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'14px 16px',marginBottom:'28px'}},
+          e('div',{style:{marginBottom:'10px'}},
+            e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'4px'}},'開店日'),
+            e('div',{style:{fontSize:'14px',color:'#f3f4f6'}},openDate||'未設定')
+          ),
+          e('div',null,
+            e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'4px'}},'住所'),
+            e('div',{style:{fontSize:'14px',color:'#f3f4f6'}},address||'未設定')
+          )
+        ),
       // メンバーセクション
       e('div',{style:SEC},'メンバー'),
       membersLoading
