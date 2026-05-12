@@ -2245,7 +2245,10 @@ function MiniApp(){
     var R=60;var circumference=2*Math.PI*R;var dashOffset=circumference*(1-salesPct);
     var salesColor=salesPct>=1?'#34d399':salesPct>=0.7?'#e8b86d':'#f87171';
 
+    var myBdIds=new Set();
+    (data&&data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===(user?user.uid:'');}).forEach(function(f){(f.castIds||[]).forEach(function(id){myBdIds.add(id);});});
     var bdCasts=(data&&data.casts||[]).filter(function(c){
+      if(!myBdIds.has(c.id))return false;
       if(!c.birthday)return false;
       var parts=c.birthday.split('-');
       return Number(parts[1])===nowM.getMonth()+1;
