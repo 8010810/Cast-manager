@@ -2215,7 +2215,10 @@ function MiniApp(){
   if(layer==='target'){
     var nowYear=new Date().getFullYear();
     var targetYears=[String(nowYear),String(nowYear-1)];
-    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive;});
+    var myUid2=user?user.uid:'';
+    var myFolderCastIds2=new Set();
+    (data&&data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===myUid2;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myFolderCastIds2.add(id);});});
+    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&(c._personal||myFolderCastIds2.has(c.id));});
     var targetCastObj=activeCastsT.find(function(c){return c.id===targetCast;})||null;
     function saveTargetForCast(cid,mk){
       var val=targetInput===''?0:Number(targetInput);
