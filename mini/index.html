@@ -730,7 +730,7 @@ function CastListPage(p){
             [['name','キャスト名','text'],['birthday','誕生日','date'],['realName','本名','text'],['hometown','出身地','text'],['height','身長 (cm)','number'],['contractShift','契約シフト','text']].map(function(f){
               return e('div',{key:f[0]},
                 e('label',{style:S.label},f[1]),
-                e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:f[0]==='height'?'例: 165':'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
+                e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:f[0]==='height'?'':'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
               );
             }),
             e('label',{style:S.label},'メモ'),
@@ -786,11 +786,11 @@ function CastListPage(p){
       e('label',{style:S.label},'本名'),
       e('input',{type:'text',style:S.input,placeholder:'本名（任意）',value:addForm.realName||'',onChange:function(ev){setAddForm(function(f){return{...f,realName:ev.target.value};})}}),
       e('label',{style:S.label},'出身地'),
-      e('input',{type:'text',style:S.input,placeholder:'例: 東京都',value:addForm.hometown||'',onChange:function(ev){setAddForm(function(f){return{...f,hometown:ev.target.value};})}}),
+      e('input',{type:'text',style:S.input,placeholder:'',value:addForm.hometown||'',onChange:function(ev){setAddForm(function(f){return{...f,hometown:ev.target.value};})}}),
       e('label',{style:S.label},'身長 (cm)'),
-      e('input',{type:'number',style:S.input,placeholder:'例: 165',value:addForm.height||'',onChange:function(ev){setAddForm(function(f){return{...f,height:ev.target.value};})}}),
+      e('input',{type:'number',style:S.input,placeholder:'',value:addForm.height||'',onChange:function(ev){setAddForm(function(f){return{...f,height:ev.target.value};})}}),
       e('label',{style:S.label},'契約シフト'),
-      e('input',{type:'text',style:S.input,placeholder:'例: 週5・20:00〜翌4:00',value:newShift,onChange:function(ev){setNewShift(ev.target.value);}}),
+      e('input',{type:'text',style:S.input,placeholder:'',value:newShift,onChange:function(ev){setNewShift(ev.target.value);}}),
       e('label',{style:S.label},'メモ'),
       e('textarea',{style:{...S.input,minHeight:'60px',resize:'vertical',fontFamily:'inherit'},placeholder:'メモ（任意）',value:addForm.memo||'',onChange:function(ev){setAddForm(function(f){return{...f,memo:ev.target.value};})}}),
       e('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
@@ -1180,7 +1180,7 @@ function ShiftPage(p){
           SHIFT_STATUSES.map(function(st){return e('button',{key:st.key,style:{padding:'10px',borderRadius:'8px',border:'1px solid',cursor:'pointer',fontWeight:600,fontSize:'13px',borderColor:editVal.status===st.key?st.color:'#2d2d4e',background:editVal.status===st.key?st.bg:'transparent',color:editVal.status===st.key?st.color:'#6b7280'},onClick:function(){setEditVal(function(v){return{...v,status:st.key};});}},st.label);})
         ),
         e('label',{style:S.label},'時間（任意）'),
-        e('input',{type:'text',style:S.input,placeholder:'例: 20:00〜翌4:00',value:editVal.time||'',onChange:function(ev){setEditVal(function(v){return{...v,time:ev.target.value};})}}),
+        e('input',{type:'text',style:S.input,placeholder:'',value:editVal.time||'',onChange:function(ev){setEditVal(function(v){return{...v,time:ev.target.value};})}}),
         e('div',{style:{display:'flex',gap:'8px'}},
           e('button',{style:{...S.btnDanger,flex:1,padding:'10px'},onClick:clearShift},'クリア'),
           e('button',{style:S.btnGhost,onClick:function(){setEditCell(null);}}, 'キャンセル'),
@@ -1686,15 +1686,15 @@ function VisitPage(p){
           ['来店','同伴'].map(function(t){var c=typeColor2(t);return e('button',{key:t,style:{flex:1,padding:'10px',borderRadius:'8px',border:'1px solid',cursor:'pointer',fontWeight:700,fontSize:'14px',borderColor:form.type===t?c:'#2d2d4e',background:form.type===t?c+'18':'transparent',color:form.type===t?c:'#6b7280'},onClick:function(){setF('type',t);}},t);})
         ),
         e('label',{style:S.label},'指名'),e('input',{type:'text',style:S.input,placeholder:'キャスト名を入力',value:form.castName||'',onChange:function(ev){setF('castName',ev.target.value);}}),
-        e('label',{style:S.label},'時間'),e('input',{type:'text',style:S.input,placeholder:'例: 20:00',value:form.time,onChange:function(ev){setF('time',ev.target.value);}}),
-        e('label',{style:S.label},'お客様名'),e('input',{type:'text',style:S.input,placeholder:'例: 田中様',value:form.guestName,onChange:function(ev){setF('guestName',ev.target.value);}}),
+        e('label',{style:S.label},'時間'),e('input',{type:'text',style:S.input,placeholder:'',value:form.time,onChange:function(ev){setF('time',ev.target.value);}}),
+        e('label',{style:S.label},'お客様名'),e('input',{type:'text',style:S.input,placeholder:'',value:form.guestName,onChange:function(ev){setF('guestName',ev.target.value);}}),
         e('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}},
-          e('div',null,e('label',{style:S.label},'人数'),e('input',{type:'number',style:S.input,placeholder:'例: 2',value:form.count,onChange:function(ev){setF('count',ev.target.value);}})),
-          e('div',null,e('label',{style:S.label},'客席'),e('input',{type:'text',style:S.input,placeholder:'例: VIP1',value:form.seat,onChange:function(ev){setF('seat',ev.target.value);}}))
+          e('div',null,e('label',{style:S.label},'人数'),e('input',{type:'number',style:S.input,placeholder:'',value:form.count,onChange:function(ev){setF('count',ev.target.value);}})),
+          e('div',null,e('label',{style:S.label},'客席'),e('input',{type:'text',style:S.input,placeholder:'',value:form.seat,onChange:function(ev){setF('seat',ev.target.value);}}))
         ),
-        e('label',{style:S.label},'ネック名'),e('input',{type:'text',style:S.input,placeholder:'例: 山崎12年',value:form.bottleNeck,onChange:function(ev){setF('bottleNeck',ev.target.value);}}),
-        e('label',{style:S.label},'ボトル'),e('input',{type:'text',style:S.input,placeholder:'例: ドンペリ白',value:form.bottle,onChange:function(ev){setF('bottle',ev.target.value);}}),
-        e('label',{style:S.label},'前回来店日'),e('input',{type:'text',style:S.input,placeholder:'例: 4/20、先週など',value:form.lastVisit,onChange:function(ev){setF('lastVisit',ev.target.value);}}),
+        e('label',{style:S.label},'ネック名'),e('input',{type:'text',style:S.input,placeholder:'',value:form.bottleNeck,onChange:function(ev){setF('bottleNeck',ev.target.value);}}),
+        e('label',{style:S.label},'ボトル'),e('input',{type:'text',style:S.input,placeholder:'',value:form.bottle,onChange:function(ev){setF('bottle',ev.target.value);}}),
+        e('label',{style:S.label},'前回来店日'),e('input',{type:'text',style:S.input,placeholder:'',value:form.lastVisit,onChange:function(ev){setF('lastVisit',ev.target.value);}}),
         e('label',{style:S.label},'その他メモ'),e('textarea',{style:{...S.input,minHeight:'60px',resize:'vertical',fontFamily:'inherit'},placeholder:'メモ',value:form.note,onChange:function(ev){setF('note',ev.target.value);}}),
         e('button',{style:{...S.btnPrimary,width:'100%',padding:'14px',fontSize:'15px'},onClick:saveVisit},'保存する')
       )
@@ -2159,7 +2159,7 @@ function MiniApp(){
               }),
             e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
             e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'別のルームに参加'),
-            e('input',{style:{width:'100%',background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'10px',padding:'12px 14px',color:'#f3f4f6',fontSize:'14px',marginBottom:'10px',boxSizing:'border-box'},placeholder:'招待コード（例: ABC123）',value:miniJoinInput,onChange:function(ev){setMiniJoinInput(ev.target.value.toUpperCase());setMiniJoinMsg('');},onKeyDown:function(ev){if(ev.key==='Enter')submitMiniJoinRequest();}}),
+            e('input',{style:{width:'100%',background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'10px',padding:'12px 14px',color:'#f3f4f6',fontSize:'14px',marginBottom:'10px',boxSizing:'border-box'},placeholder:'招待コード',value:miniJoinInput,onChange:function(ev){setMiniJoinInput(ev.target.value.toUpperCase());setMiniJoinMsg('');},onKeyDown:function(ev){if(ev.key==='Enter')submitMiniJoinRequest();}}),
             e('button',{style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'10px',color:'#9ca3af',fontWeight:600,fontSize:'14px',padding:'12px',cursor:miniJoinLoading||!miniJoinInput.trim()?'not-allowed':'pointer',opacity:miniJoinLoading||!miniJoinInput.trim()?0.5:1},onClick:submitMiniJoinRequest,disabled:miniJoinLoading||!miniJoinInput.trim()},
               miniJoinLoading?'申請中...':'参加申請を送る'
             ),
