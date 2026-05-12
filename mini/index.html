@@ -763,7 +763,7 @@ function CastListPage(p){
       !addType&&e('div',null,
         e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'16px',textAlign:'center'}},'登録タイプを選択'),
         e('div',{style:{display:'flex',gap:'12px'}},
-          e('button',{style:{flex:1,background:'#60a5fa18',border:'2px solid #60a5fa',borderRadius:'12px',padding:'20px 12px',color:'#60a5fa',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){setAddType('regular');}},
+          e('button',{style:{flex:1,background:'#60a5fa18',border:'2px solid #60a5fa',borderRadius:'12px',padding:'20px 12px',color:'#60a5fa',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){var pf=(p.data.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===p.uid;});setNewFolder(pf?pf.id:'');setAddType('regular');}},
             e('div',null,'在籍'),e('div',{style:{fontSize:'11px',fontWeight:400,marginTop:'4px',color:'#9ca3af'}},'通常キャスト')
           ),
           e('button',{style:{flex:1,background:'#a78bfa18',border:'2px solid #a78bfa',borderRadius:'12px',padding:'20px 12px',color:'#a78bfa',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){setAddType('dispatch');}},
@@ -780,7 +780,6 @@ function CastListPage(p){
       e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
       addType==='regular'&&e('label',{style:S.label},'所属フォルダ'),
       addType==='regular'&&e('select',{value:newFolder,onChange:function(ev){setNewFolder(ev.target.value);}},
-        e('option',{value:''},'デフォルト（自分のフォルダ）'),
         (function(){
           var seen=new Set();var opts=[];
           (p.data.folders||[]).forEach(function(f){
