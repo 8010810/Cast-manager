@@ -782,9 +782,8 @@ function CastListPage(p){
       addType==='regular'&&e('select',{value:newFolder,onChange:function(ev){setNewFolder(ev.target.value);}},
         (function(){
           var seen=new Set();var opts=[];
-          (p.data.folders||[]).forEach(function(f){
-            if(f.ownerUid&&f.ownerUid===p.uid&&!seen.has(f.id)){seen.add(f.id);opts.push({id:f.id,label:f.name});}
-          });
+          var myFolder=(p.data.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===p.uid;});
+          if(myFolder){seen.add(myFolder.id);opts.push({id:myFolder.id,label:myFolder.name});}
           var roomSeen=new Set();
           (p.data.folders||[]).forEach(function(f){
             if(!f._roomId||f.ownerUid||f.isDispatch||f.name==='派遣')return;
