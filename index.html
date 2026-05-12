@@ -1799,7 +1799,7 @@ function ChartPage(p){
       });
       // 12ヶ月全部埋める（データなし月はnull）
       var list=[];
-      for(var mi=1;mi<=12;mi++){var mk=selYear+'-'+pad(mi);list.push(map[mk]||{key:mk,sales:null,companions:null,nominations:null,workDays:0,floorCount:null});}
+      for(var mi=1;mi<=12;mi++){var mk=selYear+'-'+pad(mi);list.push(map[mk]||{key:mk,sales:null,companions:null,nominations:null,workDays:null,floorCount:null});}
       return list;
     }
     return aggregate(p.data.records,p.castId,mode==='daily'?'daily':'yearly');
