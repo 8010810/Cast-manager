@@ -783,7 +783,7 @@ function CastListPage(p){
       e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
       addType==='regular'&&(function(){
         var pf=(p.data.folders||[]).find(function(f){return f._personal&&f.ownerUid&&f.ownerUid===p.uid;});
-        var opts=[{id:'__personal__',label:pf?pf.name:(p.userName||'自分のフォルダ')}];
+        var opts=[{id:'__personal__',label:p.userName||'自分のフォルダ'}];
         var roomSeen=new Set();
         (p.data.folders||[]).forEach(function(f){
           if(!f._roomId||f.ownerUid||f.isDispatch||f.name==='派遣')return;
