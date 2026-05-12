@@ -685,7 +685,7 @@ function CastListPage(p){
   function getCastFolder(castId){
     var f=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(castId);});
     if(!f)return null;
-    if(f.ownerUid&&f.ownerUid===p.uid)return p.userName||f.name;
+    if(f._personal&&f.ownerUid===p.uid)return p.userName||f.name;
     return f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:f.name;
   }
 
