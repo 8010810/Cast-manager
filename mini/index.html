@@ -778,6 +778,11 @@ function CastListPage(p){
         ),
       e('label',{style:S.label},'キャスト名 *'),
       e('input',{style:S.input,placeholder:'キャスト名を入力',value:newName,autoFocus:true,onChange:function(ev){setNewName(ev.target.value);}  }),
+      addType==='regular'&&e('label',{style:S.label},'所属フォルダ'),
+      addType==='regular'&&e('select',{value:newFolder,onChange:function(ev){setNewFolder(ev.target.value);}},
+        e('option',{value:''},'デフォルト（自分のフォルダ）'),
+        (p.data.folders||[]).filter(function(f){return!f.isDispatch&&f.name!=='派遣';}).map(function(f){return e('option',{key:f.id,value:f.id},f.name);})
+      ),
 
       e('label',{style:S.label},'誕生日'),
       e('input',{type:'date',style:S.input,value:addForm.birthday||'',onChange:function(ev){setAddForm(function(f){return{...f,birthday:ev.target.value};})}}),
