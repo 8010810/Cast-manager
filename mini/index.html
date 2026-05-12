@@ -259,11 +259,15 @@ function FolderDetail(p){
   var monthlyData=useMemo(function(){
     var list=[];
     var allCasts=p.data.casts;
-    var folderCastIds=p.folder.castIds||[];
     for(var mi=1;mi<=12;mi++){
       var mk2=fcYear+'-'+pad(mi);
       var totalS=0;var totalT=0;
-      var castsInFolder=folderCastIds.map(function(cid){return allCasts.find(function(c){return c.id===cid;});}).filter(Boolean);
+      var castsInFolder=allCasts.filter(function(c){
+        if(c.folderHistory&&c.folderHistory.length>0){
+          return getCastFolderAt(c,mk2)===p.folder.id;
+        }
+        return(p.folder.castIds||[]).includes(c.id);
+      });
       castsInFolder.forEach(function(c){
         var rows=(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===mk2;});
         totalS+=rows.reduce(function(s,r){return s+Number(r.sales||0);},0);
@@ -274,7 +278,10 @@ function FolderDetail(p){
     return list;
   },[p.folderCasts,p.data,p.folder,fcYear]);
 
-  var castsThisMonth=(p.folder.castIds||[]).map(function(cid){return p.data.casts.find(function(c){return c.id===cid;});}).filter(Boolean);
+  var castsThisMonth=p.data.casts.filter(function(c){
+    if(c.folderHistory&&c.folderHistory.length>0)return getCastFolderAt(c,tm)===p.folder.id;
+    return(p.folder.castIds||[]).includes(c.id);
+  });
   var thisMonthS=castsThisMonth.reduce(function(sum,c){return sum+(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm;}).reduce(function(s,r){return s+Number(r.sales||0);},0);},0);
   var thisMonthT=castsThisMonth.reduce(function(sum,c){return sum+getMonthlyTarget(c,tm);},0);
   var pct=thisMonthT>0?Math.round(thisMonthS/thisMonthT*100):0;
