@@ -578,12 +578,11 @@ function CastListPage(p){
 
   var folderTabs=useMemo(function(){
     var tabs=[];
-    // Tab 1: ownerUid===uid のフォルダをすべてマージ（_personal + _roomId）
+    // Tab 1: ownerUid===uid のフォルダをすべてマージ（_personal + _roomId）→ ユーザー名
     var myFoldersList=(p.data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===p.uid;});
     var pfForLabel=myFoldersList.find(function(f){return f._personal;})||myFoldersList.find(function(f){return f._roomId;})||null;
-    var myLabel=pfForLabel?pfForLabel.name:'自分のフォルダ';
-    tabs.push({id:'__my__',label:myLabel,isMyFolder:true});
-    // Tab 2+: ルームの共有フォルダ（ownerUidなし）
+    tabs.push({id:'__my__',label:pfForLabel?pfForLabel.name:'自分のフォルダ',isMyFolder:true});
+    // Tab 2+: ルームの共有フォルダ（ownerUidなし）→ ルーム名
     var roomSeen=new Set();
     (p.data.folders||[]).forEach(function(f){
       if(!f._roomId||f.ownerUid||f.isDispatch||f.name==='派遣')return;
