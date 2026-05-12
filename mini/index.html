@@ -578,8 +578,15 @@ function CastListPage(p){
 
   var folderTabs=useMemo(function(){
     var tabs=[];var seen=new Set();
-    var pf=(p.data.folders||[]).find(function(f){return f.ownerUid&&f.ownerUid===p.uid;});
-    if(pf){seen.add(pf.id);tabs.push({id:pf.id,label:pf.name,folder:pf});}
+    // 個人フォルダ（_personal:trueかつownerUid===uid）を最初のタブに
+    var pf=(p.data.folders||[]).find(function(f){return f._personal&&f.ownerUid&&f.ownerUid===p.uid;});
+    if(!pf){
+      // 個人フォルダがまだ存在しない場合はプレースホルダを追加
+      tabs.push({id:'__personal__',label:'自分のフォルダ',folder:{id:'__personal__',castIds:[],ownerUid:p.uid}});
+    }else{
+      seen.add(pf.id);tabs.push({id:pf.id,label:pf.name,folder:pf});
+    }
+    // ルームの共有フォルダ（ownerUidなし）を追加
     var roomSeen=new Set();
     (p.data.folders||[]).forEach(function(f){
       if(!f._roomId||f.ownerUid||f.isDispatch||f.name==='派遣')return;
@@ -621,20 +628,34 @@ function CastListPage(p){
     var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
     // 派遣の場合は「派遣」フォルダ、なければ作成
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
-    var defaultFid=activeTabId||(p.data.folders[0]||{}).id||'';
-    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(newFolder||defaultFid);
-    var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
-    var newFolders=(p.data.folders||[]).map(function(f){
-      var shouldAdd=f.id===initFid;
-      if(shouldAdd)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});
-      return f;
-    });
-    var finalFolders=newFolders;
-    var finalCast=newCast;
-    if(isDispatch&&!dispatchFolder){
-      var dfId='dispatch_'+Date.now().toString();
-      finalCast=Object.assign({},newCast,{folderHistory:[{folderId:dfId,from:initMK}]});
-      finalFolders=[...newFolders,{id:dfId,name:'派遣',castIds:[id]}];
+    var selectedFid=newFolder||activeTabId||'';
+    var isPersonalTarget=selectedFid==='__personal__'||(!!(p.data.folders||[]).find(function(f){return f.id===selectedFid&&f._personal;}));
+    var initFid;var finalCast;var finalFolders;
+    if(isDispatch){
+      initFid=dispatchFolder?dispatchFolder.id:'dispatch_folder';
+      isPersonalTarget=false;
+    }else{
+      initFid=selectedFid||'__personal__';
+      if(initFid==='__personal__')isPersonalTarget=true;
+    }
+    if(isPersonalTarget&&!isDispatch){
+      var existPF=(p.data.folders||[]).find(function(f){return f._personal&&f.ownerUid&&f.ownerUid===p.uid;});
+      var pfId=existPF?existPF.id:('personal_'+p.uid);
+      initFid=pfId;
+      finalCast=Object.assign({},{id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:false,folderHistory:[{folderId:pfId,from:initMK}]},{_personal:true});
+      if(existPF){
+        finalFolders=(p.data.folders||[]).map(function(f){if(f.id===pfId)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});return f;});
+      }else{
+        finalFolders=(p.data.folders||[]).concat([{id:pfId,name:'自分のフォルダ',castIds:[id],ownerUid:p.uid,_personal:true}]);
+      }
+    }else{
+      finalCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
+      finalFolders=(p.data.folders||[]).map(function(f){if(f.id===initFid)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});return f;});
+      if(isDispatch&&!dispatchFolder){
+        var dfId='dispatch_'+Date.now().toString();
+        finalCast=Object.assign({},finalCast,{folderHistory:[{folderId:dfId,from:initMK}]});
+        finalFolders=[...finalFolders,{id:dfId,name:'派遣',castIds:[id]}];
+      }
     }
     p.persist({...p.data,casts:[...p.data.casts,finalCast],records:{...p.data.records,[id]:[]},customers:{...p.data.customers,[id]:[]},folders:finalFolders});
     setNewName('');setNewFolder('');setNewShift('');setAddForm({});setShowAdd(false);setAddType(null);p.notify(finalName+' を追加しました');
@@ -1801,6 +1822,7 @@ function MiniApp(){
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
+  var personalDataRef=React.useRef({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
 
   var layer=navStack[navStack.length-1]||'home';
   var isCastLayer=layer==='cast';
@@ -1816,6 +1838,7 @@ function MiniApp(){
     var autoSignInAttempted=false;
     var unsubRooms=null;
     var unsubConsent=null;
+    var unsubPersonalData=null;
 
     function tryAutoSignIn(){
       if(autoSignInAttempted)return;
@@ -1829,12 +1852,15 @@ function MiniApp(){
     function cleanupRooms(){
       if(unsubConsent){unsubConsent();unsubConsent=null;}
       if(unsubRooms){unsubRooms();unsubRooms=null;}
+      if(unsubPersonalData){unsubPersonalData();unsubPersonalData=null;}
       Object.values(unsubDataMapRef.current).forEach(function(fn){fn();});
       unsubDataMapRef.current={};roomDataMapRef.current={};primaryRoomRef.current=null;
+      personalDataRef.current={casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
     }
 
     function rebuildData(){
       var map=roomDataMapRef.current;
+      var pd=personalDataRef.current;
       var casts=[],records={},customers={},folders=[],shifts={},visits=[],quota={};
       Object.keys(map).forEach(function(rid){
         var d=map[rid]||{};
@@ -1846,6 +1872,10 @@ function MiniApp(){
         visits=visits.concat((d.visits||[]).map(function(v){return Object.assign({},v,{_roomId:rid});}));
         Object.assign(quota,d.quota||{});
       });
+      (pd.casts||[]).forEach(function(c){casts.push(Object.assign({},c,{_personal:true}));});
+      Object.keys(pd.records||{}).forEach(function(k){records[k]=pd.records[k];});
+      Object.keys(pd.customers||{}).forEach(function(k){customers[k]=pd.customers[k];});
+      (pd.folders||[]).forEach(function(f){folders.push(Object.assign({},f,{_personal:true}));});
       setData({casts:casts,records:records,customers:customers,folders:folders,shifts:shifts,visits:visits,quota:quota});
     }
 
@@ -1869,6 +1899,11 @@ function MiniApp(){
       sessionStorage.removeItem('mini_redirect_pending');
       setUser(u);cleanupRooms();
       if(u){
+        unsubPersonalData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
+          var d=doc.exists?doc.data():{};
+          personalDataRef.current=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+          rebuildData();
+        },function(){});
         setLoading(true);
         var consentDone=false,roomsReady=false;
         function checkAllDone(){if(consentDone&&roomsReady)setLoading(false);}
@@ -1887,7 +1922,7 @@ function MiniApp(){
           var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
           setRoomsList(rooms);
           if(rooms.length===0){
-            setData({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
+            rebuildData();
             if(firstRoomsSnap){firstRoomsSnap=false;roomsReady=true;checkAllDone();}
             return;
           }
@@ -1943,25 +1978,41 @@ function MiniApp(){
   function persist(next){
     setData(next);
     if(!user)return;
+    // personal items → users/{uid}/data/main
+    var personalCasts=(next.casts||[]).filter(function(c){return c._personal;});
+    var personalCastIds=new Set(personalCasts.map(function(c){return c.id;}));
+    var personalFolders=(next.folders||[]).filter(function(f){return f._personal;});
+    if(personalCasts.length>0||personalFolders.length>0){
+      var cleanPC=personalCasts.map(function(c){var cc=Object.assign({},c);delete cc._personal;return cc;});
+      var cleanPF=personalFolders.map(function(f){var ff=Object.assign({},f);delete ff._personal;return ff;});
+      var pRec={};Object.keys(next.records||{}).forEach(function(k){if(personalCastIds.has(k))pRec[k]=next.records[k];});
+      var pCus={};Object.keys(next.customers||{}).forEach(function(k){if(personalCastIds.has(k))pCus[k]=next.customers[k];});
+      var pShift={};Object.keys(next.shifts||{}).forEach(function(k){if(personalCastIds.has(k))pShift[k]=next.shifts[k];});
+      db.collection('users').doc(user.uid).collection('data').doc('main').set({casts:cleanPC,records:pRec,customers:pCus,folders:cleanPF,shifts:pShift,visits:[],quota:{}}).catch(function(e){console.error('Personal save error:',e);});
+    }
     var map=roomDataMapRef.current;
     var rids=Object.keys(map);
-    if(rids.length===0){saveToDB(user.uid,next);return;}
+    if(rids.length===0){
+      var npCasts=(next.casts||[]).filter(function(c){return !c._personal;});
+      if(npCasts.length>0){var np=Object.assign({},next,{casts:npCasts,folders:(next.folders||[]).filter(function(f){return !f._personal;})});saveToDB(user.uid,np);}
+      return;
+    }
     var primaryRid=primaryRoomRef.current||rids[0];
     var castRoomMap={};
     rids.forEach(function(rid){((map[rid]||{}).casts||[]).forEach(function(c){castRoomMap[c.id]=rid;});});
-    (next.casts||[]).forEach(function(c){if(c._roomId&&!castRoomMap[c.id])castRoomMap[c.id]=c._roomId;});
+    (next.casts||[]).forEach(function(c){if(!c._personal&&c._roomId&&!castRoomMap[c.id])castRoomMap[c.id]=c._roomId;});
     var folderRoomMap={};
     rids.forEach(function(rid){((map[rid]||{}).folders||[]).forEach(function(f){folderRoomMap[f.id]=rid;});});
-    (next.folders||[]).forEach(function(f){if(f._roomId&&!folderRoomMap[f.id])folderRoomMap[f.id]=f._roomId;});
+    (next.folders||[]).forEach(function(f){if(!f._personal&&f._roomId&&!folderRoomMap[f.id])folderRoomMap[f.id]=f._roomId;});
     rids.forEach(function(rid){
       var roomCastIds=new Set(Object.keys(castRoomMap).filter(function(cid){return castRoomMap[cid]===rid;}));
-      var roomCasts=(next.casts||[]).filter(function(c){return roomCastIds.has(c.id)||(rid===primaryRid&&!castRoomMap[c.id]);}).map(function(c){var cc=Object.assign({},c);delete cc._roomId;return cc;});
-      var roomRecords={};Object.keys(next.records||{}).forEach(function(cid){if(roomCastIds.has(cid)||(rid===primaryRid&&!castRoomMap[cid]))roomRecords[cid]=next.records[cid];});
-      var roomCustomers={};Object.keys(next.customers||{}).forEach(function(cid){if(roomCastIds.has(cid)||(rid===primaryRid&&!castRoomMap[cid]))roomCustomers[cid]=next.customers[cid];});
-      var roomShifts={};Object.keys(next.shifts||{}).forEach(function(cid){if(roomCastIds.has(cid)||(rid===primaryRid&&!castRoomMap[cid]))roomShifts[cid]=next.shifts[cid];});
+      var roomCasts=(next.casts||[]).filter(function(c){return !c._personal&&(roomCastIds.has(c.id)||(rid===primaryRid&&!castRoomMap[c.id]));}).map(function(c){var cc=Object.assign({},c);delete cc._roomId;return cc;});
+      var roomRecords={};Object.keys(next.records||{}).forEach(function(cid){if(!personalCastIds.has(cid)&&(roomCastIds.has(cid)||(rid===primaryRid&&!castRoomMap[cid])))roomRecords[cid]=next.records[cid];});
+      var roomCustomers={};Object.keys(next.customers||{}).forEach(function(cid){if(!personalCastIds.has(cid)&&(roomCastIds.has(cid)||(rid===primaryRid&&!castRoomMap[cid])))roomCustomers[cid]=next.customers[cid];});
+      var roomShifts={};Object.keys(next.shifts||{}).forEach(function(cid){if(!personalCastIds.has(cid)&&(roomCastIds.has(cid)||(rid===primaryRid&&!castRoomMap[cid])))roomShifts[cid]=next.shifts[cid];});
       var roomFolderIds=new Set(Object.keys(folderRoomMap).filter(function(fid){return folderRoomMap[fid]===rid;}));
-      var roomFolders=(next.folders||[]).filter(function(f){return roomFolderIds.has(f.id)||(rid===primaryRid&&!folderRoomMap[f.id]);}).map(function(f){var ff=Object.assign({},f);delete ff._roomId;return ff;});
-      var roomVisits=(next.visits||[]).filter(function(v){return v._roomId?v._roomId===rid:rid===primaryRid;}).map(function(v){var vv=Object.assign({},v);delete vv._roomId;return vv;});
+      var roomFolders=(next.folders||[]).filter(function(f){return !f._personal&&(roomFolderIds.has(f.id)||(rid===primaryRid&&!folderRoomMap[f.id]));}).map(function(f){var ff=Object.assign({},f);delete ff._roomId;return ff;});
+      var roomVisits=(next.visits||[]).filter(function(v){return !v._personal&&(v._roomId?v._roomId===rid:rid===primaryRid);}).map(function(v){var vv=Object.assign({},v);delete vv._roomId;return vv;});
       db.collection('rooms').doc(rid).collection('data').doc('main').set({casts:roomCasts,records:roomRecords,customers:roomCustomers,folders:roomFolders,shifts:roomShifts,visits:roomVisits,quota:next.quota||{}}).catch(function(e){console.error('Save error:',e);});
     });
   }
