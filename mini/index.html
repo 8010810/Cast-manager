@@ -578,12 +578,16 @@ function CastListPage(p){
 
   var folderTabs=useMemo(function(){
     var tabs=[];
-    // Tab 1: ownerUid===uid のフォルダをすべてマージ（_personal + _roomId）
-    var myFoldersList=(p.data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===p.uid;});
-    var pfForLabel=myFoldersList.find(function(f){return f._personal;})||myFoldersList.find(function(f){return f._roomId;})||null;
-    var myLabel=pfForLabel?pfForLabel.name:'自分のフォルダ';
-    tabs.push({id:'__my__',label:myLabel,isMyFolder:true});
-    // Tab 2+: ルームの共有フォルダ（ownerUidなし）
+    // Tab 1: 個人フォルダ（_personal && ownerUid===uid）→ ユーザー名
+    var pf=(p.data.folders||[]).find(function(f){return f._personal&&f.ownerUid&&f.ownerUid===p.uid;});
+    tabs.push({id:'__personal__',label:pf?pf.name:'自分のフォルダ',folder:pf||{id:'__personal__',castIds:[],ownerUid:p.uid,_personal:true},isPersonal:true});
+    // Tab 2+: ルームごとのownerUidフォルダ（_roomId && ownerUid===uid）→ 所属ルーム名
+    (p.data.folders||[]).forEach(function(f){
+      if(!f._roomId||!f.ownerUid||f.ownerUid!==p.uid)return;
+      var room=(p.roomsList||[]).find(function(r){return r.roomId===f._roomId;});
+      tabs.push({id:f.id,label:room?room.name:f.name,folder:f,isRoomOwner:true});
+    });
+    // Tab 3+: ルームの共有フォルダ（ownerUidなし）
     var roomSeen=new Set();
     (p.data.folders||[]).forEach(function(f){
       if(!f._roomId||f.ownerUid||f.isDispatch||f.name==='派遣')return;
@@ -591,7 +595,7 @@ function CastListPage(p){
       if(roomSeen.has(rid))return;
       roomSeen.add(rid);
       var room=(p.roomsList||[]).find(function(r){return r.roomId===rid;});
-      tabs.push({id:f.id,label:room?room.name:f.name,folder:f,isMyFolder:false});
+      tabs.push({id:f.id,label:room?room.name:f.name,folder:f});
     });
     return tabs;
   },[p.data.folders,p.uid,p.roomsList]);
@@ -600,21 +604,13 @@ function CastListPage(p){
   var activeTab=folderTabs.find(function(t){return t.id===activeTabId;})||folderTabs[0]||null;
 
   var sorted=useMemo(function(){
-    var activeCastIds;
-    if(activeTab&&activeTab.isMyFolder){
-      var ids=new Set();
-      (p.data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===p.uid;})
-        .forEach(function(f){(f.castIds||[]).forEach(function(cid){ids.add(cid);});});
-      activeCastIds=ids;
-    }else{
-      activeCastIds=new Set(activeTab?(activeTab.folder.castIds||[]):[]);
-    }
+    var activeCastIds=new Set(activeTab?(activeTab.folder.castIds||[]):[]);
     var list=p.data.casts.filter(function(c){return activeCastIds.has(c.id);});
     if(sortBy==='name')list.sort(function(a,b){return a.name.localeCompare(b.name,'ja');});
     else if(sortBy==='age')list.sort(function(a,b){var aa=calcAge(a.birthday)||999;var bb=calcAge(b.birthday)||999;return aa-bb;});
     else if(sortBy==='height')list.sort(function(a,b){return Number(b.height||0)-Number(a.height||0);});
     return list;
-  },[p.data.casts,sortBy,activeTab,p.data.folders,p.uid]);
+  },[p.data.casts,sortBy,activeTab]);
 
   var filtered=useMemo(function(){
     var q=query.trim().toLowerCase();
@@ -634,7 +630,7 @@ function CastListPage(p){
     // 派遣の場合は「派遣」フォルダ、なければ作成
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
     var selectedFid=newFolder||activeTabId||'';
-    var isPersonalTarget=(activeTab&&activeTab.isMyFolder)||selectedFid==='__my__'||selectedFid==='__personal__'||(!!(p.data.folders||[]).find(function(f){return f.id===selectedFid&&f._personal;}));
+    var isPersonalTarget=(activeTab&&activeTab.isPersonal)||selectedFid==='__personal__'||(!!(p.data.folders||[]).find(function(f){return f.id===selectedFid&&f._personal;}));
     var initFid;var finalCast;var finalFolders;
     if(isDispatch){
       initFid=dispatchFolder?dispatchFolder.id:'dispatch_folder';
