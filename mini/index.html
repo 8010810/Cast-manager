@@ -564,7 +564,7 @@ function CastListPage(p){
   var s7=useState(null);var editCast=s7[0];var setEditCast=s7[1];
   var s8=useState({});var editForm=s8[0];var setEditForm=s8[1];
   var s9=useState('name');var sortBy=s9[0];var setSortBy=s9[1];
-  var folders=p.data.folders||[];
+  var folders=(p.data.folders||[]).filter(function(f){return f._personal===true||(f.ownerUid&&f.ownerUid===p.uid);});
 
   // detail開いた時にsubBackを設定
   React.useEffect(function(){
@@ -575,12 +575,14 @@ function CastListPage(p){
   },[detail]);
 
   var sorted=useMemo(function(){
-    var list=p.data.casts.slice();
+    var pCastIds=new Set();
+    (p.data.folders||[]).filter(function(f){return f._personal===true||(f.ownerUid&&f.ownerUid===p.uid);}).forEach(function(f){(f.castIds||[]).forEach(function(cid){pCastIds.add(cid);});});
+    var list=(p.data.casts||[]).filter(function(c){return c._personal===true||pCastIds.has(c.id);});
     if(sortBy==='name')list.sort(function(a,b){return a.name.localeCompare(b.name,'ja');});
     else if(sortBy==='age')list.sort(function(a,b){var aa=calcAge(a.birthday)||999;var bb=calcAge(b.birthday)||999;return aa-bb;});
     else if(sortBy==='height')list.sort(function(a,b){return Number(b.height||0)-Number(a.height||0);});
     return list;
-  },[p.data.casts,sortBy]);
+  },[p.data.casts,p.data.folders,p.uid,sortBy]);
 
   var filtered=useMemo(function(){
     var q=query.trim().toLowerCase();
