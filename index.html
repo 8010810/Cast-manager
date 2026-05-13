@@ -3255,12 +3255,13 @@ function App(){
     }).catch(function(){setJoinReqsLoading(false);});
   }
   function approveRequest(req){
+    setJoinRequests(function(prev){return prev.filter(function(r){return r.uid!==req.uid;});});
     var now=new Date().toISOString();
     db.collection('rooms').doc(roomId).collection('members').doc(req.uid).set({role:'member',userName:req.userName||'',joinedAt:now})
       .then(function(){return db.collection('users').doc(req.uid).collection('rooms').doc(roomId).set({name:(currentRoom&&currentRoom.name)||'',role:'member',inviteCode:(currentRoom&&currentRoom.inviteCode)||'',joinedAt:now});})
       .then(function(){return db.collection('rooms').doc(roomId).collection('joinRequests').doc(req.uid).delete();})
-      .then(function(){setJoinRequests(function(prev){return prev.filter(function(r){return r.uid!==req.uid;});});notify((req.userName||'メンバー')+'を承認しました');})
-      .catch(function(){notify('承認に失敗しました','error');});
+      .then(function(){notify((req.userName||'メンバー')+'を承認しました');})
+      .catch(function(){setJoinRequests(function(prev){return [req].concat(prev);});notify('承認に失敗しました','error');});
   }
   function rejectRequest(req){
     db.collection('rooms').doc(roomId).collection('joinRequests').doc(req.uid).delete()
