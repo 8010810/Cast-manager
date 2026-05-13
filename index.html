@@ -3596,24 +3596,6 @@ function App(){
                   var el=document.createElement('textarea');el.value=invCode;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
                 }},'コードをコピー')
               ),
-              invUrl&&e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'20px',marginBottom:'16px',textAlign:'center'}},
-                e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'12px'}},'QRコード（カメラで読み取り）'),
-                e('div',{id:'invite-qr',style:{display:'flex',justifyContent:'center',marginBottom:'12px'}}),
-                e('div',{style:{fontSize:'11px',color:'#6b7280',wordBreak:'break-all'}},invUrl),
-                React.createElement(function(){
-                  React.useEffect(function(){
-                    var el=document.getElementById('invite-qr');
-                    if(el&&el.children.length===0&&typeof QRCode!=='undefined'){
-                      new QRCode(el,{text:invUrl,width:160,height:160,colorDark:'#e8b86d',colorLight:'#12122a'});
-                    }
-                  },[]);
-                  return null;
-                })
-              ),
-              e('button',{style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'10px',padding:'12px',color:'#9ca3af',fontSize:'13px',cursor:'pointer'},onClick:function(){
-                if(navigator.share){navigator.share({title:'CAST MANAGER招待',text:'招待コード: '+invCode,url:invUrl});}
-                else{if(navigator.clipboard){navigator.clipboard.writeText(invUrl);}}
-              }},'URLをシェア'),
               roomRole==='admin'&&e('div',null,
                 e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
                 e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}},
