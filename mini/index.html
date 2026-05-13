@@ -1786,6 +1786,13 @@ function MiniApp(){
   var isCastLayer=layer==='cast';
 
   useEffect(function(){
+    auth.getRedirectResult().then(function(){
+      if(sessionStorage.getItem('pending_reauth_delete')){
+        sessionStorage.removeItem('pending_reauth_delete');
+        var u=auth.currentUser;
+        if(u){u.delete().catch(function(){auth.signOut().catch(function(){});});}
+      }
+    }).catch(function(){sessionStorage.removeItem('pending_reauth_delete');});
     var fromUid=new URLSearchParams(window.location.search).get('uid');
     if(fromUid){
       window.history.replaceState({},'',window.location.pathname);
@@ -2047,10 +2054,9 @@ function MiniApp(){
       if(!auth.currentUser)return auth.signOut().catch(function(){});
       return auth.currentUser.delete().catch(function(e){
         if(e.code==='auth/requires-recent-login'){
-          var provider=new firebase.auth.GoogleAuthProvider();
-          return auth.currentUser.reauthenticateWithPopup(provider).then(function(){
-            return auth.currentUser?auth.currentUser.delete().catch(function(){return auth.signOut();}):auth.signOut();
-          }).catch(function(){return auth.signOut();});
+          sessionStorage.setItem('pending_reauth_delete','1');
+          auth.currentUser.reauthenticateWithRedirect(new firebase.auth.GoogleAuthProvider());
+          return;
         }
         return auth.signOut();
       });
