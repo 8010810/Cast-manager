@@ -1947,6 +1947,9 @@ function MiniApp(){
         var md=mem.data();
         db.collection('users').doc(uid).collection('rooms').doc(rid).set({
           name:roomName,role:md.role||'member',inviteCode:inviteCode,joinedAt:md.joinedAt||new Date().toISOString()
+        }).then(function(){
+          setSettingsPage(null);
+          notify(roomName+'に参加しました');
         }).catch(function(){});
       }).catch(function(){});
     },function(){});
