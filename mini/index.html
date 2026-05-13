@@ -1950,15 +1950,28 @@ function MiniApp(){
       var upd={};upd[rid]=firebase.firestore.FieldValue.delete();
       db.collection('users').doc(uid).collection('meta').doc('pendingJoins').update(upd).catch(function(){});
       db.collection('rooms').doc(rid).collection('members').doc(uid).get().then(function(mem){
-        if(!mem.exists)return; // 拒否された
+        if(!mem.exists){setMiniJoinMsg('');return;} // 拒否された
         var md=mem.data();
         db.collection('users').doc(uid).collection('rooms').doc(rid).set({
           name:roomName,role:md.role||'member',inviteCode:inviteCode,joinedAt:md.joinedAt||new Date().toISOString()
         }).then(function(){
           setSettingsPage(null);
           notify(roomName+'に参加しました');
-        }).catch(function(){});
-      }).catch(function(){});
+        }).catch(function(){
+          setSettingsPage(null);
+          notify(roomName+'に参加しました');
+        });
+      }).catch(function(){
+        // members読み取り失敗（遅延・ルール）→ デフォルトで書き込んで画面遷移
+        db.collection('users').doc(uid).collection('rooms').doc(rid).set({
+          name:roomName,role:'member',inviteCode:inviteCode,joinedAt:new Date().toISOString()
+        }).then(function(){
+          setSettingsPage(null);
+          notify(roomName+'に参加しました');
+        }).catch(function(){
+          setSettingsPage(null);
+        });
+      });
     },function(){});
     pendingListenersRef.current[rid]=unsub;
   }
