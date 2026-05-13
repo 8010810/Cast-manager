@@ -2976,6 +2976,7 @@ function App(){
   var unsubRoleRef=React.useRef(null);
   var unsubRoomsListRef=React.useRef(null);
   var unsubConsentRef=React.useRef(null);
+  var planSelectShownAtRef=React.useRef(0);
   var s2=useState(null);var data=s2[0];var setData=s2[1];
   var s3=useState(true);var loading=s3[0];var setLoading=s3[1];
   // navStack: ['home', 'mycast', ...] スタック方式
@@ -3374,6 +3375,7 @@ function App(){
           var uName=userName.trim();
           db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
           setUserName(uName);
+          planSelectShownAtRef.current=Date.now();
           setConsentState('planselect');
         }},'登録する')
       )
@@ -3391,7 +3393,7 @@ function App(){
           e('button',{style:{background:'#12122a',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left',cursor:'pointer',transition:'border-color 0.2s'},
             onMouseEnter:function(ev){ev.currentTarget.style.borderColor='rgba(167,139,250,0.9)';},
             onMouseLeave:function(ev){ev.currentTarget.style.borderColor='rgba(167,139,250,0.4)';},
-            onClick:function(){window.location.href='/mini';}},
+            onClick:function(){if(Date.now()-planSelectShownAtRef.current<400)return;window.location.href='/mini';}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
               e('div',{style:{width:'36px',height:'36px',borderRadius:'10px',background:'rgba(167,139,250,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}},'📱'),
               e('div',null,
@@ -3408,7 +3410,7 @@ function App(){
           e('button',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left',cursor:'pointer',transition:'border-color 0.2s'},
             onMouseEnter:function(ev){ev.currentTarget.style.borderColor='rgba(232,184,109,0.9)';},
             onMouseLeave:function(ev){ev.currentTarget.style.borderColor='rgba(232,184,109,0.4)';},
-            onClick:function(){setConsentState('roomselect');}},
+            onClick:function(){if(Date.now()-planSelectShownAtRef.current<400)return;setConsentState('roomselect');}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
               e('div',{style:{width:'36px',height:'36px',borderRadius:'10px',background:'rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}},'🏠'),
               e('div',null,
