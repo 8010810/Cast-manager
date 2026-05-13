@@ -1793,26 +1793,9 @@ function MiniApp(){
         if(u){u.delete().catch(function(){auth.signOut().catch(function(){});});}
       }
     }).catch(function(){sessionStorage.removeItem('pending_reauth_delete');});
-    var fromUid=new URLSearchParams(window.location.search).get('uid');
-    if(fromUid){
-      window.history.replaceState({},'',window.location.pathname);
-      sessionStorage.setItem('mini_expected_uid',fromUid);
-    } else {
-      sessionStorage.removeItem('mini_expected_uid');
-    }
-    var autoSignInAttempted=false;
     var unsubRooms=null;
     var unsubConsent=null;
     var unsubPersonalData=null;
-
-    function tryAutoSignIn(){
-      if(autoSignInAttempted)return;
-      autoSignInAttempted=true;
-      var provider=new firebase.auth.GoogleAuthProvider();
-      provider.setCustomParameters({'prompt':'none'});
-      sessionStorage.setItem('mini_redirect_pending','1');
-      auth.signInWithRedirect(provider);
-    }
 
     function cleanupRooms(){
       if(unsubConsent){unsubConsent();unsubConsent=null;}
@@ -1858,23 +1841,6 @@ function MiniApp(){
     }
 
     var unsubAuth=auth.onAuthStateChanged(function(u){
-      var expectedUid=sessionStorage.getItem('mini_expected_uid');
-      if(u&&expectedUid&&u.uid!==expectedUid){
-        sessionStorage.removeItem('mini_expected_uid');
-        autoSignInAttempted=false;
-        cleanupRooms();auth.signOut();
-        return;
-      }
-      if(u&&expectedUid&&u.uid===expectedUid){sessionStorage.removeItem('mini_expected_uid');}
-      if(!u&&expectedUid){
-        var rp=sessionStorage.getItem('mini_redirect_pending');
-        if(!rp){tryAutoSignIn();return;}       // 初回: リダイレクト開始して待機
-        if(rp==='1'){sessionStorage.setItem('mini_redirect_pending','2');return;} // リダイレクト処理中: 待機
-        // rp==='2': リダイレクト後もu=null → 失敗 → フラグクリアしてログイン画面へ
-        sessionStorage.removeItem('mini_redirect_pending');
-        sessionStorage.removeItem('mini_expected_uid');
-      }
-      sessionStorage.removeItem('mini_redirect_pending');
       setUser(u);cleanupRooms();
       if(u){
         unsubPersonalData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
@@ -2207,7 +2173,7 @@ function MiniApp(){
           ),
           e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'20px 18px'})},
             e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'アプリ'),
-            e('button',{style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(232,184,109,0.08)',border:'1px solid rgba(232,184,109,0.3)',borderRadius:'12px',padding:'16px',marginBottom:'16px',cursor:'pointer',textAlign:'left'},onClick:function(){window.location.href='https://cast-manager-seven.vercel.app/?uid='+(user?user.uid:'');}},
+            e('button',{style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(232,184,109,0.08)',border:'1px solid rgba(232,184,109,0.3)',borderRadius:'12px',padding:'16px',marginBottom:'16px',cursor:'pointer',textAlign:'left'},onClick:function(){window.location.href='/';}},
               e('div',null,
                 e('div',{style:{fontWeight:700,fontSize:'14px',color:'#e8b86d'}},'CAST MANAGER'),
                 e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},'店舗管理アプリ')
