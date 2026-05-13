@@ -400,7 +400,7 @@ function FolderMKDetail(p){
   if(!p.selFolderMK)return null;
   var mkKey=p.chartYear+'-'+pad(Number(p.selFolderMK.replace('月','')));
   var castSales=(p.data.casts||[]).filter(function(c){
-    if(c.folderHistory&&c.folderHistory.length>0)return getCastFolderAt(c,mkKey)===p.folder.id;
+    if(c.folderHistory&&c.folderHistory.length>0){var fid0=getCastFolderAt(c,mkKey);if(fid0!==null)return fid0===p.folder.id;return(p.folder.castIds||[]).includes(c.id);}
     return(p.folder.castIds||[]).includes(c.id);
   }).map(function(c){
     var rows=((p.data.records||{})[c.id]||[]).filter(function(r){return r.date.slice(0,7)===mkKey;});
@@ -454,10 +454,9 @@ function FolderDetail(p){
       // この月にこのフォルダに所属していたキャストを収集
       var castsInFolder=allCasts.filter(function(c){
         if(c.folderHistory&&c.folderHistory.length>0){
-          // 履歴あり: その月の所属フォルダIDを確認
-          return getCastFolderAt(c,mk2)===p.folder.id;
+          var fid1=getCastFolderAt(c,mk2);if(fid1!==null)return fid1===p.folder.id;
+          return(p.folder.castIds||[]).includes(c.id);
         }
-        // 履歴なし: 現在のフォルダメンバーかどうか
         return(p.folder.castIds||[]).includes(c.id);
       });
       castsInFolder.forEach(function(c){
@@ -471,7 +470,7 @@ function FolderDetail(p){
   },[p.folderCasts,p.data,p.folder,fcYear]);
 
   var castsThisMonth=p.data.casts.filter(function(c){
-    if(c.folderHistory&&c.folderHistory.length>0)return getCastFolderAt(c,tm)===p.folder.id;
+    if(c.folderHistory&&c.folderHistory.length>0){var fid2=getCastFolderAt(c,tm);if(fid2!==null)return fid2===p.folder.id;return(p.folder.castIds||[]).includes(c.id);}
     return(p.folder.castIds||[]).includes(c.id);
   });
   var thisMonthS=castsThisMonth.reduce(function(sum,c){return sum+(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm;}).reduce(function(s,r){return s+Number(r.sales||0);},0);},0);
