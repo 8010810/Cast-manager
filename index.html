@@ -3300,11 +3300,42 @@ function App(){
     var userRef=db.collection('users').doc(uid2);
     function deleteFirestoreData(){
       return userRef.collection('rooms').get().catch(function(){return{docs:[]};}).then(function(roomSnap){
-        var memberDeletes=roomSnap.docs.map(function(rd){
-          return db.collection('rooms').doc(rd.id).collection('members').doc(uid2).delete().catch(function(){});
+        var roomHandles=roomSnap.docs.map(function(rd){
+          var rid=rd.id;
+          var isAdmin=(rd.data().role==='admin');
+          if(!isAdmin){
+            return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){})
+              .then(function(){return rd.ref.delete().catch(function(){});});
+          }
+          return db.collection('rooms').doc(rid).collection('members').get().catch(function(){return{docs:[]};}).then(function(membersSnap){
+            var others=membersSnap.docs.filter(function(m){return m.id!==uid2;});
+            if(others.length===0){
+              // 管理者1人のみ → ルームごと削除
+              var roomRef=db.collection('rooms').doc(rid);
+              return roomRef.collection('data').doc('main').delete().catch(function(){})
+                .then(function(){return roomRef.collection('members').doc(uid2).delete().catch(function(){});})
+                .then(function(){return roomRef.delete().catch(function(){});})
+                .then(function(){return rd.ref.delete().catch(function(){});});
+            }
+            var otherAdmins=others.filter(function(m){return m.data().role==='admin';});
+            if(otherAdmins.length>0){
+              // 他に管理者がいる → 自分だけ抜ける
+              return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){})
+                .then(function(){return rd.ref.delete().catch(function(){});});
+            }
+            // 管理者1人・他メンバーあり → 最古参を管理者に昇格
+            others.sort(function(a,b){
+              var aj=a.data().joinedAt||'';var bj=b.data().joinedAt||'';
+              return aj<bj?-1:aj>bj?1:0;
+            });
+            var newAdmin=others[0];
+            return db.collection('rooms').doc(rid).collection('members').doc(newAdmin.id).update({role:'admin'}).catch(function(){})
+              .then(function(){return db.collection('users').doc(newAdmin.id).collection('rooms').doc(rid).update({role:'admin'}).catch(function(){});})
+              .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){});})
+              .then(function(){return rd.ref.delete().catch(function(){});});
+          });
         });
-        var roomSubDeletes=roomSnap.docs.map(function(rd){return rd.ref.delete().catch(function(){});});
-        return Promise.all(memberDeletes.concat(roomSubDeletes));
+        return Promise.all(roomHandles);
       }).then(function(){
         return Promise.all([
           userRef.collection('data').doc('main').delete().catch(function(){}),
