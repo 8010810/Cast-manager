@@ -3058,8 +3058,10 @@ function App(){
     useEffect(function(){
     unsubAuthRef.current=null;
     var currentAuthGen=0;
+    var expectedUid=(new URLSearchParams(window.location.search)).get('uid')||null;
     var unsubAuth=auth.onAuthStateChanged(function(u){
       var gen=++currentAuthGen;
+      if(u&&expectedUid&&u.uid!==expectedUid){auth.signOut();return;}
       setUser(u);
       if(unsubConsentRef.current){unsubConsentRef.current();unsubConsentRef.current=null;}
       if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
