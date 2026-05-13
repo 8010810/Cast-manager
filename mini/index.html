@@ -2031,10 +2031,19 @@ function MiniApp(){
     if(!user)return;
     var uid2=user.uid;
     var userRef=db.collection('users').doc(uid2);
-    Promise.all([
-      userRef.collection('data').doc('main').delete().catch(function(){}),
-      userRef.collection('meta').doc('consent').delete().catch(function(){})
-    ]).then(function(){
+    userRef.collection('rooms').get().catch(function(){return{docs:[]};}).then(function(roomSnap){
+      var memberDeletes=roomSnap.docs.map(function(rd){
+        return db.collection('rooms').doc(rd.id).collection('members').doc(uid2).delete().catch(function(){});
+      });
+      var roomSubDeletes=roomSnap.docs.map(function(rd){return rd.ref.delete().catch(function(){});});
+      return Promise.all(memberDeletes.concat(roomSubDeletes));
+    }).then(function(){
+      return Promise.all([
+        userRef.collection('data').doc('main').delete().catch(function(){}),
+        userRef.collection('meta').doc('consent').delete().catch(function(){}),
+        userRef.collection('meta').doc('pendingJoins').delete().catch(function(){})
+      ]);
+    }).then(function(){
       if(!auth.currentUser)return auth.signOut().catch(function(){});
       return auth.currentUser.delete().catch(function(e){
         if(e.code==='auth/requires-recent-login'){
