@@ -1791,7 +1791,7 @@ function MiniApp(){
       if(pendingUid){
         localStorage.removeItem('pending_reauth_delete');
         var u=auth.currentUser;
-        if(u&&u.uid===pendingUid){u.delete().catch(function(){auth.signOut().catch(function(){});});}
+        if(u&&u.uid===pendingUid){u.delete().then(function(){window.location.href='/';}).catch(function(){auth.signOut().catch(function(){});window.location.href='/';});}
       }
     }).catch(function(){localStorage.removeItem('pending_reauth_delete');});
     var unsubRooms=null;
@@ -2013,7 +2013,7 @@ function MiniApp(){
   }
   function navigate(pg){setNavStack(function(st){return [...st,pg];});setSubBack(null);refreshData();}
   function goHome(){setNavStack(['home']);setSubBack(null);refreshData();}
-  function handleSignOut(){fbSignOut().then(function(){setData(null);setNavStack(['home']);});}
+  function handleSignOut(){fbSignOut().then(function(){window.location.href='/';});}
   function handleDeleteAccount(){
     if(!user)return;
     var uid2=user.uid;
@@ -2041,10 +2041,10 @@ function MiniApp(){
         return auth.signOut();
       });
     }).then(function(){
-      setData(null);setNavStack(['home']);
+      window.location.href='/';
     }).catch(function(){
       auth.signOut().catch(function(){});
-      setData(null);setNavStack(['home']);
+      window.location.href='/';
     });
   }
   function goBack(){
