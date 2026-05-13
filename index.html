@@ -2907,6 +2907,7 @@ function RoomSelectScreen(p){
   if(mode==='select'){
     return e('div',{style:WRAP},
       e('div',{style:BOX},
+        p.onBack&&e('button',{style:{background:'none',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px',marginBottom:'12px',display:'block'},onClick:p.onBack},'‹ プラン選択に戻る'),
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'}},'CAST MANAGER'),
         e('h2',{style:{fontSize:'16px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'ルームを選択'),
         e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'24px'}},'ルームはお店ごとのデータ空間です'),
@@ -3774,6 +3775,7 @@ function App(){
       roomsList:roomsList,
       db:db,
       uid:uid,
+      onBack:roomsList.length===0?function(){setConsentState('planselect');}:null,
       onRoomReady:function(rid,role,roomInfo,data){
         setRoomId(rid);
         setRoomRole(role);
