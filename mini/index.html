@@ -1780,6 +1780,7 @@ function MiniApp(){
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
   var personalDataRef=React.useRef({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
+  var pendingListenersRef=React.useRef({});
 
   var layer=navStack[navStack.length-1]||'home';
   var isCastLayer=layer==='cast';
@@ -1813,6 +1814,8 @@ function MiniApp(){
       Object.values(unsubDataMapRef.current).forEach(function(fn){fn();});
       unsubDataMapRef.current={};roomDataMapRef.current={};primaryRoomRef.current=null;
       personalDataRef.current={casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
+      Object.values(pendingListenersRef.current).forEach(function(fn){fn();});
+      pendingListenersRef.current={};
     }
 
     function rebuildData(){
@@ -1884,6 +1887,14 @@ function MiniApp(){
             if(!consentDone){setConsentState(cd.userName?'done':'username');consentDone=true;checkAllDone();}
           }
         },function(){if(!consentDone){setConsentState('needed');consentDone=true;checkAllDone();}});
+        db.collection('users').doc(u.uid).collection('meta').doc('pendingJoins').get().then(function(doc){
+          if(!doc.exists)return;
+          var pending=doc.data()||{};
+          Object.keys(pending).forEach(function(rid){
+            var info=pending[rid]||{};
+            setupApprovalListener(u.uid,rid,info.name||'',info.inviteCode||'');
+          });
+        }).catch(function(){});
         var loadedRids=new Set();
         var firstRoomsSnap=true;
         unsubRooms=db.collection('users').doc(u.uid).collection('rooms').onSnapshot(function(snap){
@@ -1920,6 +1931,23 @@ function MiniApp(){
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){if(showToast)notify('更新しました','success');}
+  function setupApprovalListener(uid,rid,roomName,inviteCode){
+    if(pendingListenersRef.current[rid])return;
+    var unsub=db.collection('rooms').doc(rid).collection('members').doc(uid).onSnapshot(function(doc){
+      if(!doc.exists)return;
+      var fn=pendingListenersRef.current[rid];if(fn){fn();}
+      delete pendingListenersRef.current[rid];
+      var md=doc.data();
+      db.collection('users').doc(uid).collection('rooms').doc(rid).set({
+        name:roomName,role:md.role||'member',inviteCode:inviteCode,joinedAt:md.joinedAt||new Date().toISOString()
+      }).then(function(){
+        var upd={};upd[rid]=firebase.firestore.FieldValue.delete();
+        db.collection('users').doc(uid).collection('meta').doc('pendingJoins').update(upd).catch(function(){});
+      }).catch(function(){});
+    },function(){});
+    pendingListenersRef.current[rid]=unsub;
+  }
+
   function submitMiniJoinRequest(){
     var code=miniJoinInput.trim().toUpperCase();
     if(!code){setMiniJoinMsg('招待コードを入力してください');return;}
@@ -1929,6 +1957,7 @@ function MiniApp(){
     db.collection('rooms').where('inviteCode','==',actualCode).limit(1).get().then(function(snap){
       if(snap.empty){setMiniJoinMsg('招待コードが見つかりません');setMiniJoinLoading(false);return;}
       var rid=snap.docs[0].id;
+      var roomInfo=snap.docs[0].data();
       db.collection('rooms').doc(rid).collection('members').doc(user.uid).get().then(function(mem){
         if(mem.exists){setMiniJoinMsg('すでに参加済みです');setMiniJoinLoading(false);return;}
         db.collection('rooms').doc(rid).collection('joinRequests').doc(user.uid).get().then(function(req){
@@ -1938,6 +1967,9 @@ function MiniApp(){
           }).then(function(){
             setMiniJoinMsg('参加申請を送りました。管理者の承認をお待ちください。');
             setMiniJoinInput('');setMiniJoinLoading(false);
+            var pj={};pj[rid]={name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''};
+            db.collection('users').doc(user.uid).collection('meta').doc('pendingJoins').set(pj,{merge:true}).catch(function(){});
+            setupApprovalListener(user.uid,rid,roomInfo.name||'',roomInfo.inviteCode||'');
           }).catch(function(){setMiniJoinMsg('申請に失敗しました');setMiniJoinLoading(false);});
         });
       });
