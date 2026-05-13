@@ -3079,11 +3079,11 @@ function App(){
         // 削除処理中はログイン画面のまま待機
         if(window._castManagerDeleting){setLoading(false);return;}
         setLoading(true);
-        // タイムアウト保険: 10秒でフォールバック
+        // タイムアウト保険: 20秒でフォールバック
         var authTimeout=setTimeout(function(){
           if(gen!==currentAuthGen)return;
           setLoading(false);setConsentState('roomselect');
-        },10000);
+        },20000);
         // 同意状態確認
         var firstConsentSnap=true;
         unsubConsentRef.current=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
@@ -3125,8 +3125,9 @@ function App(){
           unsubRoomsListRef.current=db.collection('users').doc(u.uid).collection('rooms').onSnapshot(function(snap){
             if(gen!==currentAuthGen)return;
             var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
-            if(rooms.length>0&&!appliedRooms){appliedRooms=true;applyRooms(rooms);}
+            if(rooms.length>0&&!appliedRooms){clearTimeout(authTimeout);appliedRooms=true;applyRooms(rooms);}
             else if(rooms.length>0){setRoomsList(rooms);}
+            else if(!snap.metadata.fromCache){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);}
           },function(){
             if(gen!==currentAuthGen)return;
             clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
