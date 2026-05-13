@@ -1787,12 +1787,13 @@ function MiniApp(){
 
   useEffect(function(){
     auth.getRedirectResult().then(function(){
-      if(sessionStorage.getItem('pending_reauth_delete')){
-        sessionStorage.removeItem('pending_reauth_delete');
+      var pendingUid=localStorage.getItem('pending_reauth_delete');
+      if(pendingUid){
+        localStorage.removeItem('pending_reauth_delete');
         var u=auth.currentUser;
-        if(u){u.delete().catch(function(){auth.signOut().catch(function(){});});}
+        if(u&&u.uid===pendingUid){u.delete().catch(function(){auth.signOut().catch(function(){});});}
       }
-    }).catch(function(){sessionStorage.removeItem('pending_reauth_delete');});
+    }).catch(function(){localStorage.removeItem('pending_reauth_delete');});
     var unsubRooms=null;
     var unsubConsent=null;
     var unsubPersonalData=null;
@@ -2033,7 +2034,7 @@ function MiniApp(){
       if(!auth.currentUser)return auth.signOut().catch(function(){});
       return auth.currentUser.delete().catch(function(e){
         if(e.code==='auth/requires-recent-login'){
-          sessionStorage.setItem('pending_reauth_delete','1');
+          localStorage.setItem('pending_reauth_delete',uid2);
           auth.currentUser.reauthenticateWithRedirect(new firebase.auth.GoogleAuthProvider());
           return;
         }
