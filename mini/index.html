@@ -884,7 +884,7 @@ function ShiftPage(p){
     var seen=new Set();var result=[];
     (p.data.folders||[]).forEach(function(f){
       var rid=f._roomId||'__none__';
-      if(!seen.has(rid)){seen.add(rid);result.push({rid:rid,label:f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:f.name});}
+      if(!seen.has(rid)){seen.add(rid);result.push({rid:rid,label:f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:p.userName||f.name});}
     });
     return result;
   },[p.data.folders,p.roomsList]);
@@ -2472,7 +2472,7 @@ function MiniApp(){
         );
       })(),
       layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomsList:roomsList,userName:userName})),
-      layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList})),
+      layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList,userName:userName})),
       layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack})),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
         castPage==='input'&&e(InputPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
