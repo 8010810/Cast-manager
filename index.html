@@ -76,7 +76,7 @@ var HAS_CHARTS=!!(ComposedChart&&ResponsiveContainer);
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 var pad=function(n){return String(n).padStart(2,'0');};
-var todayStr=function(){var d=new Date();if(d.getHours()<3)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+var todayStr=function(){var d=new Date();if(d.getHours()<9)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
 var yen=function(n){return n==null?'--':'¥'+Number(n).toLocaleString();};
 var fmtDate=function(s){if(!s)return'';var p=s.split('-');return p[0]+'/'+p[1]+'/'+p[2];};
 var uid=function(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);};
@@ -1308,7 +1308,7 @@ var SHIFT_STATUSES=[
 ];
 
 function ShiftPage(p){
-  var now=new Date();if(now.getHours()<3)now.setDate(now.getDate()-1);
+  var now=new Date();if(now.getHours()<9)now.setDate(now.getDate()-1);
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
   var s2=useState('week');var viewMode=s2[0];var setViewMode=s2[1];
   var s3=useState('');var query=s3[0];var setQuery=s3[1];
@@ -2000,7 +2000,7 @@ function AIPage(p){
 
 // ─── 来店予定ページ ────────────────────────────────────────────────────────────
 function VisitPage(p){
-  var now=new Date();if(now.getHours()<3)now.setDate(now.getDate()-1);
+  var now=new Date();if(now.getHours()<9)now.setDate(now.getDate()-1);
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
   var s2=useState(null);var selectedDate=s2[0];var setSelectedDate=s2[1];
   var s3=useState(false);var showForm=s3[0];var setShowForm=s3[1];
@@ -3041,7 +3041,7 @@ function App(){
       setCurrentRoom({id:r.roomId,name:r.name,inviteCode:r.inviteCode||''});
       setData(nd);
       db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:r.roomId}).catch(function(){});
-      var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+      var nowR=new Date();if(nowR.getHours()<9)nowR.setDate(nowR.getDate()-1);
       var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
       if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
       unsubAttRef.current=db.collection('rooms').doc(r.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
@@ -3137,7 +3137,7 @@ function App(){
             setRoomRole(roomInfo.role||'member');
             setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
             loadRoomData(roomInfo.roomId,roomInfo.name||'');
-            var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
+            var now2=new Date();if(now2.getHours()<9)now2.setDate(now2.getDate()-1);
             var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
             if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
             unsubAttRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('attendance').doc(ts).onSnapshot(function(doc){
@@ -3183,7 +3183,7 @@ function App(){
       setData(nd);
     }).catch(function(){});
     if(roomId){
-      var now2=new Date();if(now2.getHours()<3)now2.setDate(now2.getDate()-1);
+      var now2=new Date();if(now2.getHours()<9)now2.setDate(now2.getDate()-1);
       var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
       db.collection('rooms').doc(roomId).collection('attendance').doc(ts).get()
         .then(function(doc){
@@ -3548,7 +3548,7 @@ function App(){
             setRoomsList(function(prev){return prev.concat([{roomId:rid,name:rn,role:'admin',inviteCode:inviteCode}]);});
             setData(initData);
             db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
-            var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+            var nowR=new Date();if(nowR.getHours()<9)nowR.setDate(nowR.getDate()-1);
             var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
             if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
             unsubAttRef.current=db.collection('rooms').doc(rid).collection('attendance').doc(tsR).onSnapshot(function(doc){
@@ -3716,7 +3716,7 @@ function App(){
                   setCurrentRoom({id:next.roomId,name:next.name,inviteCode:next.inviteCode||''});
                   setData(nd);
                   db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:next.roomId}).catch(function(){});
-                  var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+                  var nowR=new Date();if(nowR.getHours()<9)nowR.setDate(nowR.getDate()-1);
                   var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
@@ -3752,7 +3752,7 @@ function App(){
                   setCurrentRoom({id:next.roomId,name:next.name,inviteCode:next.inviteCode||''});
                   setData(nd);
                   db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:next.roomId}).catch(function(){});
-                  var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+                  var nowR=new Date();if(nowR.getHours()<9)nowR.setDate(nowR.getDate()-1);
                   var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
@@ -3801,7 +3801,7 @@ function App(){
         if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
         setData(nd);
         db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
-        var nowR=new Date();if(nowR.getHours()<3)nowR.setDate(nowR.getDate()-1);
+        var nowR=new Date();if(nowR.getHours()<9)nowR.setDate(nowR.getDate()-1);
         var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
         if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
         unsubAttRef.current=db.collection('rooms').doc(rid).collection('attendance').doc(tsR).onSnapshot(function(doc){
@@ -3914,7 +3914,7 @@ function AttendancePage(p){
   var useEffect=React.useEffect;
   var useMemo=React.useMemo;
   var now=new Date();
-  var adjNow=new Date(now);if(adjNow.getHours()<3)adjNow.setDate(adjNow.getDate()-1);
+  var adjNow=new Date(now);if(adjNow.getHours()<9)adjNow.setDate(adjNow.getDate()-1);
   var todayStr=adjNow.getFullYear()+'-'+pad(adjNow.getMonth()+1)+'-'+pad(adjNow.getDate());
 
   var s0=useState('main');var subPage=s0[0];var setSubPage=s0[1];
