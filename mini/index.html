@@ -2398,7 +2398,7 @@ function MiniApp(){
     var salesColor=salesPct>=1?'#34d399':salesPct>=0.7?'#e8b86d':'#f87171';
 
     var myBdIds=new Set();
-    (data&&data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===(user?user.uid:'');}).forEach(function(f){(f.castIds||[]).forEach(function(id){myBdIds.add(id);});});
+    (data&&data.folders||[]).filter(function(f){return f._personal===true;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myBdIds.add(id);});});
     var bdCasts=(data&&data.casts||[]).filter(function(c){
       if(!myBdIds.has(c.id))return false;
       if(!c.birthday)return false;
@@ -2498,7 +2498,7 @@ function MiniApp(){
     e('div',{style:S.main},
       layer==='mycast'&&(function(){
         var myUid=user?user.uid:'';
-        var myFolders=(data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===myUid;});
+        var myFolders=(data.folders||[]).filter(function(f){return f._personal===true;});
         var commonProps2={data:data,onOpenCast:openCast,notify:notify,uid:myUid,onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},onRestoreFolder:function(){},persist:persist};
         // 所属ルームを重複なく取得
         var myRooms=(function(){
