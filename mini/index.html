@@ -1923,15 +1923,15 @@ function MiniApp(){
       var upd={};upd[rid]=firebase.firestore.FieldValue.delete();
       db.collection('users').doc(uid).collection('meta').doc('pendingJoins').update(upd).catch(function(){});
       db.collection('rooms').doc(rid).collection('members').doc(uid).get().then(function(mem){
-        if(!mem.exists){setMiniJoinMsg('');return;} // 拒否された
+        if(!mem.exists){return;} // 拒否された
         var md=mem.data();
         db.collection('users').doc(uid).collection('rooms').doc(rid).set({
           name:roomName,role:md.role||'member',inviteCode:inviteCode,joinedAt:md.joinedAt||new Date().toISOString()
         }).then(function(){
-          setSettingsPage(null);
+          setSettingsPage('room');
           notify(roomName+'に参加しました');
         }).catch(function(){
-          setSettingsPage(null);
+          setSettingsPage('room');
           notify(roomName+'に参加しました');
         });
       }).catch(function(){
@@ -1939,10 +1939,10 @@ function MiniApp(){
         db.collection('users').doc(uid).collection('rooms').doc(rid).set({
           name:roomName,role:'member',inviteCode:inviteCode,joinedAt:new Date().toISOString()
         }).then(function(){
-          setSettingsPage(null);
+          setSettingsPage('room');
           notify(roomName+'に参加しました');
         }).catch(function(){
-          setSettingsPage(null);
+          setSettingsPage('room');
         });
       });
     },function(){});
@@ -1966,8 +1966,9 @@ function MiniApp(){
           db.collection('rooms').doc(rid).collection('joinRequests').doc(user.uid).set({
             uid:user.uid,userName:userName||'',requestedAt:new Date().toISOString(),status:'pending'
           }).then(function(){
-            setMiniJoinMsg('参加申請を送りました。管理者の承認をお待ちください。');
             setMiniJoinInput('');setMiniJoinLoading(false);
+            setSettingsPage(null);
+            notify('参加申請を送りました。管理者の承認をお待ちください。');
             var pj={};pj[rid]={name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''};
             db.collection('users').doc(user.uid).collection('meta').doc('pendingJoins').set(pj,{merge:true}).catch(function(){});
             setupApprovalListener(user.uid,rid,roomInfo.name||'',roomInfo.inviteCode||'');
