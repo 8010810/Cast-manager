@@ -1764,6 +1764,14 @@ function MiniApp(){
   var isCastLayer=layer==='cast';
 
   useEffect(function(){
+    if(loading||consentState!=='done'||!user)return;
+    var params=new URLSearchParams(window.location.search);
+    var joinCode=params.get('joinRoom');
+    if(!joinCode)return;
+    window.history.replaceState({},'','/mini');
+    submitMiniJoinRequest(null,joinCode);
+  },[loading,consentState]);
+  useEffect(function(){
     auth.getRedirectResult().then(function(){
       var pendingUid=localStorage.getItem('pending_reauth_delete');
       if(pendingUid){
@@ -1949,8 +1957,8 @@ function MiniApp(){
     pendingListenersRef.current[rid]=unsub;
   }
 
-  function submitMiniJoinRequest(onSuccess){
-    var code=miniJoinInput.trim().toUpperCase();
+  function submitMiniJoinRequest(onSuccess,codeOverride){
+    var code=(codeOverride!==undefined?codeOverride:miniJoinInput).trim().toUpperCase();
     if(!code){setMiniJoinMsg('招待コードを入力してください');return;}
     var match=code.match(/[A-Z2-9]{6}/);
     var actualCode=match?match[0]:code;
