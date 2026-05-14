@@ -2826,8 +2826,10 @@ function RoomSelectScreen(p){
           return p.db.collection('rooms').doc(rid).collection('joinRequests').doc(p.user.uid).set({
             uid:p.user.uid,userName:p.userName||'',requestedAt:now,status:'pending'
           }).then(function(){
-            setJoinMsg('参加申請を送りました。管理者の承認をお待ちください。');
             setInviteInput('');setLoading(false);
+            var fromMini=new URLSearchParams(window.location.search).get('from')==='mini';
+            if(fromMini){window.location.href='/mini';}
+            else{setJoinMsg('参加申請を送りました。管理者の承認をお待ちください。');}
           });
         });
       });
@@ -2838,6 +2840,7 @@ function RoomSelectScreen(p){
   useEffect(function(){
     var params=new URLSearchParams(window.location.search);
     var joinCode=params.get('join');
+    var fromMiniFlag=params.get('from')==='mini';
     if(joinCode){
       window.history.replaceState({},'','/');
       setInviteInput(joinCode.toUpperCase());
@@ -2866,8 +2869,9 @@ function RoomSelectScreen(p){
             p.db.collection('rooms').doc(rid).collection('joinRequests').doc(p.user.uid).set({
               uid:p.user.uid,userName:p.userName||'',requestedAt:now,status:'pending'
             }).then(function(){
-              setJoinMsg('参加申請を送りました。管理者の承認をお待ちください。');
-              setLoading(false);setMode('join');
+              setLoading(false);
+              if(fromMiniFlag){window.location.href='/mini';}
+              else{setJoinMsg('参加申請を送りました。管理者の承認をお待ちください。');setMode('join');}
             }).catch(function(){setErr('申請に失敗しました');setLoading(false);setMode('join');setInviteInput(code);});
           });
         });
