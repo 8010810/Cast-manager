@@ -1949,7 +1949,7 @@ function MiniApp(){
     pendingListenersRef.current[rid]=unsub;
   }
 
-  function submitMiniJoinRequest(){
+  function submitMiniJoinRequest(onSuccess){
     var code=miniJoinInput.trim().toUpperCase();
     if(!code){setMiniJoinMsg('招待コードを入力してください');return;}
     var match=code.match(/[A-Z2-9]{6}/);
@@ -1967,11 +1967,11 @@ function MiniApp(){
             uid:user.uid,userName:userName||'',requestedAt:new Date().toISOString(),status:'pending'
           }).then(function(){
             setMiniJoinInput('');setMiniJoinLoading(false);
-            setSettingsPage(null);
-            notify('参加申請を送りました。管理者の承認をお待ちください。');
             var pj={};pj[rid]={name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''};
             db.collection('users').doc(user.uid).collection('meta').doc('pendingJoins').set(pj,{merge:true}).catch(function(){});
             setupApprovalListener(user.uid,rid,roomInfo.name||'',roomInfo.inviteCode||'');
+            if(typeof onSuccess==='function'){onSuccess();}
+            else{setSettingsPage(null);notify('参加申請を送りました。管理者の承認をお待ちください。');}
           }).catch(function(){setMiniJoinMsg('申請に失敗しました');setMiniJoinLoading(false);});
         });
       });
@@ -2106,8 +2106,49 @@ function MiniApp(){
             if(!alreadyExists){newData.folders=[{id:uid(),name:uName,castIds:[],ownerUid:user.uid}].concat(newData.folders||[]);}
             db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
             persist(newData);
-            setConsentState('done');
-          }},'登録する')
+            setConsentState('plan');
+          }},'次へ')
+        )
+      );
+    }
+    if(consentState==='plan'){
+      var OB_WRAP={minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'};
+      var OB_CARD={background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'};
+      var OB_TITLE={fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'};
+      return e('div',{style:OB_WRAP},
+        e('div',{style:OB_CARD},
+          e('div',{style:OB_TITLE},'CAST MANAGER mini'),
+          e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'どのように使いますか？'),
+          e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'24px'}},'後から設定で変更できます'),
+          e('button',{style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'12px',padding:'16px',color:'#0d0d1a',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'10px'},onClick:function(){setMiniJoinInput('');setMiniJoinMsg('');setConsentState('joinRoom');}},
+            'ルームに参加する'
+          ),
+          e('p',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'16px'}},'招待コードでルームに参加します'),
+          e('button',{style:{width:'100%',background:'transparent',border:'1px solid #2d2d4e',borderRadius:'12px',padding:'16px',color:'#9ca3af',fontWeight:600,fontSize:'14px',cursor:'pointer'},onClick:function(){setConsentState('done');}},
+            'まずは個人で使う'
+          ),
+          e('p',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginTop:'8px'}},'後から設定 › ルームで参加できます')
+        )
+      );
+    }
+    if(consentState==='joinRoom'){
+      var canSend=miniJoinInput.trim().length>0&&!miniJoinLoading;
+      return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+        e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'}},
+          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px',marginBottom:'16px',padding:0},onClick:function(){setConsentState('plan');setMiniJoinMsg('');}},
+            '‹ 戻る'
+          ),
+          e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'20px'}},'CAST MANAGER mini'),
+          e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'ルームに参加する'),
+          e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'20px'}},'管理者から受け取った招待コードを入力してください'),
+          e('input',{style:{width:'100%',background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'12px',color:'#e5e7eb',fontSize:'16px',letterSpacing:'0.2em',fontWeight:700,outline:'none',boxSizing:'border-box',marginBottom:'12px',textAlign:'center'},placeholder:'招待コード',value:miniJoinInput,onChange:function(ev){setMiniJoinInput(ev.target.value.toUpperCase());setMiniJoinMsg('');},onKeyDown:function(ev){if(ev.key==='Enter'&&canSend)submitMiniJoinRequest(function(){setConsentState('done');notify('参加申請を送りました。管理者の承認をお待ちください。');});},autoFocus:true}),
+          miniJoinMsg&&e('div',{style:{color:miniJoinMsg.includes('失敗')||miniJoinMsg.includes('見つかり')||miniJoinMsg.includes('すでに')?'#f87171':'#34d399',fontSize:'12px',marginBottom:'12px',textAlign:'center'}},miniJoinMsg),
+          e('button',{style:{width:'100%',background:canSend?'linear-gradient(135deg,#c9983a,#e8b86d)':'#1e2035',border:'none',borderRadius:'10px',padding:'14px',color:canSend?'#0d0d1a':'#4b5563',fontWeight:700,fontSize:'15px',cursor:canSend?'pointer':'default'},disabled:!canSend,onClick:function(){
+            submitMiniJoinRequest(function(){setConsentState('done');notify('参加申請を送りました。管理者の承認をお待ちください。');});
+          }},miniJoinLoading?'申請中...':'参加申請を送る'),
+          e('button',{style:{width:'100%',background:'transparent',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',marginTop:'16px',padding:'8px'},onClick:function(){setConsentState('done');}},
+            'スキップして個人で使う'
+          )
         )
       );
     }
