@@ -2190,42 +2190,9 @@ function MiniApp(){
             roomsList.length===0
               ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'12px 0'}},'参加中のルームはありません')
               :roomsList.map(function(r){
-                return e('div',{key:r.roomId,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'8px',display:'flex',alignItems:'center',justifyContent:'space-between'}},
-                  e('div',null,
-                    e('div',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},r.name),
-                    e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},r.role==='admin'?'管理者':'メンバー')
-                  ),
-                  r.role!=='admin'&&e('button',{style:{background:'transparent',border:'1px solid #7f1d1d',borderRadius:'8px',padding:'6px 12px',color:'#f87171',fontSize:'12px',cursor:'pointer'},onClick:function(){
-                    if(!confirm('「'+r.name+'」を退室しますか？\nグラフデータはアプリ内に保持されます。'))return;
-                    var rid=r.roomId;
-                    var uid=user.uid;
-                    var prev=roomDataMapRef.current[rid];
-                    function doLeave(){
-                      db.collection('rooms').doc(rid).collection('members').doc(uid).delete().catch(function(){});
-                      db.collection('users').doc(uid).collection('rooms').doc(rid).delete().catch(function(){});
-                    }
-                    if(prev&&((prev.casts||[]).length>0||(prev.folders||[]).length>0)){
-                      var pRef2=db.collection('users').doc(uid).collection('data').doc('main');
-                      pRef2.get().then(function(pDoc){
-                        var pd=pDoc.exists?pDoc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
-                        var pCids=new Set((pd.casts||[]).map(function(c){return c.id;}));
-                        var pFids=new Set((pd.folders||[]).map(function(f){return f.id;}));
-                        var merged={
-                          casts:(pd.casts||[]).concat((prev.casts||[]).filter(function(c){return !pCids.has(c.id);})),
-                          records:Object.assign({},prev.records||{},pd.records||{}),
-                          customers:Object.assign({},prev.customers||{},pd.customers||{}),
-                          folders:(pd.folders||[]).concat((prev.folders||[]).map(function(f){return Object.assign({},f,{ownerUid:uid});}).filter(function(f){return !pFids.has(f.id);})),
-                          shifts:Object.assign({},prev.shifts||{},pd.shifts||{}),
-                          visits:(pd.visits||[]).concat(prev.visits||[]),
-                          quota:Object.assign({},prev.quota||{},pd.quota||{})
-                        };
-                        pRef2.set(merged).catch(function(){});
-                        doLeave();
-                      }).catch(function(){doLeave();});
-                    } else {
-                      doLeave();
-                    }
-                  }},'退室')
+                return e('div',{key:r.roomId,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'8px'}},
+                  e('div',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},r.name),
+                  e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},r.role==='admin'?'管理者':'メンバー')
                 );
               }),
             e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
