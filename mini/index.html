@@ -43,7 +43,7 @@ var HAS_CHARTS=!!(ComposedChart&&ResponsiveContainer);
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 var pad=function(n){return String(n).padStart(2,'0');};
-var todayStr=function(){var d=new Date();if(d.getHours()<3)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+var todayStr=function(){var d=new Date();if(d.getHours()<9)d.setDate(d.getDate()-1);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
 var yen=function(n){return n==null?'--':'¥'+Number(n).toLocaleString();};
 var fmtDate=function(s){if(!s)return'';var p=s.split('-');return p[0]+'/'+p[1]+'/'+p[2];};
 var uid=function(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);};
@@ -819,7 +819,7 @@ var SHIFT_STATUSES=[
 ];
 
 function ShiftPage(p){
-  var now=new Date();if(now.getHours()<3)now.setDate(now.getDate()-1);
+  var now=new Date();if(now.getHours()<9)now.setDate(now.getDate()-1);
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
   var s2=useState('week');var viewMode=s2[0];var setViewMode=s2[1];
   var s3=useState('');var query=s3[0];var setQuery=s3[1];
@@ -1522,7 +1522,7 @@ function AIPage(p){
 
 // ─── 来店予定ページ ────────────────────────────────────────────────────────────
 function VisitPage(p){
-  var now=new Date();if(now.getHours()<3)now.setDate(now.getDate()-1);
+  var now=new Date();if(now.getHours()<9)now.setDate(now.getDate()-1);
   var s1=useState(now.getFullYear()+'-'+pad(now.getMonth()+1));var currentYM=s1[0];var setCurrentYM=s1[1];
   var s2=useState(null);var selectedDate=s2[0];var setSelectedDate=s2[1];
   var s3=useState(false);var showForm=s3[0];var setShowForm=s3[1];
