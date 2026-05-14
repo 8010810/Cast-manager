@@ -2826,6 +2826,9 @@ function RoomSelectScreen(p){
           return p.db.collection('rooms').doc(rid).collection('joinRequests').doc(p.user.uid).set({
             uid:p.user.uid,userName:p.userName||'',requestedAt:now,status:'pending'
           }).then(function(){
+            var pj={};pj[rid]={name:rd.name||'',inviteCode:actualCode||''};
+            return p.db.collection('users').doc(p.user.uid).collection('meta').doc('pendingJoins').set(pj,{merge:true});
+          }).then(function(){
             setInviteInput('');setLoading(false);
             var fromMini=new URLSearchParams(window.location.search).get('from')==='mini';
             if(fromMini){window.location.href='/mini';}
@@ -2868,6 +2871,9 @@ function RoomSelectScreen(p){
             if(req.exists){setErr('申請中です。管理者の承認をお待ちください。');setLoading(false);setMode('join');return;}
             p.db.collection('rooms').doc(rid).collection('joinRequests').doc(p.user.uid).set({
               uid:p.user.uid,userName:p.userName||'',requestedAt:now,status:'pending'
+            }).then(function(){
+              var pj={};pj[rid]={name:rd.name||'',inviteCode:code||''};
+              return p.db.collection('users').doc(p.user.uid).collection('meta').doc('pendingJoins').set(pj,{merge:true});
             }).then(function(){
               setLoading(false);
               if(fromMiniFlag){window.location.href='/mini';}
@@ -3240,7 +3246,17 @@ function App(){
     setJoinRequests(function(prev){return prev.filter(function(r){return r.uid!==req.uid;});});
     var now=new Date().toISOString();
     db.collection('rooms').doc(roomId).collection('members').doc(req.uid).set({role:'member',userName:req.userName||'',joinedAt:now})
-      .then(function(){return db.collection('rooms').doc(roomId).collection('joinRequests').doc(req.uid).delete();})
+      .then(function(){
+        return Promise.all([
+          db.collection('rooms').doc(roomId).collection('joinRequests').doc(req.uid).delete(),
+          db.collection('users').doc(req.uid).collection('rooms').doc(roomId).set({
+            name:currentRoom?currentRoom.name||'':'',
+            role:'member',
+            inviteCode:currentRoom?currentRoom.inviteCode||'':'',
+            joinedAt:now
+          }).catch(function(){})
+        ]);
+      })
       .then(function(){notify((req.userName||'メンバー')+'を承認しました');})
       .catch(function(){setJoinRequests(function(prev){return [req].concat(prev);});notify('承認に失敗しました','error');});
   }
