@@ -320,37 +320,11 @@ function FolderDetail(p){
     );
   }
 
-  var s_fai=React.useState(false);var showFAI=s_fai[0];var setShowFAI=s_fai[1];
-  var s_fair=React.useState('');var faiResult=s_fair[0];var setFaiResult=s_fair[1];
-  var s_fail=React.useState(false);var faiLoading=s_fail[0];var setFaiLoading=s_fail[1];
-
-  function runFolderAI(){
-    setFaiLoading(true);setFaiResult('');setShowFAI(true);
-    var now2=new Date();var tm2=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-    var lines=p.folderCasts.map(function(c){
-      var rows=(p.data.records[c.id]||[]).filter(function(r){return r.date.slice(0,7)===tm2;});
-      var s=rows.reduce(function(a,r){return a+Number(r.sales||0);},0);
-      var t=getMonthlyTarget(c,tm2);
-      return c.name+': '+yen(s)+(t>0?' 目標'+yen(t)+' '+(Math.round(s/t*100))+'%':'');
-    }).join(', ');
-    var prompt=p.folder.name+'フォルダの'+( now2.getMonth()+1)+'月売上: '+lines+' 各キャストへのアドバイスを日本語300文字以内で。';
-    fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:600,messages:[{role:'user',content:prompt}]})})
-    .then(function(r){return r.json();}).then(function(d){setFaiResult(d.content&&d.content[0]?d.content[0].text:'失敗');setFaiLoading(false);})
-    .catch(function(){setFaiResult('エラー');setFaiLoading(false);});
-  }
-
   return e(FolderErrorBoundary,null,e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
     !p.hideHeader&&e('div',{style:S.pageTitle},
       e('button',{style:{background:'transparent',border:'none',padding:'2px 4px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center',minWidth:'40px'},onClick:function(){if(p.onGoBack)p.onGoBack();}},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'15 18 9 12 15 6'}))),
       e('h1',{style:{...S.h1,flex:1,textAlign:'center'}},'MG実績'),
       e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center',minWidth:'40px',justifyContent:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})))
-    ),
-    showFAI&&e('div',{style:{background:'#12122a',border:'1px solid #a78bfa44',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
-      e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
-        e('span',{style:{color:'#a78bfa',fontWeight:700}},p.folder.name+' AI分析'),
-        e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setShowFAI(false);}},'✗')
-      ),
-      faiLoading?e('div',{style:{color:'#6b7280',fontSize:'13px'}},'分析中...'):e('div',{style:{color:'#e5e7eb',fontSize:'13px',lineHeight:'1.8',whiteSpace:'pre-wrap'}},faiResult)
     ),
 
     // グラフ
