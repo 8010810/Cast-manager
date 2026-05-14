@@ -2800,9 +2800,11 @@ function RoomSelectScreen(p){
   function joinRoom(){
     var code=inviteInput.trim().toUpperCase();
     if(!code){setErr('招待コードを入力してください');return;}
-    setLoading(true);setErr('');setJoinMsg('');
     var match=code.match(/[A-Z2-9]{6}/);
     var actualCode=match?match[0]:code;
+    var fromMiniNow=new URLSearchParams(window.location.search).get('from')==='mini';
+    if(fromMiniNow){window.location.href='/mini?joinRoom='+encodeURIComponent(actualCode);return;}
+    setLoading(true);setErr('');setJoinMsg('');
     p.db.collection('rooms').where('inviteCode','==',actualCode).limit(1).get().then(function(snap){
       if(snap.empty){setErr('招待コードが見つかりません');setLoading(false);return;}
       var roomDoc=snap.docs[0];var rid=roomDoc.id;var rd=roomDoc.data();
