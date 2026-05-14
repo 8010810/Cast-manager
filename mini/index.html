@@ -2387,7 +2387,7 @@ function MiniApp(){
     var nowM=new Date();var thisMonth=nowM.getFullYear()+'-'+pad(nowM.getMonth()+1);
     var allSalesThisMonth=0;var allTargetThisMonth=0;
     if(data&&data.casts){
-      data.casts.filter(function(c){return !c.inactive;}).forEach(function(c){
+      data.casts.filter(function(c){return !c.inactive&&c._personal===true;}).forEach(function(c){
         var recs=(data.records||{})[c.id]||[];
         recs.forEach(function(r){if(r.date&&r.date.startsWith(thisMonth))allSalesThisMonth+=r.sales||0;});
         allTargetThisMonth+=getMonthlyTarget(c,thisMonth);
