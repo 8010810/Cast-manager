@@ -1753,6 +1753,7 @@ function MiniApp(){
   var s_tc=useState(null);var targetCast=s_tc[0];var setTargetCast=s_tc[1];
   var s_etmk=useState(null);var editTargetMK=s_etmk[0];var setEditTargetMK=s_etmk[1];
   var s_tin=useState('');var targetInput=s_tin[0];var setTargetInput=s_tin[1];
+  var s_tf=useState(null);var targetFolder=s_tf[0];var setTargetFolder=s_tf[1];
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
@@ -2254,10 +2255,16 @@ function MiniApp(){
     var nowYear=new Date().getFullYear();
     var targetYears=[String(nowYear),String(nowYear-1)];
     var myUid2=user?user.uid:'';
-    var myFolderCastIds2=new Set();
-    (data&&data.folders||[]).filter(function(f){return f.ownerUid&&f.ownerUid===myUid2;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myFolderCastIds2.add(id);});});
-    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&(c._personal||myFolderCastIds2.has(c.id));});
-    var targetCastObj=activeCastsT.find(function(c){return c.id===targetCast;})||null;
+    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive;});
+    // フォルダタブ: キャストが1人以上いるフォルダのみ
+    var allTargetFolders=(data&&data.folders||[]).filter(function(f){
+      return (f.castIds||[]).some(function(cid){return activeCastsT.some(function(c){return c.id===cid;});});
+    });
+    var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
+    var curTFObj=allTargetFolders.find(function(f){return f.id===curTF;})||null;
+    var castsInTF=curTFObj?activeCastsT.filter(function(c){return (curTFObj.castIds||[]).includes(c.id);}):activeCastsT;
+    var targetCastObj=castsInTF.find(function(c){return c.id===targetCast;})||null;
+    function getTFLabel(f){if(f._personal||f.ownerUid===myUid2)return userName||f.name;return f.name;}
     function saveTargetForCast(cid,mk){
       var val=targetInput===''?0:Number(targetInput);
       if(isNaN(val))return;
@@ -2281,9 +2288,16 @@ function MiniApp(){
         e('div',{style:{display:'flex',gap:'6px',marginBottom:'14px'}},
           targetYears.map(function(y){return e('button',{key:y,style:Object.assign({},y===targetYear?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 12px'}),onClick:function(){setTargetYear(y);setEditTargetMK(null);}},y+'年');})
         ),
+        allTargetFolders.length>1&&e('div',{style:{display:'flex',gap:'6px',overflowX:'auto',marginBottom:'12px',paddingBottom:'2px',WebkitOverflowScrolling:'touch'}},
+          allTargetFolders.map(function(f){
+            return e('button',{key:f.id,style:Object.assign({},f.id===curTF?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 14px',flexShrink:0,whiteSpace:'nowrap'}),onClick:function(){
+              setTargetFolder(f.id);setTargetCast(null);setEditTargetMK(null);setTargetInput('');
+            }},getTFLabel(f));
+          })
+        ),
         e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'8px'}},'キャストを選択して月別目標を設定'),
         e('div',{style:{display:'flex',gap:'6px',flexWrap:'wrap',marginBottom:'14px'}},
-          activeCastsT.map(function(c){return e('button',{key:c.id,style:Object.assign({},c.id===targetCast?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 12px'}),onClick:function(){setTargetCast(c.id===targetCast?null:c.id);setEditTargetMK(null);setTargetInput('');}},c.name);})
+          castsInTF.map(function(c){return e('button',{key:c.id,style:Object.assign({},c.id===targetCast?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 12px'}),onClick:function(){setTargetCast(c.id===targetCast?null:c.id);setEditTargetMK(null);setTargetInput('');}},c.name);})
         ),
         targetCastObj&&e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px'}},
           Array.from({length:12},function(_,i){
