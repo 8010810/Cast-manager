@@ -1759,6 +1759,7 @@ function MiniApp(){
   var s_tin=useState('');var targetInput=s_tin[0];var setTargetInput=s_tin[1];
   var s_tf=useState(null);var targetFolder=s_tf[0];var setTargetFolder=s_tf[1];
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
+  var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|castId
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
@@ -2192,6 +2193,56 @@ function MiniApp(){
       );
     }
 
+    if(aiPage){
+      var myUidAI=user?user.uid:'';
+      var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI));});
+      var aiCastIdSet=new Set();
+      aiFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){aiCastIdSet.add(cid);});});
+      var aiCasts=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&aiCastIdSet.has(c.id);});
+      var AI_OV={position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:200,display:'flex',flexDirection:'column',background:'#0d0d1a'};
+      var AI_HDR={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(167,139,250,0.15)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
+      var AI_BODY={flex:1,overflowY:'auto',padding:'20px 16px 40px'};
+      var AI_CHEVRON=e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#4b5563',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'9 18 15 12 9 6'}));
+      if(aiPage==='hub'){
+        return e('div',{style:AI_OV},
+          e('div',{style:AI_HDR},
+            e('div',{style:{width:'60px'}}),
+            e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+              e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#a78bfa',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z'})),
+              e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'AI分析')
+            ),
+            e('button',{style:{background:'transparent',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'22px',lineHeight:'1',padding:'4px 8px'},onClick:function(){setAiPage(null);}},'×')
+          ),
+          e('div',{style:AI_BODY},
+            aiCasts.length===0
+              ?e('div',{style:{textAlign:'center',padding:'60px 24px',color:'#4b5563',fontSize:'14px'}},'キャストがいません')
+              :aiCasts.map(function(cast){
+                return e('button',{key:cast.id,style:{display:'flex',alignItems:'center',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'0',color:'#e5e7eb',cursor:'pointer',textAlign:'left',marginBottom:'10px',overflow:'hidden'},onClick:function(){setAiPage(cast.id);}},
+                  e('div',{style:{width:'4px',alignSelf:'stretch',background:'#a78bfa',flexShrink:0}}),
+                  e('div',{style:{flex:1,padding:'16px 14px'}},
+                    e('div',{style:{fontWeight:600,fontSize:'14px'}},cast.name)
+                  ),
+                  e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
+                );
+              })
+          )
+        );
+      }
+      var aiCast=(data?data.casts||[]:[]).find(function(c){return c.id===aiPage;})||null;
+      return e('div',{style:AI_OV},
+        e('div',{style:AI_HDR},
+          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');}},'‹ 戻る'),
+          e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},aiCast?aiCast.name:''),
+          e('div',{style:{width:'40px'}})
+        ),
+        e('div',{style:AI_BODY},
+          e('div',{style:{textAlign:'center',padding:'80px 24px',color:'#4b5563'}},
+            e('div',{style:{width:'40px',height:'4px',background:'#a78bfa',borderRadius:'2px',margin:'0 auto 20px'}}),
+            e('div',{style:{fontSize:'14px',color:'#6b7280'}},'準備中')
+          )
+        )
+      );
+    }
     // 設定画面
     if(settingsPage){
       var SETTINGS_OVERLAY_STYLE={position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',flexDirection:'column'};
@@ -2327,7 +2378,7 @@ function MiniApp(){
       ?e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},LOGO_SVG,LOGO_TEXT)
       :e('div',{style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer'},onClick:goHome},LOGO_SVG,LOGO_TEXT),
     e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
-      e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'},onClick:function(){/* AI analysis TODO */}},
+      e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'},onClick:function(){setAiPage('hub');}},
         e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#a78bfa',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
           e('path',{d:'M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z'}),
           e('path',{d:'M5 3L5.8 5.2L8 6L5.8 6.8L5 9L4.2 6.8L2 6L4.2 5.2Z'}),

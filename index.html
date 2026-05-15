@@ -3064,6 +3064,7 @@ function App(){
   var s_jrq=useState([]);var joinRequests=s_jrq[0];var setJoinRequests=s_jrq[1];
   var s_jrql=useState(false);var joinReqsLoading=s_jrql[0];var setJoinReqsLoading=s_jrql[1];
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
+  var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|'ai-sales'|'ai-trends'|'ai-shift'|'ai-attendance'|'ai-visits'
 
   var layer=navStack[navStack.length-1]||'home';
 
@@ -3530,6 +3531,57 @@ function App(){
 
   if(!data&&consentState==='done')return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'データを読み込み中...'));
 
+  if(aiPage){
+    var AI_CATS=[
+      {key:'ai-sales',label:'売上',desc:'売上データのAI分析',color:'#f59e0b'},
+      {key:'ai-trends',label:'キャスト傾向',desc:'キャストごとの傾向分析',color:'#60a5fa'},
+      {key:'ai-shift',label:'シフト最適化',desc:'最適なシフト提案',color:'#34d399'},
+      {key:'ai-attendance',label:'勤怠改善案',desc:'勤怠パターンの改善提案',color:'#f87171'},
+      {key:'ai-visits',label:'来店予定',desc:'来店予測と対策',color:'#a78bfa'},
+    ];
+    var AI_OV={position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:200,display:'flex',flexDirection:'column',background:'#0d0d1a'};
+    var AI_HDR={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(167,139,250,0.15)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
+    var AI_BODY={flex:1,overflowY:'auto',padding:'20px 16px 40px'};
+    var AI_CHEVRON=e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#4b5563',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'9 18 15 12 9 6'}));
+    if(aiPage==='hub'){
+      return e('div',{style:AI_OV},
+        e('div',{style:AI_HDR},
+          e('div',{style:{width:'60px'}}),
+          e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+            e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'#a78bfa',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('path',{d:'M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z'})),
+            e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'AI分析')
+          ),
+          e('button',{style:{background:'transparent',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'22px',lineHeight:'1',padding:'4px 8px'},onClick:function(){setAiPage(null);}},'×')
+        ),
+        e('div',{style:AI_BODY},
+          AI_CATS.map(function(cat){
+            return e('button',{key:cat.key,style:{display:'flex',alignItems:'center',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'0',color:'#e5e7eb',cursor:'pointer',textAlign:'left',marginBottom:'10px',overflow:'hidden'},onClick:function(){setAiPage(cat.key);}},
+              e('div',{style:{width:'4px',alignSelf:'stretch',background:cat.color,flexShrink:0}}),
+              e('div',{style:{flex:1,padding:'16px 14px'}},
+                e('div',{style:{fontWeight:600,fontSize:'14px',marginBottom:'3px'}},cat.label),
+                e('div',{style:{fontSize:'12px',color:'#6b7280'}},cat.desc)
+              ),
+              e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
+            );
+          })
+        )
+      );
+    }
+    var aiCat=AI_CATS.find(function(c){return c.key===aiPage;})||{label:'',color:'#a78bfa'};
+    return e('div',{style:AI_OV},
+      e('div',{style:AI_HDR},
+        e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');}},'‹ 戻る'),
+        e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},aiCat.label),
+        e('div',{style:{width:'40px'}})
+      ),
+      e('div',{style:AI_BODY},
+        e('div',{style:{textAlign:'center',padding:'80px 24px',color:'#4b5563'}},
+          e('div',{style:{width:'40px',height:'4px',background:aiCat.color,borderRadius:'2px',margin:'0 auto 20px'}}),
+          e('div',{style:{fontSize:'14px',color:'#6b7280'}},'準備中')
+        )
+      )
+    );
+  }
   // 設定画面
   if(settingsPage){
     var SETTINGS_OVERLAY_STYLE={position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',flexDirection:'column'};
@@ -3896,7 +3948,7 @@ function App(){
         ),
       isHomeLayer
         ?e('div',{style:{display:'flex',alignItems:'center',gap:'10px'}},
-          e('button',{style:{background:'transparent',border:'none',padding:'4px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'},onClick:function(){/* AI analysis TODO */}},
+          e('button',{style:{background:'transparent',border:'none',padding:'4px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'},onClick:function(){setAiPage('hub');}},
             e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#a78bfa',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
               e('path',{d:'M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z'}),
               e('path',{d:'M5 3L5.8 5.2L8 6L5.8 6.8L5 9L4.2 6.8L2 6L4.2 5.2Z'}),
@@ -3912,7 +3964,7 @@ function App(){
           )
         )
         :e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
-          e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'},onClick:function(){/* AI analysis TODO */}},
+          e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',display:'flex',flexDirection:'column',alignItems:'center',gap:'2px'},onClick:function(){setAiPage('hub');}},
             e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#a78bfa',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
               e('path',{d:'M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z'}),
               e('path',{d:'M5 3L5.8 5.2L8 6L5.8 6.8L5 9L4.2 6.8L2 6L4.2 5.2Z'}),
