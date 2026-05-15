@@ -2266,31 +2266,48 @@ function CastViewerPage(){
   var selChartKey=s9[0];var setSelChartKey=s9[1];
 
   React.useEffect(function(){
-    if(!castId||(!uid&&!rid)){
+    if(!castId||!uid){
       setErrMsg('URLパラメータ不足 id='+castId);
       setStatus('error');
       return;
     }
-    var ref=rid
-      ?db.collection('rooms').doc(rid).collection('data').doc('main')
-      :db.collection('users').doc(uid).collection('data').doc('main');
-    ref.get()
-    .then(function(doc){
-      if(!doc.exists){setErrMsg('データなし');setStatus('error');return;}
-      var d=doc.data();
+    function applyDoc(d){
       var cast=(d.casts||[]).find(function(c){return c.id===castId;});
-      if(!cast){setErrMsg('キャスト未発見 id='+castId);setStatus('error');return;}
-      setCastData({
-        cast:cast,
-        records:(d.records||{})[castId]||[],
-        customers:(d.customers||{})[castId]||[]
-      });
+      if(!cast)return false;
+      setCastData({cast:cast,records:(d.records||{})[castId]||[],customers:(d.customers||{})[castId]||[]});
       setStatus('done');
-    })
-    .catch(function(err){
-      setErrMsg('DBエラー: '+err.message);
-      setStatus('error');
-    });
+      return true;
+    }
+    function searchRooms(){
+      db.collection('users').doc(uid).collection('rooms').get()
+      .then(function(snap){
+        var rids=snap.docs.map(function(d){return d.id;});
+        return Promise.all(rids.map(function(r){
+          return db.collection('rooms').doc(r).collection('data').doc('main').get()
+          .then(function(rdoc){return rdoc.exists?rdoc.data():null;});
+        }));
+      })
+      .then(function(results){
+        var found=results.find(function(d){return d&&(d.casts||[]).find(function(c){return c.id===castId;});});
+        if(found){applyDoc(found);}
+        else{setErrMsg('キャスト未発見 id='+castId);setStatus('error');}
+      })
+      .catch(function(err){setErrMsg('DBエラー: '+err.message);setStatus('error');});
+    }
+    if(rid){
+      db.collection('rooms').doc(rid).collection('data').doc('main').get()
+      .then(function(doc){
+        if(!doc.exists||!applyDoc(doc.data())){setErrMsg('キャスト未発見 id='+castId);setStatus('error');}
+      })
+      .catch(function(err){setErrMsg('DBエラー: '+err.message);setStatus('error');});
+    } else {
+      db.collection('users').doc(uid).collection('data').doc('main').get()
+      .then(function(doc){
+        if(doc.exists&&applyDoc(doc.data()))return;
+        searchRooms();
+      })
+      .catch(function(){searchRooms();});
+    }
   },[]);
 
   var e=React.createElement;
