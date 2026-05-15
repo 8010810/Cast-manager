@@ -1035,7 +1035,7 @@ function CastListPage(p){
   var s_disp=useState(null);var addType=s_disp[0];var setAddType=s_disp[1]; // null=未選択,'regular'=在籍,'dispatch'=派遣
   var s7=useState(null);var editCast=s7[0];var setEditCast=s7[1];
   var s8=useState({});var editForm=s8[0];var setEditForm=s8[1];
-  var s9=useState('name');var sortBy=s9[0];var setSortBy=s9[1];
+  var s9=useState('default');var sortBy=s9[0];var setSortBy=s9[1];
 
   var folders=p.data.folders||[];
 
@@ -1047,11 +1047,13 @@ function CastListPage(p){
     }
   },[detail]);
 
+  var CUP_ORDER={A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,I:9,J:10,K:11};
   var sorted=useMemo(function(){
     var list=[...p.data.casts];
     if(sortBy==='name')list.sort(function(a,b){return a.name.localeCompare(b.name,'ja');});
     else if(sortBy==='age')list.sort(function(a,b){var aa=calcAge(a.birthday)||999;var bb=calcAge(b.birthday)||999;return aa-bb;});
     else if(sortBy==='height')list.sort(function(a,b){return Number(b.height||0)-Number(a.height||0);});
+    else if(sortBy==='cup')list.sort(function(a,b){var ca=CUP_ORDER[a.cup]||99;var cb=CUP_ORDER[b.cup]||99;return cb-ca;});
     return list;
   },[p.data.casts,sortBy]);
 
@@ -1283,9 +1285,8 @@ function CastListPage(p){
       e('input',{style:{...S.input,paddingLeft:'38px',marginBottom:0},placeholder:'名前・本名・出身地・身長・メモで検索...',value:query,onChange:function(ev){setQuery(ev.target.value);}})
     ),
     // 並べ替え
-    e('div',{style:{display:'flex',gap:'6px',marginBottom:'14px',alignItems:'center'}},
-      e('span',{style:{color:'#6b7280',fontSize:'11px',alignSelf:'center'}},'並べ替え:'),
-      [['name','50音順'],['age','年齢順'],['height','身長順']].map(function(item){
+    e('div',{style:{display:'flex',flexWrap:'wrap',gap:'6px',marginBottom:'14px'}},
+      [['default','登録順'],['name','50音順'],['age','年齢順'],['height','身長順'],['cup','カップ数順']].map(function(item){
         return e('button',{key:item[0],style:{...(sortBy===item[0]?S.modeActive:S.modeBtn),fontSize:'11px',padding:'4px 10px'},onClick:function(){setSortBy(item[0]);}},item[1]);
       })
 ,
