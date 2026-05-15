@@ -2245,6 +2245,7 @@ function CastViewerPage(){
   var params=new URLSearchParams(window.location.search);
   var castId=params.get('id');
   var uid=params.get('uid');
+  var rid=params.get('rid');
   var s1=React.useState('loading');
   var status=s1[0];var setStatus=s1[1];
   var s2=React.useState(null);
@@ -2265,12 +2266,15 @@ function CastViewerPage(){
   var selChartKey=s9[0];var setSelChartKey=s9[1];
 
   React.useEffect(function(){
-    if(!castId||!uid){
-      setErrMsg('URLパラメータ不足 id='+castId+' uid='+uid);
+    if(!castId||(!uid&&!rid)){
+      setErrMsg('URLパラメータ不足 id='+castId);
       setStatus('error');
       return;
     }
-    db.collection('users').doc(uid).collection('data').doc('main').get()
+    var ref=rid
+      ?db.collection('rooms').doc(rid).collection('data').doc('main')
+      :db.collection('users').doc(uid).collection('data').doc('main');
+    ref.get()
     .then(function(doc){
       if(!doc.exists){setErrMsg('データなし');setStatus('error');return;}
       var d=doc.data();
