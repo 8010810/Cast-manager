@@ -2321,6 +2321,44 @@ function MiniApp(){
       var SETTINGS_HEADER={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(232,184,109,0.1)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
 
       if(settingsPage==='profile'){
+        var MPFIELD={background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'10px'};
+        var MPLBL={fontSize:'11px',color:'#6b7280',marginBottom:'6px'};
+        var MPVAL={fontSize:'15px',color:'#f3f4f6',fontWeight:600};
+        var MPEDIT={background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'};
+        var MPSAVE={background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',padding:'5px 12px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,cursor:'pointer'};
+        var MPINP={width:'100%',boxSizing:'border-box',background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'10px 12px',color:'#e5e7eb',fontSize:'14px',outline:'none'};
+        function mpSelect(label,key,opts){
+          var cur=miniProfileData[key]||'';
+          return e('div',{style:MPFIELD,key:key},
+            e('div',{style:MPLBL},label),
+            e('div',{style:{display:'flex',gap:'6px',marginTop:'4px'}},
+              opts.map(function(opt){
+                var active=cur===opt;
+                return e('button',{key:opt,style:{flex:1,padding:'8px 4px',borderRadius:'8px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'rgba(232,184,109,0.15)':'transparent',color:active?'#e8b86d':'#9ca3af',fontSize:'11px',cursor:'pointer',fontWeight:active?700:400},onClick:function(){saveMiniProfileSelect(key,opt);}},opt);
+              })
+            )
+          );
+        }
+        function mpText(label,key,multiline){
+          var isEditing=miniProfEditField===key;
+          var cur=miniProfileData[key]||'';
+          return e('div',{style:MPFIELD,key:key},
+            e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
+              e('div',{style:MPLBL},label),
+              isEditing
+                ?e('div',{style:{display:'flex',gap:'6px'}},
+                  e('button',{style:MPEDIT,onClick:function(){setMiniProfEditField(null);}},'キャンセル'),
+                  e('button',{style:MPSAVE,onClick:saveMiniProfileText},'保存')
+                )
+                :e('button',{style:MPEDIT,onClick:function(){setMiniProfEditField(key);setMiniProfEditVal(cur);}},'変更')
+            ),
+            isEditing
+              ?(multiline
+                ?e('textarea',{style:Object.assign({},MPINP,{minHeight:'80px',resize:'vertical',fontFamily:'inherit'}),value:miniProfEditVal,onChange:function(ev){setMiniProfEditVal(ev.target.value);},autoFocus:true})
+                :e('input',{style:MPINP,type:'number',value:miniProfEditVal,onChange:function(ev){setMiniProfEditVal(ev.target.value);},autoFocus:true}))
+              :e('div',{style:{fontSize:'14px',color:cur?'#f3f4f6':'#6b7280'}},cur?(key==='experienceYears'?cur+'年':cur):'未設定')
+          );
+        }
         return e('div',{style:SETTINGS_OVERLAY_STYLE},
           e('div',{style:SETTINGS_HEADER},
             e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
@@ -2329,13 +2367,13 @@ function MiniApp(){
           ),
           e('div',{style:SETTINGS_PANEL},
             e('div',{style:{padding:'20px 18px'}},
-              e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'12px'}},
+              e('div',{style:MPFIELD},
                 e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
-                  e('div',{style:{fontSize:'11px',color:'#6b7280'}},'ユーザー名'),
+                  e('div',{style:MPLBL},'ユーザー名'),
                   editingName
                     ?e('div',{style:{display:'flex',gap:'6px'}},
-                      e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditingName(false);setEditNameVal(userName);}},'キャンセル'),
-                      e('button',{style:{background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',padding:'5px 12px',color:'#0d0d1a',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){
+                      e('button',{style:MPEDIT,onClick:function(){setEditingName(false);setEditNameVal(userName);}},'キャンセル'),
+                      e('button',{style:MPSAVE,onClick:function(){
                         var uName=editNameVal.trim();if(!uName)return;
                         var oldName=userName;
                         db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName}).catch(function(){});
@@ -2346,24 +2384,45 @@ function MiniApp(){
                         }
                       }},'保存')
                     )
-                    :e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditingName(true);setEditNameVal(userName);}},'変更')
+                    :e('button',{style:MPEDIT,onClick:function(){setEditingName(true);setEditNameVal(userName);}},'変更')
                 ),
                 editingName
-                  ?e('input',{style:{width:'100%',boxSizing:'border-box',background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'10px 12px',color:'#e5e7eb',fontSize:'14px',outline:'none'},value:editNameVal,onChange:function(ev){setEditNameVal(ev.target.value);},autoFocus:true})
-                  :e('div',{style:{fontSize:'15px',color:'#f3f4f6',fontWeight:600}},userName||'未設定')
+                  ?e('input',{style:MPINP,value:editNameVal,onChange:function(ev){setEditNameVal(ev.target.value);},autoFocus:true})
+                  :e('div',{style:MPVAL},userName||'未設定')
               ),
-              e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'12px'}},
-                e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'6px'}},'メールアドレス'),
+              e('div',{style:MPFIELD},
+                e('div',{style:MPLBL},'メールアドレス'),
                 user&&user.email
                   ?e('div',{style:{fontSize:'14px',color:'#f3f4f6'}},user.email)
                   :e('div',{style:{display:'flex',gap:'8px',alignItems:'center'}},
                     e('span',{style:{fontSize:'14px',color:'#9ca3af',flex:1}},'未設定'),
-                    e('button',{style:{background:'#e8b86d',border:'none',borderRadius:'8px',padding:'8px 14px',color:'#0d0d1a',fontWeight:700,fontSize:'13px',cursor:'pointer'},onClick:function(){
+                    e('button',{style:MPSAVE,onClick:function(){
                       var email=prompt('メールアドレスを入力してください');if(!email)return;
                       user.updateEmail(email).then(function(){alert('更新しました');}).catch(function(err){alert('失敗: '+err.message);});
                     }},'設定')
                   )
-              )
+              ),
+              e('div',{style:MPFIELD},
+                e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
+                  e('div',{style:MPLBL},'電話番号'),
+                  editingMiniPhone
+                    ?e('div',{style:{display:'flex',gap:'6px'}},
+                      e('button',{style:MPEDIT,onClick:function(){setEditingMiniPhone(false);setEditMiniPhoneVal(miniPhone);}},'キャンセル'),
+                      e('button',{style:MPSAVE,onClick:saveMiniPhone},'保存')
+                    )
+                    :e('button',{style:MPEDIT,onClick:function(){setEditingMiniPhone(true);}},'変更')
+                ),
+                editingMiniPhone
+                  ?e('input',{style:MPINP,type:'tel',value:editMiniPhoneVal,onChange:function(ev){setEditMiniPhoneVal(ev.target.value);},autoFocus:true})
+                  :e('div',{style:{fontSize:'14px',color:miniPhone?'#f3f4f6':'#6b7280'}},miniPhone||'未設定')
+              ),
+              e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'20px',marginBottom:'10px',fontWeight:600,letterSpacing:'0.05em'}},'マネジメントスタイル'),
+              mpText('経験年数','experienceYears',false),
+              mpSelect('キャストとの距離感','castRelationStyle',['寄り添い型','バランス型','厳しめ']),
+              mpSelect('リスク許容度','riskTolerance',['攻め型','バランス型','守り型']),
+              mpSelect('育成方針','trainingPolicy',['短期結果重視','じっくり育成','バランス']),
+              mpText('得意領域','specialtyArea',true),
+              mpText('判断スタイル・特記事項','decisionStyle',true)
             )
           )
         );
