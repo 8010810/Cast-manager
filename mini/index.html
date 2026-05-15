@@ -1821,14 +1821,18 @@ function MiniApp(){
       var roomCastIds=new Set(casts.map(function(c){return c.id;}));
       var roomFolderIds=new Set(folders.map(function(f){return f.id;}));
       (pd.casts||[]).forEach(function(c){
-        if(!roomCastIds.has(c.id))casts.push(Object.assign({},c,{_personal:true}));
+        if(!roomCastIds.has(c.id)){
+          var arch=c._archived||!c._personal;
+          casts.push(Object.assign({},c,{_personal:true},arch?{_archived:true}:{}));
+        }
       });
       Object.keys(pd.records||{}).forEach(function(k){if(!roomCastIds.has(k))records[k]=pd.records[k];});
       Object.keys(pd.customers||{}).forEach(function(k){if(!roomCastIds.has(k))customers[k]=pd.customers[k];});
       (pd.folders||[]).forEach(function(f){
         if(!roomFolderIds.has(f.id)){
           var filteredCids=(f.castIds||[]).filter(function(cid){return !roomCastIds.has(cid);});
-          folders.push(Object.assign({},f,{castIds:filteredCids,_personal:true}));
+          var arch=f._archived||!f._personal;
+          folders.push(Object.assign({},f,{castIds:filteredCids,_personal:true},arch?{_archived:true}:{}));
         }
       });
       Object.keys(pd.shifts||{}).forEach(function(k){if(!roomCastIds.has(k))shifts[k]=pd.shifts[k];});
