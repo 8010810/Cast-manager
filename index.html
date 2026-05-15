@@ -4000,7 +4000,7 @@ function AttendancePage(p){
 
     // 遅刻: ボードのスロット基準で比較（切り上げ後のスロット > 予定スロット）
     if(status==='出勤'&&time){
-      var sched=scheduledTime[castId];
+      var sched=scheduledTime[castId]||(((p.data.shifts||{})[castId]||{})[todayStr]||{}).time||'';
       if(sched){
         var slots=getSlots();
         var intv=timeSetting.interval||30;
