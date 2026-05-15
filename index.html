@@ -2354,7 +2354,7 @@ function CastViewerPage(){
   var thisTgt=gt(tm);
   var thisPct=thisTgt>0?Math.min(999,Math.round(thisSales/thisTgt*100)):null;
 
-  var wrapStyle={minHeight:'100vh',background:'#0d0d1a',color:'#e5e7eb',fontFamily:"'Hiragino Sans',sans-serif",maxWidth:'600px',margin:'0 auto',padding:'16px'};
+  var wrapStyle={minHeight:'100vh',background:'#0d0d1a',color:'#e5e7eb',fontFamily:"'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif",maxWidth:'600px',margin:'0 auto',padding:'16px'};
   var cardStyle={background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'12px'};
   var boxStyle={background:'#0d0d1a',borderRadius:'8px',padding:'12px',textAlign:'center',border:'1px solid #1e2035'};
   var btnBase={border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:600};
@@ -2363,7 +2363,7 @@ function CastViewerPage(){
     // ヘッダー
     e('div',{style:{textAlign:'center',padding:'16px 0',borderBottom:'1px solid #1e2035',marginBottom:'16px',position:'relative'}},
       e('button',{style:{position:'absolute',top:0,right:0,background:'#1e2035',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#9ca3af',fontSize:'11px',padding:'6px 10px',cursor:'pointer'},onClick:function(){window.location.reload();}},'🔄 更新'),
-      e('div',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700,letterSpacing:'3px',marginBottom:'6px'}},'✦ CAST MANAGER'),
+      e('div',{style:{fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",fontSize:'22px',fontWeight:300,letterSpacing:'0.3em',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a,#e8b86d)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',marginBottom:'6px'}},'CAST MANAGER'),
       e('div',{style:{color:'#f3f4f6',fontSize:'22px',fontWeight:700}},cast.name),
       e('div',{style:{color:'#6b7280',fontSize:'12px',marginTop:'4px'}},(now.getMonth()+1)+'月のデータ')
     ),
