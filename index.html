@@ -488,7 +488,7 @@ function FolderDetail(p){
   function QRModal(){
     var cast=p.data.casts.find(function(c){return c.id===qrCast;});
     if(!cast)return null;
-    var url=window.location.origin+'/?view=cast&id='+qrCast+'&uid='+(p.uid||'');
+    var url=window.location.origin+'/?view=cast&id='+qrCast+'&uid='+(p.uid||'')+(p.roomId?'&rid='+p.roomId:'');
     var qrRef=React.useRef(null);
     React.useEffect(function(){
       if(qrRef.current&&window.QRCode){
@@ -4099,7 +4099,7 @@ function App(){
     // メインコンテンツ
     e('main',{style:S.main},
       isHomeLayer&&e(HomeScreen,{data:data,onNavigate:navigate,roomName:currentRoom&&currentRoom.name||''}),
-      layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
+      layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',roomId:roomId||'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
       layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
       layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,holidays:roomHolidays}),
