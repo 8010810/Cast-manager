@@ -3726,12 +3726,18 @@ function App(){
           roomRole==='admin'&&currentRoom&&e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
             if(!confirm('ルーム「'+currentRoom.name+'」を削除しますか？\nすべてのキャストデータが失われます。\nこの操作は取り消せません。'))return;
             var rid=roomId;
-            Promise.all([
-              db.collection('rooms').doc(rid).collection('data').doc('main').delete(),
-              db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
-              db.collection('rooms').doc(rid).delete(),
-              db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
-            ]).then(function(){
+            db.collection('rooms').doc(rid).collection('members').get().then(function(membersSnap){
+              var memberUids=membersSnap.docs.map(function(d){return d.id;});
+              var dels=[
+                db.collection('rooms').doc(rid).collection('data').doc('main').delete(),
+                db.collection('rooms').doc(rid).delete(),
+              ];
+              memberUids.forEach(function(mUid){
+                dels.push(db.collection('rooms').doc(rid).collection('members').doc(mUid).delete().catch(function(){}));
+                dels.push(db.collection('users').doc(mUid).collection('rooms').doc(rid).delete().catch(function(){}));
+              });
+              return Promise.all(dels);
+            }).then(function(){
               var remaining=roomsList.filter(function(r){return r.roomId!==rid;});
               setRoomsList(remaining);
               if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
