@@ -2362,7 +2362,7 @@ function CastViewerPage(){
   return e('div',{style:wrapStyle},
     // ヘッダー
     e('div',{style:{textAlign:'center',padding:'16px 0',borderBottom:'1px solid #1e2035',marginBottom:'16px',position:'relative'}},
-      e('button',{style:{position:'absolute',top:0,right:0,background:'#1e2035',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#9ca3af',fontSize:'11px',padding:'6px 10px',cursor:'pointer'},onClick:function(){window.location.reload();}},'🔄 更新'),
+      e('button',{style:{position:'absolute',top:0,right:0,background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){window.location.reload();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'}))),
       e('div',{style:{fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",fontSize:'22px',fontWeight:300,letterSpacing:'0.3em',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a,#e8b86d)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',marginBottom:'6px'}},'CAST MANAGER'),
       e('div',{style:{color:'#f3f4f6',fontSize:'22px',fontWeight:700}},cast.name),
       e('div',{style:{color:'#6b7280',fontSize:'12px',marginTop:'4px'}},(now.getMonth()+1)+'月のデータ')
