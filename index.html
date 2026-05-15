@@ -3192,7 +3192,19 @@ function App(){
             var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
             if(rooms.length>0&&!appliedRooms){clearTimeout(authTimeout);appliedRooms=true;applyRooms(rooms);}
             else if(rooms.length>0){setRoomsList(rooms);}
-            else if(!snap.metadata.fromCache){clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);}
+            else if(!snap.metadata.fromCache){
+              if(appliedRooms){
+                // 一度読み込んだ後に空になった = ルームを全退出
+                clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
+              }else{
+                // 初回ロード中に空スナップが来た可能性がある (race condition)
+                // 3秒待って、その間に実際のルームが届かなければルーム選択へ
+                clearTimeout(authTimeout);
+                setTimeout(function(){
+                  if(gen===currentAuthGen&&!appliedRooms){setConsentState('roomselect');setLoading(false);}
+                },3000);
+              }
+            }
           },function(){
             if(gen!==currentAuthGen)return;
             clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
