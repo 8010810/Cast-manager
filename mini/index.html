@@ -2326,7 +2326,16 @@ function MiniApp(){
     layer==='home'
       ?e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},LOGO_SVG,LOGO_TEXT)
       :e('div',{style:{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer'},onClick:goHome},LOGO_SVG,LOGO_TEXT),
-    e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',color:'#9ca3af',display:'flex',alignItems:'center'},onClick:function(){setSettingsPage('settings');}},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('circle',{cx:12,cy:12,r:3}),e('path',{d:'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'})))
+    e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},
+      e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',color:'#9ca3af',display:'flex',alignItems:'center'},onClick:function(){/* AI analysis TODO */}},
+        e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},
+          e('path',{d:'M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5Z'}),
+          e('path',{d:'M5 3L5.8 5.2L8 6L5.8 6.8L5 9L4.2 6.8L2 6L4.2 5.2Z'}),
+          e('path',{d:'M19 15L19.5 16.5L21 17L19.5 17.5L19 19L18.5 17.5L17 17L18.5 16.5Z'})
+        )
+      ),
+      e('button',{style:{background:'transparent',border:'none',padding:'4px 6px',cursor:'pointer',color:'#9ca3af',display:'flex',alignItems:'center'},onClick:function(){setSettingsPage('settings');}},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round',strokeLinejoin:'round'},e('circle',{cx:12,cy:12,r:3}),e('path',{d:'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z'})))
+    )
   );
 
   var toastEl=toast&&e('div',{style:{position:'fixed',top:'calc(16px + env(safe-area-inset-top))',left:'50%',transform:'translateX(-50%)',zIndex:1000,background:toast.type==='error'?'#ef4444':'#22c55e',color:'#fff',padding:'10px 20px',borderRadius:'10px',fontSize:'13px',fontWeight:600,whiteSpace:'nowrap',boxShadow:'0 4px 20px rgba(0,0,0,0.4)',animation:'pageFadeIn 0.3s ease both'}},toast.msg);
