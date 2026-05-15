@@ -1400,6 +1400,8 @@ function ShiftPage(p){
   }
 
   var weekDates=getWeekDates();
+  var hdSet=new Set(p.holidays||[]);
+  var visWeekDates=weekDates.filter(function(d,i){return !hdSet.has(i);});
   var firstDay=new Date(yr,mo-1,1).getDay();
 
   function ShiftCell(cp){
@@ -1487,8 +1489,9 @@ function ShiftPage(p){
       ),
       showQuota&&e('div',{style:{marginBottom:'10px'}},
         e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'6px'}},'各曜日の目標出勤人数'),
-        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'3px'}},
+        e('div',{style:{display:'grid',gridTemplateColumns:'repeat('+(7-hdSet.size)+',1fr)',gap:'3px'}},
           dayLabels.map(function(d,i){
+            if(hdSet.has(i))return null;
             return e('div',{key:i,style:{textAlign:'center'}},
               e('div',{style:{fontSize:'10px',color:i===0?'#fca5a5':i===6?'#60a5fa':'#6b7280',marginBottom:'2px'}},d),
               e('input',{type:'number',style:{width:'100%',background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'4px',color:'#e5e7eb',fontSize:'12px',padding:'4px 2px',textAlign:'center',outline:'none'},value:quotaMap[i]||'',placeholder:'0',onChange:function(ev){var v=ev.target.value;setQuotaMap(function(m){var nm=Object.assign({},m);nm[i]=v;return nm;});}})
@@ -1500,21 +1503,22 @@ function ShiftPage(p){
         e('thead',null,
           e('tr',null,
             e('th',{style:{padding:'4px 2px',textAlign:'left',color:'#6b7280',fontWeight:600,fontSize:'11px'}},''),
-            dayLabels.map(function(d,i){var active=selDayIdx===i;return e('th',{key:i,style:{padding:'2px'}},e('button',{style:{width:'100%',padding:'5px 2px',borderRadius:'6px',border:'2px solid '+(active?'#e8b86d':(i===0?'#fca5a544':i===6?'#60a5fa44':'#374151')),background:active?'#e8b86d33':(i===0?'#fca5a511':i===6?'#60a5fa11':'#12122a'),color:i===0?'#fca5a5':i===6?'#60a5fa':'#9ca3af',fontWeight:active?700:600,fontSize:'11px',cursor:'pointer',transition:'all 0.1s'},onClick:function(){setSelDayIdx(active?null:i);}},d));})
+            dayLabels.map(function(d,i){if(hdSet.has(i))return null;var active=selDayIdx===i;return e('th',{key:i,style:{padding:'2px'}},e('button',{style:{width:'100%',padding:'5px 2px',borderRadius:'6px',border:'2px solid '+(active?'#e8b86d':(i===0?'#fca5a544':i===6?'#60a5fa44':'#374151')),background:active?'#e8b86d33':(i===0?'#fca5a511':i===6?'#60a5fa11':'#12122a'),color:i===0?'#fca5a5':i===6?'#60a5fa':'#9ca3af',fontWeight:active?700:600,fontSize:'11px',cursor:'pointer',transition:'all 0.1s'},onClick:function(){setSelDayIdx(active?null:i);}},d));})
           )
         ),
         e('tbody',null,
           e('tr',null,
             e('td',{style:{padding:'4px 4px',color:'#9ca3af',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}},'定数'),
-            weekdayDiff.map(function(item,i){return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:'#9ca3af'}},item.quota||'-');})
+            weekdayDiff.map(function(item,i){if(hdSet.has(i))return null;return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:'#9ca3af'}},item.quota||'-');})
           ),
           e('tr',null,
             e('td',{style:{padding:'4px 4px',color:'#9ca3af',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}},'予定'),
-            weekdayDiff.map(function(item,i){return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:'#e5e7eb'}},item.actual+'人');})
+            weekdayDiff.map(function(item,i){if(hdSet.has(i))return null;return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:'#e5e7eb'}},item.actual+'人');})
           ),
           e('tr',null,
             e('td',{style:{padding:'4px 4px',color:'#9ca3af',fontSize:'11px',fontWeight:600,whiteSpace:'nowrap'}},'差異'),
             weekdayDiff.map(function(item,i){
+              if(hdSet.has(i))return null;
               var diffColor=item.diff===null?'#6b7280':item.diff>=0?'#34d399':'#fca5a5';
               return e('td',{key:i,style:{padding:'4px 2px',textAlign:'center',color:diffColor,fontWeight:600}},item.diff===null?'-':(item.diff>0?'+':'')+item.diff);
             })
@@ -1594,8 +1598,8 @@ function ShiftPage(p){
           e('tr',null,
             e('th',{style:{padding:'6px 10px',textAlign:'left',color:'#6b7280',fontSize:'11px',fontWeight:600,borderBottom:'1px solid #1e2035',position:'sticky',left:0,background:'#0d0d1a',minWidth:'90px'}},'キャスト'),
             viewMode==='week'
-              ?weekDates.map(function(d,i){var dn=Number(d.split('-')[2]);return e('th',{key:d,style:{padding:'4px',textAlign:'center',color:i===0?'#fca5a5':i===6?'#60a5fa':'#6b7280',fontSize:'10px',fontWeight:600,borderBottom:'1px solid #1e2035',minWidth:'48px'}},e('div',null,dayLabels[i]),e('div',{style:{fontSize:'12px',fontWeight:700}},dn));})
-              :Array.from({length:daysInMonth},function(_,i){var dn=i+1;var dow=new Date(yr,mo-1,dn).getDay();return e('th',{key:dn,style:{padding:'2px',textAlign:'center',color:dow===0?'#fca5a5':dow===6?'#60a5fa':'#6b7280',fontSize:'9px',borderBottom:'1px solid #1e2035',minWidth:'32px'}},e('div',null,dayLabels[dow]),e('div',{style:{fontSize:'10px',fontWeight:700}},dn));})
+              ?visWeekDates.map(function(d){var dn=Number(d.split('-')[2]);var dow=new Date(d).getDay();return e('th',{key:d,style:{padding:'4px',textAlign:'center',color:dow===0?'#fca5a5':dow===6?'#60a5fa':'#6b7280',fontSize:'10px',fontWeight:600,borderBottom:'1px solid #1e2035',minWidth:'48px'}},e('div',null,dayLabels[dow]),e('div',{style:{fontSize:'12px',fontWeight:700}},dn));})
+              :Array.from({length:daysInMonth},function(_,i){var dn=i+1;var dow=new Date(yr,mo-1,dn).getDay();if(hdSet.has(dow))return null;return e('th',{key:dn,style:{padding:'2px',textAlign:'center',color:dow===0?'#fca5a5':dow===6?'#60a5fa':'#6b7280',fontSize:'9px',borderBottom:'1px solid #1e2035',minWidth:'32px'}},e('div',null,dayLabels[dow]),e('div',{style:{fontSize:'10px',fontWeight:700}},dn));})
           )
         ),
         e('tbody',null,
@@ -1612,8 +1616,8 @@ function ShiftPage(p){
                 c.contractShift&&e('div',{style:{fontSize:'9px',color:'#6b7280'}},c.contractShift)
               ),
               viewMode==='week'
-                ?weekDates.map(function(d){return e('td',{key:d,style:{padding:'2px',borderBottom:'1px solid #1e2035',textAlign:'center'}},e(ShiftCell,{castId:c.id,date:d}));})
-                :Array.from({length:daysInMonth},function(_,i){var d=yr+'-'+pad(mo)+'-'+pad(i+1);return e('td',{key:d,style:{padding:'1px',borderBottom:'1px solid #1e2035',textAlign:'center'}},e(ShiftCell,{castId:c.id,date:d}));})
+                ?visWeekDates.map(function(d){return e('td',{key:d,style:{padding:'2px',borderBottom:'1px solid #1e2035',textAlign:'center'}},e(ShiftCell,{castId:c.id,date:d}));})
+                :Array.from({length:daysInMonth},function(_,i){var d=yr+'-'+pad(mo)+'-'+pad(i+1);var dow=new Date(yr,mo-1,i+1).getDay();if(hdSet.has(dow))return null;return e('td',{key:d,style:{padding:'1px',borderBottom:'1px solid #1e2035',textAlign:'center'}},e(ShiftCell,{castId:c.id,date:d}));})
             );
           })
         )
@@ -3051,6 +3055,7 @@ function App(){
   var s_jrm=useState('');var joinReqMsg=s_jrm[0];var setJoinReqMsg=s_jrm[1];
   var s_jrq=useState([]);var joinRequests=s_jrq[0];var setJoinRequests=s_jrq[1];
   var s_jrql=useState(false);var joinReqsLoading=s_jrql[0];var setJoinReqsLoading=s_jrql[1];
+  var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
 
   var layer=navStack[navStack.length-1]||'home';
 
@@ -3197,6 +3202,7 @@ function App(){
 
 
   useEffect(function(){if(settingsPage==='invite'&&roomRole==='admin'&&roomId){loadJoinRequests();}else if(settingsPage!=='invite'){setJoinRequests([]);}}, [settingsPage]);
+  useEffect(function(){if(!roomId){setRoomHolidays([]);return;}db.collection('rooms').doc(roomId).get().then(function(doc){setRoomHolidays(doc.exists?(doc.data().holidays||[]):[]);}).catch(function(){setRoomHolidays([]);});},[roomId]);
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){
     if(!user||!roomId)return;
@@ -3898,7 +3904,7 @@ function App(){
       layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
       layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
-      layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
+      layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,holidays:roomHolidays}),
       layer==='attendance'&&e(AttendancePage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',roomId:roomId||'',attData:attData,setAttData:setAttData}),
       layer==='visit'&&e(VisitPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
