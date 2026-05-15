@@ -2530,12 +2530,17 @@ function StoreSettingsPage(p){
   var s7=useState({openDate:'',address:''});var storeOrig=s7[0];var setStoreOrig=s7[1];
   var s5=useState(null);var promotingId=s5[0];var setPromotingId=s5[1];
   var s8=useState(null);var editingMemberId=s8[0];var setEditingMemberId=s8[1];
+  var s9=useState('');var area=s9[0];var setArea=s9[1];
+  var s10=useState('');var mainGuest=s10[0];var setMainGuest=s10[1];
+  var s11=useState('');var freeRate=s11[0];var setFreeRate=s11[1];
+  var s12=useState([]);var holidays=s12[0];var setHolidays=s12[1];
+  var s13=useState('');var policy=s13[0];var setPolicy=s13[1];
 
   useEffect(function(){
     if(!p.roomId)return;
     // 店舗情報読み込み
     p.db.collection('rooms').doc(p.roomId).get().then(function(doc){
-      if(doc.exists){var d=doc.data();setOpenDate(d.openDate||'');setAddress(d.address||'');}
+      if(doc.exists){var d=doc.data();setOpenDate(d.openDate||'');setAddress(d.address||'');setArea(d.area||'');setMainGuest(d.mainGuest||'');setFreeRate(d.freeRate||'');setHolidays(d.holidays||[]);setPolicy(d.policy||'');}
     }).catch(function(){});
     // メンバー一覧読み込み
     setMembersLoading(true);
@@ -2554,7 +2559,7 @@ function StoreSettingsPage(p){
   function saveStore(){
     if(!p.roomId)return;
     setStoreLoading(true);
-    p.db.collection('rooms').doc(p.roomId).update({openDate:openDate,address:address})
+    p.db.collection('rooms').doc(p.roomId).update({openDate:openDate,address:address,area:area,mainGuest:mainGuest,freeRate:freeRate,holidays:holidays,policy:policy})
       .then(function(){setStoreLoading(false);setEditingStore(false);p.notify('保存しました');})
       .catch(function(){setStoreLoading(false);p.notify('保存に失敗しました');});
   }
@@ -2616,7 +2621,7 @@ function StoreSettingsPage(p){
       // 店舗情報セクション
       e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}},
         e('div',{style:SEC,marginBottom:0},'店舗情報'),
-        !editingStore&&e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setStoreOrig({openDate:openDate,address:address});setEditingStore(true);}},'編集')
+        !editingStore&&e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'5px 12px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){setStoreOrig({openDate:openDate,address:address,area:area,mainGuest:mainGuest,freeRate:freeRate,holidays:holidays,policy:policy});setEditingStore(true);}},'編集')
       ),
       editingStore
         ?e('div',null,
@@ -2624,20 +2629,38 @@ function StoreSettingsPage(p){
           e('input',{type:'date',style:INP,value:openDate,onChange:function(ev){setOpenDate(ev.target.value);}}),
           e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'住所'),
           e('input',{type:'text',style:INP,placeholder:'',value:address,onChange:function(ev){setAddress(ev.target.value);}}),
+          e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'エリア・繁華街名'),
+          e('input',{type:'text',style:INP,placeholder:'例: 歌舞伎町、すすきの',value:area,onChange:function(ev){setArea(ev.target.value);}}),
+          e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'主要客層'),
+          e('input',{type:'text',style:INP,placeholder:'例: 30〜40代のビジネスマン',value:mainGuest,onChange:function(ev){setMainGuest(ev.target.value);}}),
+          e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'6px'}},'フリー客比率'),
+          e('div',{style:{display:'flex',gap:'8px',marginBottom:'10px'}},
+            ['多い','少ない'].map(function(v){var active=freeRate===v;return e('button',{key:v,style:{flex:1,padding:'9px',borderRadius:'8px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'13px',fontWeight:active?700:400,cursor:'pointer'},onClick:function(){setFreeRate(active?'':v);}},v);})
+          ),
+          e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'6px'}},'定休日'),
+          e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}},
+            ['日','月','火','水','木','金','土'].map(function(d,i){var active=holidays.indexOf(i)>=0;return e('button',{key:i,style:{width:'36px',height:'36px',borderRadius:'8px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?(i===0?'#fca5a5':i===6?'#60a5fa':'#e8b86d'):(i===0?'#fca5a5':i===6?'#60a5fa':'#6b7280'),fontSize:'13px',fontWeight:active?700:400,cursor:'pointer'},onClick:function(){setHolidays(function(prev){return active?prev.filter(function(x){return x!==i;}):[].concat(prev,[i]).sort(function(a,b){return a-b;});});}},d);})
+          ),
+          e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'店舗方針・特記事項'),
+          e('textarea',{style:Object.assign({},INP,{minHeight:'90px',resize:'vertical',fontFamily:'inherit',lineHeight:'1.6'}),placeholder:'自由記述',value:policy,onChange:function(ev){setPolicy(ev.target.value);}}),
           e('div',{style:{display:'flex',gap:'8px',marginBottom:'28px'}},
-            e('button',{style:{flex:1,background:'transparent',border:'1px solid #374151',borderRadius:'10px',color:'#9ca3af',fontWeight:600,fontSize:'14px',padding:'12px',cursor:'pointer'},onClick:function(){setOpenDate(storeOrig.openDate);setAddress(storeOrig.address);setEditingStore(false);}},'キャンセル'),
+            e('button',{style:{flex:1,background:'transparent',border:'1px solid #374151',borderRadius:'10px',color:'#9ca3af',fontWeight:600,fontSize:'14px',padding:'12px',cursor:'pointer'},onClick:function(){setOpenDate(storeOrig.openDate);setAddress(storeOrig.address);setArea(storeOrig.area);setMainGuest(storeOrig.mainGuest);setFreeRate(storeOrig.freeRate);setHolidays(storeOrig.holidays);setPolicy(storeOrig.policy);setEditingStore(false);}},'キャンセル'),
             e('button',{style:{flex:1,background:'linear-gradient(135deg,#d4a017,#e8b86d)',border:'none',borderRadius:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',padding:'12px',cursor:storeLoading?'not-allowed':'pointer',opacity:storeLoading?0.6:1},onClick:saveStore,disabled:storeLoading},storeLoading?'保存中...':'保存')
           )
         )
         :e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'14px 16px',marginBottom:'28px'}},
-          e('div',{style:{marginBottom:'10px'}},
-            e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'4px'}},'開店日'),
-            e('div',{style:{fontSize:'14px',color:'#f3f4f6'}},openDate||'未設定')
-          ),
-          e('div',null,
-            e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'4px'}},'住所'),
-            e('div',{style:{fontSize:'14px',color:'#f3f4f6'}},address||'未設定')
-          )
+          [
+            {label:'開店日',val:openDate||'未設定'},
+            {label:'住所',val:address||'未設定'},
+            {label:'エリア・繁華街名',val:area||'未設定'},
+            {label:'主要客層',val:mainGuest||'未設定'},
+            {label:'フリー客比率',val:freeRate||'未設定'},
+            {label:'定休日',val:holidays.length>0?['日','月','火','水','木','金','土'].filter(function(_,i){return holidays.indexOf(i)>=0;}).join('・'):'なし'},
+            {label:'店舗方針・特記事項',val:policy||'未設定'}
+          ].map(function(row,i,arr){return e('div',{key:row.label,style:{marginBottom:i<arr.length-1?'10px':0}},
+            e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'4px'}},row.label),
+            e('div',{style:{fontSize:'14px',color:'#f3f4f6',whiteSpace:'pre-wrap',wordBreak:'break-word'}},row.val)
+          );})
         ),
       // メンバーセクション
       e('div',{style:SEC},'メンバー'),
