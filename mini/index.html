@@ -1793,6 +1793,22 @@ function MiniApp(){
   var s_tf=useState(null);var targetFolder=s_tf[0];var setTargetFolder=s_tf[1];
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
   var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|castId
+  var s_pdata=useState({experienceYears:'',castRelationStyle:'',riskTolerance:'',trainingPolicy:'',specialtyArea:'',decisionStyle:''});var miniProfileData=s_pdata[0];var setMiniProfileData=s_pdata[1];
+  var s_pef=useState(null);var miniProfEditField=s_pef[0];var setMiniProfEditField=s_pef[1];
+  var s_pev=useState('');var miniProfEditVal=s_pev[0];var setMiniProfEditVal=s_pev[1];
+  var s_mphone=useState('');var miniPhone=s_mphone[0];var setMiniPhone=s_mphone[1];
+  var s_ephp=useState(false);var editingMiniPhone=s_ephp[0];var setEditingMiniPhone=s_ephp[1];
+  var s_phpv=useState('');var editMiniPhoneVal=s_phpv[0];var setEditMiniPhoneVal=s_phpv[1];
+  React.useEffect(function(){
+    if(!user)return;
+    db.collection('users').doc(user.uid).collection('meta').doc('consent').get().then(function(doc){
+      if(!doc.exists)return;
+      var d=doc.data();
+      var ph=d.phoneNumber||'';
+      setMiniPhone(ph);setEditMiniPhoneVal(ph);
+      setMiniProfileData({experienceYears:d.experienceYears||'',castRelationStyle:d.castRelationStyle||'',riskTolerance:d.riskTolerance||'',trainingPolicy:d.trainingPolicy||'',specialtyArea:d.specialtyArea||'',decisionStyle:d.decisionStyle||''});
+    }).catch(function(){});
+  },[user&&user.uid]);
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
@@ -2094,6 +2110,27 @@ function MiniApp(){
   function navigate(pg){setNavStack(function(st){return [...st,pg];});setSubBack(null);refreshData();}
   function goHome(){setNavStack(['home']);setSubBack(null);refreshData();}
   function handleSignOut(){fbSignOut().then(function(){window.location.href='/';});}
+  function saveMiniProfileSelect(key,val){
+    if(!user)return;
+    var upd={};upd[key]=val;
+    db.collection('users').doc(user.uid).collection('meta').doc('consent').update(upd).catch(function(){});
+    setMiniProfileData(function(prev){return Object.assign({},prev,upd);});
+  }
+  function saveMiniProfileText(){
+    if(!user||!miniProfEditField)return;
+    var upd={};upd[miniProfEditField]=miniProfEditVal;
+    db.collection('users').doc(user.uid).collection('meta').doc('consent').update(upd).catch(function(){});
+    setMiniProfileData(function(prev){return Object.assign({},prev,upd);});
+    setMiniProfEditField(null);
+    notify('保存しました');
+  }
+  function saveMiniPhone(){
+    if(!user)return;
+    var ph=editMiniPhoneVal.trim();
+    db.collection('users').doc(user.uid).collection('meta').doc('consent').update({phoneNumber:ph}).catch(function(){});
+    setMiniPhone(ph);setEditingMiniPhone(false);
+    notify('電話番号を保存しました');
+  }
   function handleDeleteAccount(){
     if(!user)return;
     var uid2=user.uid;

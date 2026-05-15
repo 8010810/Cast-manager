@@ -2749,6 +2749,9 @@ function ProfileSettingsPage(p){
   var s4=useState('');var editPhone=s4[0];var setEditPhone=s4[1];
   var s5=useState(false);var editingPhone=s5[0];var setEditingPhone=s5[1];
   var s6=useState('');var phoneFromDB=s6[0];var setPhoneFromDB=s6[1];
+  var s7=useState({experienceYears:'',castRelationStyle:'',riskTolerance:'',trainingPolicy:'',specialtyArea:'',decisionStyle:''});var profileData=s7[0];var setProfileData=s7[1];
+  var s8=useState(null);var profileEditField=s8[0];var setProfileEditField=s8[1];
+  var s9=useState('');var profileEditVal=s9[0];var setProfileEditVal=s9[1];
 
   useEffect(function(){
     if(!p.user||!p.db)return;
@@ -2758,6 +2761,7 @@ function ProfileSettingsPage(p){
         var ph=d.phoneNumber||(p.user&&p.user.phoneNumber)||'';
         setPhoneFromDB(ph);
         setEditPhone(ph);
+        setProfileData({experienceYears:d.experienceYears||'',castRelationStyle:d.castRelationStyle||'',riskTolerance:d.riskTolerance||'',trainingPolicy:d.trainingPolicy||'',specialtyArea:d.specialtyArea||'',decisionStyle:d.decisionStyle||''});
       }
     });
   },[p.user&&p.user.uid]);
@@ -2796,6 +2800,51 @@ function ProfileSettingsPage(p){
     setPhoneFromDB(ph);
     setEditingPhone(false);
     p.notify('電話番号を更新しました');
+  }
+  function saveProfileSelect(key,val){
+    var upd={};upd[key]=val;
+    p.db.collection('users').doc(p.user.uid).collection('meta').doc('consent').update(upd).catch(function(){});
+    setProfileData(function(prev){return Object.assign({},prev,upd);});
+  }
+  function saveProfileText(){
+    if(!profileEditField)return;
+    var upd={};upd[profileEditField]=profileEditVal;
+    p.db.collection('users').doc(p.user.uid).collection('meta').doc('consent').update(upd).catch(function(){});
+    setProfileData(function(prev){return Object.assign({},prev,upd);});
+    setProfileEditField(null);
+    p.notify('保存しました');
+  }
+  function renderProfSelect(label,key,opts){
+    var cur=profileData[key]||'';
+    return e('div',{style:FIELD,key:key},
+      e('div',{style:LBL},label),
+      e('div',{style:{display:'flex',gap:'6px',marginTop:'4px'}},
+        opts.map(function(opt){
+          var active=cur===opt;
+          return e('button',{key:opt,style:{flex:1,padding:'8px 4px',borderRadius:'8px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'rgba(232,184,109,0.15)':'transparent',color:active?'#e8b86d':'#9ca3af',fontSize:'11px',cursor:'pointer',fontWeight:active?700:400},onClick:function(){saveProfileSelect(key,opt);}},opt);
+        })
+      )
+    );
+  }
+  function renderProfText(label,key,multiline){
+    var isEditing=profileEditField===key;
+    var cur=profileData[key]||'';
+    return e('div',{style:FIELD,key:key},
+      e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'6px'}},
+        e('div',{style:LBL},label),
+        isEditing
+          ?e('div',{style:{display:'flex',gap:'6px'}},
+            e('button',{style:EDIT_BTN,onClick:function(){setProfileEditField(null);}},'キャンセル'),
+            e('button',{style:SAVE_BTN,onClick:saveProfileText},'保存')
+          )
+          :e('button',{style:EDIT_BTN,onClick:function(){setProfileEditField(key);setProfileEditVal(cur);}},'変更')
+      ),
+      isEditing
+        ?(multiline
+          ?e('textarea',{style:Object.assign({},INP,{minHeight:'80px',resize:'vertical',fontFamily:'inherit'}),value:profileEditVal,onChange:function(ev){setProfileEditVal(ev.target.value);},autoFocus:true})
+          :e('input',{style:INP,type:'number',value:profileEditVal,onChange:function(ev){setProfileEditVal(ev.target.value);},autoFocus:true}))
+        :e('div',{style:Object.assign({},VAL,{color:cur?'#f3f4f6':'#6b7280',fontSize:'14px'})},cur?(key==='experienceYears'?cur+'年':cur):'未設定')
+    );
   }
   var OVERLAY={position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',flexDirection:'column'};
   var PANEL={background:'#0d0d1a',flex:1,overflowY:'auto'};
@@ -2857,7 +2906,14 @@ function ProfileSettingsPage(p){
         editingPhone
           ?e('input',{style:INP,type:'tel',placeholder:'',value:editPhone,onChange:function(ev){setEditPhone(ev.target.value);},autoFocus:true})
           :e('div',{style:Object.assign({},VAL,{color:phoneFromDB?'#f3f4f6':'#6b7280'})},phoneFromDB||'未設定')
-      )
+      ),
+      e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'20px',marginBottom:'10px',fontWeight:600,letterSpacing:'0.05em'}},'マネジメントスタイル'),
+      renderProfText('経験年数','experienceYears',false),
+      renderProfSelect('キャストとの距離感','castRelationStyle',['寄り添い型','バランス型','厳しめ']),
+      renderProfSelect('リスク許容度','riskTolerance',['攻め型','バランス型','守り型']),
+      renderProfSelect('育成方針','trainingPolicy',['短期結果重視','じっくり育成','バランス']),
+      renderProfText('得意領域','specialtyArea',true),
+      renderProfText('判断スタイル・特記事項','decisionStyle',true)
     )
   );
 }
