@@ -587,14 +587,14 @@ function CastListPage(p){
       var existPF=(p.data.folders||[]).find(function(f){return f._personal&&f.ownerUid&&f.ownerUid===p.uid;});
       var pfId=existPF?existPF.id:('personal_'+p.uid);
       initFid=pfId;
-      finalCast=Object.assign({},{id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:false,folderHistory:[{folderId:pfId,from:initMK}]},{_personal:true});
+      finalCast=Object.assign({},{id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',cup:addForm.cup||'',castType:addForm.castType||'',isDispatch:false,folderHistory:[{folderId:pfId,from:initMK}]},{_personal:true});
       if(existPF){
         finalFolders=(p.data.folders||[]).map(function(f){if(f.id===pfId)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});return f;});
       }else{
         finalFolders=(p.data.folders||[]).concat([{id:pfId,name:'自分のフォルダ',castIds:[id],ownerUid:p.uid,_personal:true}]);
       }
     }else{
-      finalCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
+      finalCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',cup:addForm.cup||'',castType:addForm.castType||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
       finalFolders=(p.data.folders||[]).map(function(f){if(f.id===initFid)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});return f;});
       if(isDispatch&&!dispatchFolder){
         var dfId='dispatch_'+Date.now().toString();
@@ -679,7 +679,7 @@ function CastListPage(p){
         e('div',{style:{display:'flex',gap:'8px'}},
           !isEditing&&e('button',{style:S.btnEdit,onClick:function(){
             var cf=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(detail);});
-            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||'',isDispatch:cast.isDispatch||false});
+            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||'',cup:cast.cup||'',castType:cast.castType||'',isDispatch:cast.isDispatch||false});
           }}, '編集'),
           e('button',{style:S.btnDanger,onClick:function(){deleteCastItem(cast.id,cast.name);}}, '削除')
         )
@@ -704,12 +704,17 @@ function CastListPage(p){
                 }
               },editForm.isDispatch?'在籍に変更':'派遣に変更')
             ),
-            [['name','キャスト名','text'],['birthday','誕生日','date'],['realName','本名','text'],['hometown','出身地','text'],['height','身長 (cm)','number'],['contractShift','契約シフト','text']].map(function(f){
+            [['name','キャスト名','text'],['birthday','誕生日','date'],['realName','本名','text'],['hometown','出身地','text'],['height','身長 (cm)','number'],['castType','系統','text'],['contractShift','契約シフト','text']].map(function(f){
               return e('div',{key:f[0]},
                 e('label',{style:S.label},f[1]),
-                e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:f[0]==='height'?'':'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
+                e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
               );
             }),
+            e('label',{style:S.label},'カップ数'),
+            e('select',{style:Object.assign({},S.input,{appearance:'none'}),value:editForm.cup||'',onChange:function(ev){setEditForm(function(fm){return{...fm,cup:ev.target.value};})}},
+              e('option',{value:''},'---'),
+              ['A','B','C','D','E','F','G','H','I','J','K'].map(function(c){return e('option',{key:c,value:c},c+'カップ');})
+            ),
             e('label',{style:S.label},'メモ'),
             e('textarea',{style:{...S.input,minHeight:'70px',resize:'vertical',fontFamily:'inherit'},value:editForm.memo||'',onChange:function(ev){setEditForm(function(fm){return{...fm,memo:ev.target.value};})},placeholder:'メモ...'}),
             e('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},
@@ -721,6 +726,7 @@ function CastListPage(p){
             [['誕生日',cast.birthday?fmtDate(cast.birthday)+(age!==null?' ('+age+'歳)':''):'未設定'],
              ['本名',cast.realName||'未設定'],['出身地',cast.hometown||'未設定'],
              ['身長',cast.height?cast.height+'cm':'未設定'],
+             ['カップ数',cast.cup?cast.cup+'カップ':'未設定'],['系統',cast.castType||'未設定'],
              ['契約シフト',cast.contractShift||'未設定'],['所属フォルダ',castFolderName||'未設定'],['メモ',cast.memo||'なし']].map(function(row){
               return e('div',{key:row[0],style:{display:'flex',gap:'8px',marginBottom:'10px',fontSize:'14px'}},
                 e('span',{style:{color:'#6b7280',minWidth:'100px',flexShrink:0}},row[0]),
@@ -761,11 +767,18 @@ function CastListPage(p){
       e('label',{style:S.label},'誕生日'),
       e('input',{type:'date',style:S.input,value:addForm.birthday||'',onChange:function(ev){setAddForm(function(f){return{...f,birthday:ev.target.value};})}}),
       e('label',{style:S.label},'本名'),
-      e('input',{type:'text',style:S.input,placeholder:'本名（任意）',value:addForm.realName||'',onChange:function(ev){setAddForm(function(f){return{...f,realName:ev.target.value};})}}),
+      e('input',{type:'text',style:S.input,placeholder:'',value:addForm.realName||'',onChange:function(ev){setAddForm(function(f){return{...f,realName:ev.target.value};})}}),
       e('label',{style:S.label},'出身地'),
       e('input',{type:'text',style:S.input,placeholder:'',value:addForm.hometown||'',onChange:function(ev){setAddForm(function(f){return{...f,hometown:ev.target.value};})}}),
       e('label',{style:S.label},'身長 (cm)'),
       e('input',{type:'number',style:S.input,placeholder:'',value:addForm.height||'',onChange:function(ev){setAddForm(function(f){return{...f,height:ev.target.value};})}}),
+      e('label',{style:S.label},'カップ数'),
+      e('select',{style:Object.assign({},S.input,{appearance:'none'}),value:addForm.cup||'',onChange:function(ev){setAddForm(function(f){return{...f,cup:ev.target.value};})}},
+        e('option',{value:''},'---'),
+        ['A','B','C','D','E','F','G','H','I','J','K'].map(function(c){return e('option',{key:c,value:c},c+'カップ');})
+      ),
+      e('label',{style:S.label},'系統'),
+      e('input',{type:'text',style:S.input,placeholder:'',value:addForm.castType||'',onChange:function(ev){setAddForm(function(f){return{...f,castType:ev.target.value};})}}),
       e('label',{style:S.label},'契約シフト'),
       e('input',{type:'text',style:S.input,placeholder:'',value:newShift,onChange:function(ev){setNewShift(ev.target.value);}}),
       e('label',{style:S.label},'メモ'),
