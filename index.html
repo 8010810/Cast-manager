@@ -3202,7 +3202,7 @@ function App(){
 
 
   useEffect(function(){if(settingsPage==='invite'&&roomRole==='admin'&&roomId){loadJoinRequests();}else if(settingsPage!=='invite'){setJoinRequests([]);}}, [settingsPage]);
-  useEffect(function(){if(!roomId){setRoomHolidays([]);return;}db.collection('rooms').doc(roomId).get().then(function(doc){setRoomHolidays(doc.exists?(doc.data().holidays||[]):[]);}).catch(function(){setRoomHolidays([]);});},[roomId]);
+  useEffect(function(){if(!roomId){setRoomHolidays([]);return;}var unsub=db.collection('rooms').doc(roomId).onSnapshot(function(doc){setRoomHolidays(doc.exists?(doc.data().holidays||[]):[]);},function(){setRoomHolidays([]);});return function(){unsub();};},[roomId]);
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){
     if(!user||!roomId)return;
