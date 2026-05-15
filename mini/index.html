@@ -1801,13 +1801,14 @@ function MiniApp(){
   var s_phpv=useState('');var editMiniPhoneVal=s_phpv[0];var setEditMiniPhoneVal=s_phpv[1];
   React.useEffect(function(){
     if(!user)return;
-    db.collection('users').doc(user.uid).collection('meta').doc('consent').get().then(function(doc){
+    var unsub=db.collection('users').doc(user.uid).collection('meta').doc('consent').onSnapshot(function(doc){
       if(!doc.exists)return;
       var d=doc.data();
       var ph=d.phoneNumber||'';
       setMiniPhone(ph);setEditMiniPhoneVal(ph);
       setMiniProfileData({experienceYears:d.experienceYears||'',castRelationStyle:d.castRelationStyle||'',riskTolerance:d.riskTolerance||'',trainingPolicy:d.trainingPolicy||'',specialtyArea:d.specialtyArea||'',decisionStyle:d.decisionStyle||''});
-    }).catch(function(){});
+    },function(){});
+    return function(){unsub();};
   },[user&&user.uid]);
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});

@@ -2755,7 +2755,7 @@ function ProfileSettingsPage(p){
 
   useEffect(function(){
     if(!p.user||!p.db)return;
-    p.db.collection('users').doc(p.user.uid).collection('meta').doc('consent').get().then(function(doc){
+    var unsub=p.db.collection('users').doc(p.user.uid).collection('meta').doc('consent').onSnapshot(function(doc){
       if(doc.exists){
         var d=doc.data();
         var ph=d.phoneNumber||(p.user&&p.user.phoneNumber)||'';
@@ -2763,7 +2763,8 @@ function ProfileSettingsPage(p){
         setEditPhone(ph);
         setProfileData({experienceYears:d.experienceYears||'',castRelationStyle:d.castRelationStyle||'',riskTolerance:d.riskTolerance||'',trainingPolicy:d.trainingPolicy||'',specialtyArea:d.specialtyArea||'',decisionStyle:d.decisionStyle||''});
       }
-    });
+    },function(){});
+    return function(){unsub();};
   },[p.user&&p.user.uid]);
 
   var FIELD={background:'#12122a',borderRadius:'12px',padding:'16px',marginBottom:'10px'};
