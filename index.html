@@ -2612,6 +2612,14 @@ function StoreSettingsPage(p){
         p.db.collection('users').doc(targetUid).collection('rooms').doc(p.roomId).delete().catch(function(){});
         setMembers(function(prev){return prev.filter(function(m){return m.uid!==targetUid;});});
         p.notify(targetName+'さんをルームから退室させました');
+        return p.db.collection('rooms').doc(p.roomId).collection('members').get();
+      }).then(function(snap){
+        if(snap&&snap.empty){
+          Promise.all([
+            p.db.collection('rooms').doc(p.roomId).collection('data').doc('main').delete().catch(function(){}),
+            p.db.collection('rooms').doc(p.roomId).delete().catch(function(){}),
+          ]).catch(function(){});
+        }
       }).catch(function(){p.notify('退室処理に失敗しました');});
   }
 
@@ -3774,6 +3782,15 @@ function App(){
               db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
               db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
             ]).then(function(){
+              return db.collection('rooms').doc(rid).collection('members').get().then(function(snap){
+                if(snap.empty){
+                  return Promise.all([
+                    db.collection('rooms').doc(rid).collection('data').doc('main').delete().catch(function(){}),
+                    db.collection('rooms').doc(rid).delete().catch(function(){}),
+                  ]);
+                }
+              });
+            }).then(function(){
               var remaining=roomsList.filter(function(r){return r.roomId!==rid;});
               setRoomsList(remaining);
               if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
