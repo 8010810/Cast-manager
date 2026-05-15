@@ -1884,11 +1884,13 @@ function MiniApp(){
                   var pd2=pDoc.exists?pDoc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
                   var pCids2=new Set((pd2.casts||[]).map(function(c){return c.id;}));
                   var pFids2=new Set((pd2.folders||[]).map(function(f){return f.id;}));
+                  var lvCids=new Set((prevLeave.casts||[]).map(function(c){return c.id;}));
+                  var lvFids=new Set((prevLeave.folders||[]).map(function(f){return f.id;}));
                   db.collection('users').doc(u.uid).collection('data').doc('main').set({
-                    casts:(pd2.casts||[]).concat((prevLeave.casts||[]).filter(function(c){return !pCids2.has(c.id);}).map(function(c){return Object.assign({},c,{_archived:true});})),
+                    casts:(pd2.casts||[]).map(function(c){return lvCids.has(c.id)?Object.assign({},c,{_archived:true}):c;}).concat((prevLeave.casts||[]).filter(function(c){return !pCids2.has(c.id);}).map(function(c){return Object.assign({},c,{_archived:true});})),
                     records:Object.assign({},prevLeave.records||{},pd2.records||{}),
                     customers:pd2.customers||{},
-                    folders:(pd2.folders||[]).concat((prevLeave.folders||[]).map(function(f){return Object.assign({},f,{ownerUid:u.uid,_archived:true});}).filter(function(f){return !pFids2.has(f.id);})),
+                    folders:(pd2.folders||[]).map(function(f){return lvFids.has(f.id)?Object.assign({},f,{_archived:true}):f;}).concat((prevLeave.folders||[]).map(function(f){return Object.assign({},f,{ownerUid:u.uid,_archived:true});}).filter(function(f){return !pFids2.has(f.id);})),
                     shifts:pd2.shifts||{},visits:pd2.visits||[],quota:pd2.quota||{}
                   }).catch(function(){});
                 }).catch(function(){});
@@ -1909,11 +1911,13 @@ function MiniApp(){
                     var pd=pDoc.exists?pDoc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
                     var pCids=new Set((pd.casts||[]).map(function(c){return c.id;}));
                     var pFids=new Set((pd.folders||[]).map(function(f){return f.id;}));
+                    var prevCids=new Set((prev.casts||[]).map(function(c){return c.id;}));
+                    var prevFids=new Set((prev.folders||[]).map(function(f){return f.id;}));
                     var merged={
-                      casts:(pd.casts||[]).concat((prev.casts||[]).filter(function(c){return !pCids.has(c.id);}).map(function(c){return Object.assign({},c,{_archived:true});})),
+                      casts:(pd.casts||[]).map(function(c){return prevCids.has(c.id)?Object.assign({},c,{_archived:true}):c;}).concat((prev.casts||[]).filter(function(c){return !pCids.has(c.id);}).map(function(c){return Object.assign({},c,{_archived:true});})),
                       records:Object.assign({},prev.records||{},pd.records||{}),
                       customers:pd.customers||{},
-                      folders:(pd.folders||[]).concat((prev.folders||[]).map(function(f){return Object.assign({},f,{ownerUid:u.uid,_archived:true});}).filter(function(f){return !pFids.has(f.id);})),
+                      folders:(pd.folders||[]).map(function(f){return prevFids.has(f.id)?Object.assign({},f,{_archived:true}):f;}).concat((prev.folders||[]).map(function(f){return Object.assign({},f,{ownerUid:u.uid,_archived:true});}).filter(function(f){return !pFids.has(f.id);})),
                       shifts:pd.shifts||{},visits:pd.visits||[],quota:pd.quota||{}
                     };
                     pRef2.set(merged).catch(function(){});
