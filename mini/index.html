@@ -2336,9 +2336,9 @@ function MiniApp(){
     var nowYear=new Date().getFullYear();
     var targetYears=[String(nowYear),String(nowYear-1)];
     var myUid2=user?user.uid:'';
-    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive;});
+    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived;});
     // フォルダタブ: キャストが1人以上いるフォルダのみ
-    var allTargetFolders=(data&&data.folders||[]).filter(function(f){
+    var allTargetFolders=(data&&data.folders||[]).filter(function(f){if(f._archived)return false;
       return (f.castIds||[]).some(function(cid){return activeCastsT.some(function(c){return c.id===cid;});});
     });
     var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
