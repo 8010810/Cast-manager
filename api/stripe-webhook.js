@@ -47,18 +47,18 @@ export default async function handler(req, res) {
 
     if (event.type === 'checkout.session.completed') {
       var session = event.data.object;
-      var uid = session.metadata && session.metadata.uid;
+      var uid = session.client_reference_id || (session.metadata && session.metadata.uid) || '';
+      var plan = (session.metadata && session.metadata.plan) || 'standard';
 
       if (uid) {
         var db = getDb();
         await db.collection('users').doc(uid).collection('subscription').doc('main').set({
+          plan: plan,
           status: 'active',
-          sessionId: session.id,
-          customerId: session.customer || '',
           subscriptionId: session.subscription || '',
-          customerEmail: session.customer_email || '',
-          updatedAt: new Date().toISOString(),
-        }, { merge: true });
+          customerId: session.customer || '',
+          createdAt: new Date().toISOString(),
+        });
       }
     }
 
