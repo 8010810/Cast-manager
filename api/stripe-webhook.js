@@ -20,7 +20,14 @@ function getRawBody(req) {
 function getDb() {
   try {
     if (getApps().length === 0) {
-      var serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+      var privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+      var serviceAccount = {
+        type: 'service_account',
+        project_id: process.env.FIREBASE_PROJECT_ID || '',
+        private_key: privateKey,
+        client_email: process.env.FIREBASE_CLIENT_EMAIL || '',
+      };
+      console.log('[stripe-webhook] Firebase init project_id:', serviceAccount.project_id);
       initializeApp({ credential: cert(serviceAccount) });
     }
     return getFirestore();
