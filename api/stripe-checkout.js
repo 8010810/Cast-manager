@@ -1,0 +1,40 @@
+import Stripe from 'stripe';
+
+const BASE_URL = 'https://cast-manager-seven.vercel.app';
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    var priceId = req.body.priceId;
+    var quantity = req.body.quantity || 1;
+    var uid = req.body.uid || '';
+
+    if (!priceId) {
+      return res.status(400).json({ error: 'priceId is required' });
+    }
+
+    var session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: quantity }],
+      metadata: { uid: uid },
+      success_url: BASE_URL + '/?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: BASE_URL + '/?checkout=cancel',
+    });
+
+    return res.status(200).json({ sessionId: session.id });
+  } catch (_e) {
+    return res.status(500).json({ error: _e.message });
+  }
+}
