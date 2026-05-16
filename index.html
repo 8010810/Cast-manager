@@ -2,6 +2,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="CAST MANAGER"><meta name="theme-color" content="#0a0a16">
 <style>*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}body{background:#0a0a16;color:#e5e7eb;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);font-family:'Zen Kaku Gothic New','Noto Serif JP','Hiragino Sans',sans-serif;min-height:100vh}input,textarea,button,select{font-family:inherit}input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none}input[type=date]{-webkit-appearance:none;appearance:none;color:inherit;font-size:14px;font-family:inherit}select{background:#12122a;color:#e5e7eb;border:1px solid #2d2d4e;border-radius:8px;padding:10px 14px;width:100%;margin-bottom:12px;outline:none;font-size:14px}table{border-spacing:0}@keyframes spin{to{transform:rotate(360deg)}}@keyframes pageFadeIn{0%{opacity:0}100%{opacity:1}}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://js.stripe.com/v3/"></script>
 </head><body>
 <div id="root"><div style="display:flex;align-items:center;justify-content:center;height:100vh;color:#e8b86d;font-size:14px;font-family:'Cormorant Garamond',serif;letter-spacing:0.2em">LOADING...</div></div>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -3141,6 +3142,53 @@ function App(){
   var s_jrql=useState(false);var joinReqsLoading=s_jrql[0];var setJoinReqsLoading=s_jrql[1];
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
   var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|'ai-sales'|'ai-trends'|'ai-shift'|'ai-attendance'|'ai-visits'
+  var s_cper=useState({mini:'monthly',std:'monthly'});var checkoutPeriod=s_cper[0];var setCheckoutPeriod=s_cper[1];
+  var s_cl=useState(false);var checkoutLoading=s_cl[0];var setCheckoutLoading=s_cl[1];
+
+  var PRICE_IDS={
+    MINI_MONTHLY:'price_1TXgkgQaq3EwNY4QyYQ6sea2',
+    MINI_YEARLY:'price_1TXgmOQaq3EwNY4QKovRRNqb',
+    STD_MONTHLY:'price_1TXgnIQaq3EwNY4QcKOSwHGF',
+    STD_YEARLY:'price_1TXgo0Qaq3EwNY4Q98Zkhml5',
+    ACCOUNT_ADD:'price_1TXgqSQaq3EwNY4QdQVc6rNT'
+  };
+
+  function handleCheckout(priceId,successPath,cancelPath){
+    if(checkoutLoading||!user)return;
+    setCheckoutLoading(true);
+    fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel'})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d.url){window.location.href=d.url;return;}
+      if(d.sessionId&&d.publishableKey&&window.Stripe){
+        var strp=window.Stripe(d.publishableKey);
+        strp.redirectToCheckout({sessionId:d.sessionId}).then(function(r){
+          if(r&&r.error){setCheckoutLoading(false);notify(r.error.message,'error');}
+        }).catch(function(_e){setCheckoutLoading(false);notify(_e.message,'error');});
+      } else {
+        setCheckoutLoading(false);notify('決済の初期化に失敗しました','error');
+      }
+    })
+    .catch(function(_e){setCheckoutLoading(false);notify('エラーが発生しました','error');});
+  }
+
+  function syncMemberCount(forRoomId,adminUid){
+    var targetRoomId=forRoomId||roomId;
+    var targetUid=adminUid||( user?user.uid:null);
+    if(!targetRoomId||!targetUid)return;
+    db.collection('rooms').doc(targetRoomId).collection('members').get()
+    .then(function(snap){
+      var memberCount=snap.docs.filter(function(d){return d.id!==targetUid;}).length;
+      return db.collection('users').doc(targetUid).collection('subscription').doc('main').get()
+      .then(function(subDoc){
+        if(!subDoc.exists)return;
+        var subData=subDoc.data();
+        if(!subData.subscriptionId)return;
+        db.collection('users').doc(targetUid).collection('subscription').doc('main').update({linkedCount:memberCount}).catch(function(){});
+        return fetch('/api/stripe-update-quantity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriptionId:subData.subscriptionId,quantity:memberCount})}).catch(function(){});
+      });
+    }).catch(function(){});
+  }
 
   var layer=navStack[navStack.length-1]||'home';
 
@@ -3423,7 +3471,7 @@ function App(){
           }).catch(function(){})
         ]);
       })
-      .then(function(){notify((req.userName||'メンバー')+'を承認しました');})
+      .then(function(){notify((req.userName||'メンバー')+'を承認しました');syncMemberCount(roomId,user?user.uid:null);})
       .catch(function(){setJoinRequests(function(prev){return [req].concat(prev);});notify('承認に失敗しました','error');});
   }
   function rejectRequest(req){
@@ -3578,10 +3626,7 @@ function App(){
         e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'プランを選択してください'),
         e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'28px'}},'後から変更はできません'),
         e('div',{style:{display:'flex',flexDirection:'column',gap:'14px'}},
-          e('button',{style:{background:'#12122a',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left',cursor:'pointer',transition:'border-color 0.2s'},
-            onMouseEnter:function(ev){ev.currentTarget.style.borderColor='rgba(167,139,250,0.9)';},
-            onMouseLeave:function(ev){ev.currentTarget.style.borderColor='rgba(167,139,250,0.4)';},
-            onClick:function(){if(Date.now()-planSelectShownAtRef.current<400)return;window.location.href='/mini';}},
+          e('div',{style:{background:'#12122a',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left'}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
               e('div',{style:{width:'36px',height:'36px',borderRadius:'10px',background:'rgba(167,139,250,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}},'📱'),
               e('div',null,
@@ -3589,16 +3634,21 @@ function App(){
                 e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'1px'}},'シンプル・個人向け')
               )
             ),
-            e('ul',{style:{margin:0,paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:1.9}},
+            e('ul',{style:{margin:'0 0 14px',paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:1.9}},
               e('li',null,'キャスト管理・売上記録'),
               e('li',null,'ルームへの参加のみ可能'),
               e('li',null,'軽量で使いやすい')
-            )
+            ),
+            e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='monthly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='monthly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='monthly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'monthly'});});};},'月額'),
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='yearly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='yearly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='yearly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'yearly'});});};},'年額')
+            ),
+            e('button',{style:{width:'100%',background:'linear-gradient(135deg,#7c3aed,#a78bfa)',border:'none',borderRadius:'10px',padding:'12px',color:'#fff',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},onClick:function(){
+              if(Date.now()-planSelectShownAtRef.current<400)return;
+              handleCheckout(checkoutPeriod.mini==='yearly'?PRICE_IDS.MINI_YEARLY:PRICE_IDS.MINI_MONTHLY,'/mini?checkout=success','/mini?checkout=cancel');
+            }},checkoutLoading?'処理中...':'miniプランで開始する')
           ),
-          e('button',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left',cursor:'pointer',transition:'border-color 0.2s'},
-            onMouseEnter:function(ev){ev.currentTarget.style.borderColor='rgba(232,184,109,0.9)';},
-            onMouseLeave:function(ev){ev.currentTarget.style.borderColor='rgba(232,184,109,0.4)';},
-            onClick:function(){if(Date.now()-planSelectShownAtRef.current<400)return;setConsentState('roomselect');}},
+          e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left'}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
               e('div',{style:{width:'36px',height:'36px',borderRadius:'10px',background:'rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}},'🏠'),
               e('div',null,
@@ -3606,11 +3656,19 @@ function App(){
                 e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'1px'}},'フル機能・管理者向け')
               )
             ),
-            e('ul',{style:{margin:0,paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:1.9}},
+            e('ul',{style:{margin:'0 0 14px',paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:1.9}},
               e('li',null,'ルームの作成・管理'),
               e('li',null,'メンバー管理・シフト管理'),
               e('li',null,'詳細な売上分析')
-            )
+            ),
+            e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='monthly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'monthly'});});};},'月額'),
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='yearly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='yearly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'yearly'});});};},'年額')
+            ),
+            e('button',{style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'12px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},onClick:function(){
+              if(Date.now()-planSelectShownAtRef.current<400)return;
+              handleCheckout(checkoutPeriod.std==='yearly'?PRICE_IDS.STD_YEARLY:PRICE_IDS.STD_MONTHLY,'/?checkout=success','/?checkout=cancel');
+            }},checkoutLoading?'処理中...':'standardプランで開始する')
           )
         )
       )
@@ -3919,19 +3977,22 @@ function App(){
           roomRole!=='admin'&&currentRoom&&e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
             if(!confirm('ルーム「'+currentRoom.name+'」から退室しますか？'))return;
             var rid=roomId;
-            Promise.all([
-              db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
-              db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
-            ]).then(function(){
-              return db.collection('rooms').doc(rid).collection('members').get().then(function(snap){
-                if(snap.empty){
-                  return Promise.all([
-                    db.collection('rooms').doc(rid).collection('data').doc('main').delete().catch(function(){}),
-                    db.collection('rooms').doc(rid).delete().catch(function(){}),
-                  ]);
-                }
-              });
-            }).then(function(){
+            db.collection('rooms').doc(rid).get().then(function(roomDoc){
+              var ownerUid=roomDoc.exists?roomDoc.data().ownerUid:null;
+              Promise.all([
+                db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
+                db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
+              ]).then(function(){
+                return db.collection('rooms').doc(rid).collection('members').get().then(function(snap){
+                  if(snap.empty){
+                    return Promise.all([
+                      db.collection('rooms').doc(rid).collection('data').doc('main').delete().catch(function(){}),
+                      db.collection('rooms').doc(rid).delete().catch(function(){}),
+                    ]);
+                  }
+                  if(ownerUid){syncMemberCount(rid,ownerUid);}
+                });
+              }).then(function(){
               var remaining=roomsList.filter(function(r){return r.roomId!==rid;});
               setRoomsList(remaining);
               if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
@@ -3959,6 +4020,7 @@ function App(){
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
                 setSettingsPage(null);window.location.href='/mini';
               }
+            }).catch(function(){notify('退室に失敗しました','error');});
             }).catch(function(){notify('退室に失敗しました','error');});
           }},'ルームを退室する'),
           e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer'},onClick:function(){

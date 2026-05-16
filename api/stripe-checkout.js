@@ -20,6 +20,8 @@ export default async function handler(req, res) {
     var priceId = req.body.priceId;
     var quantity = req.body.quantity || 1;
     var uid = req.body.uid || '';
+    var successPath = req.body.successPath || '/?checkout=success';
+    var cancelPath = req.body.cancelPath || '/?checkout=cancel';
 
     if (!priceId) {
       return res.status(400).json({ error: 'priceId is required' });
@@ -29,11 +31,15 @@ export default async function handler(req, res) {
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: quantity }],
       metadata: { uid: uid },
-      success_url: BASE_URL + '/?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: BASE_URL + '/?checkout=cancel',
+      success_url: BASE_URL + successPath + (successPath.includes('?') ? '&' : '?') + 'session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: BASE_URL + cancelPath,
     });
 
-    return res.status(200).json({ sessionId: session.id });
+    return res.status(200).json({
+      sessionId: session.id,
+      url: session.url,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    });
   } catch (_e) {
     return res.status(500).json({ error: _e.message });
   }
