@@ -9,23 +9,25 @@ export const config = {
 function getRawBody(req) {
   return new Promise(function(resolve, reject) {
     var chunks = [];
-    req.on('data', function(chunk) { chunks.push(chunk); });
+    req.on('data', function(chunk) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    });
     req.on('end', function() { resolve(Buffer.concat(chunks)); });
-    req.on('error', reject);
+    req.on('error', function(err) { reject(err); });
   });
 }
 
 function getDb() {
-  if (getApps().length === 0) {
-    initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-      }),
-    });
+  try {
+    if (getApps().length === 0) {
+      var serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
+      initializeApp({ credential: cert(serviceAccount) });
+    }
+    return getFirestore();
+  } catch (_e) {
+    console.error('[stripe-webhook] Firebase init error:', _e.message);
+    throw _e;
   }
-  return getFirestore();
 }
 
 export default async function handler(req, res) {
@@ -33,37 +35,59 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  var rawBody;
   try {
-    var rawBody = await getRawBody(req);
-    var sig = req.headers['stripe-signature'];
-    var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    rawBody = await getRawBody(req);
+  } catch (_e) {
+    console.error('[stripe-webhook] Failed to read raw body:', _e.message);
+    return res.status(400).json({ error: 'Failed to read request body' });
+  }
 
-    var event;
-    try {
-      event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
-    } catch (_e) {
-      return res.status(400).json({ error: 'Webhook signature verification failed: ' + _e.message });
-    }
+  var sig = req.headers['stripe-signature'];
+  if (!sig) {
+    console.error('[stripe-webhook] Missing stripe-signature header');
+    return res.status(400).json({ error: 'Missing stripe-signature header' });
+  }
 
+  var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  var event;
+  try {
+    event = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET);
+  } catch (_e) {
+    console.error('[stripe-webhook] Signature verification failed:', _e.message);
+    return res.status(400).json({ error: 'Webhook signature verification failed: ' + _e.message });
+  }
+
+  console.log('[stripe-webhook] Event received:', event.type);
+
+  try {
     if (event.type === 'checkout.session.completed') {
       var session = event.data.object;
       var uid = session.client_reference_id || (session.metadata && session.metadata.uid) || '';
       var plan = (session.metadata && session.metadata.plan) || 'standard';
 
-      if (uid) {
-        var db = getDb();
-        await db.collection('users').doc(uid).collection('subscription').doc('main').set({
-          plan: plan,
-          status: 'active',
-          subscriptionId: session.subscription || '',
-          customerId: session.customer || '',
-          createdAt: new Date().toISOString(),
-        });
+      console.log('[stripe-webhook] checkout.session.completed uid:', uid, 'plan:', plan);
+
+      if (!uid) {
+        console.error('[stripe-webhook] No uid found in session');
+        return res.status(200).json({ received: true, warning: 'No uid' });
       }
+
+      var db = getDb();
+      await db.collection('users').doc(uid).collection('subscription').doc('main').set({
+        plan: plan,
+        status: 'active',
+        subscriptionId: session.subscription || '',
+        customerId: session.customer || '',
+        createdAt: new Date().toISOString(),
+      });
+
+      console.log('[stripe-webhook] Subscription saved for uid:', uid);
     }
 
     return res.status(200).json({ received: true });
   } catch (_e) {
+    console.error('[stripe-webhook] Handler error:', _e.message, _e.stack);
     return res.status(500).json({ error: _e.message });
   }
 }
