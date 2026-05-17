@@ -3828,6 +3828,9 @@ function App(){
               handleCheckout(checkoutPeriod.std==='yearly'?PRICE_IDS.STD_YEARLY:PRICE_IDS.STD_MONTHLY,'/?checkout=success','/?checkout=cancel');
             }},checkoutLoading?'処理中...':'standardプランで開始する')
           )
+        ),
+        e('button',{style:{display:'block',margin:'20px auto 0',background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',textDecoration:'underline'},onClick:function(){auth.signOut();}},
+          'ログアウト'
         )
       )
     );
