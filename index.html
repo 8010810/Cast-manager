@@ -3207,7 +3207,7 @@ function App(){
         setPendingInvite(null);setPendingInviteJoining(false);
         window.history.replaceState({},'','/');
         setRoomId(rid);setRoomRole('member');
-        setCurrentRoom({id:rid,name:rName,inviteCode:''});
+        setCurrentRoom({id:rid,name:rName,inviteCode:pendingInvite.inviteCode||''});
         setRoomsList([{roomId:rid,name:rName,role:'member'}]);
         db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
         setData(nd);setLoading(false);setConsentState('done');
@@ -3452,7 +3452,7 @@ function App(){
         var rd=roomDoc.data();
         db.collection('rooms').doc(invRid).collection('members').doc(user.uid).get().then(function(memDoc){
           if(memDoc.exists)return; // 既参加
-          setPendingInvite({roomId:invRid,roomName:rd.name||'',token:invToken,ownerUid:rd.ownerUid||''});
+          setPendingInvite({roomId:invRid,roomName:rd.name||'',token:invToken,ownerUid:rd.ownerUid||'',inviteCode:rd.inviteCode||''});
         }).catch(function(_e){});
       }).catch(function(_e){});
     }).catch(function(_e){});
@@ -3986,17 +3986,21 @@ function App(){
           e('div',{style:{width:'40px'}})
         ),
         e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'24px 18px'})},
-          invCode
-            ?e('div',null,
-              e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'20px',marginBottom:'16px',textAlign:'center'}},
-                e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'8px'}},'招待コード'),
-                e('div',{style:{fontSize:'36px',fontWeight:700,color:'#e8b86d',letterSpacing:'0.3em',fontFamily:"'Cormorant Garamond',serif"}},invCode),
-                e('button',{style:{marginTop:'12px',background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 16px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){
-                  if(navigator.clipboard){navigator.clipboard.writeText(invCode);}
-                  var el=document.createElement('textarea');el.value=invCode;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
-                }},'コードをコピー')
-              ),
-              roomRole==='admin'&&e('div',null,
+          roomRole!=='admin'
+            ?e('div',{style:{textAlign:'center',padding:'40px 0'}},
+                e('div',{style:{fontSize:'24px',marginBottom:'12px'}},'🔒'),
+                e('div',{style:{color:'#6b7280',fontSize:'13px'}},'管理者権限です')
+              )
+            :invCode
+              ?e('div',null,
+                e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'20px',marginBottom:'16px',textAlign:'center'}},
+                  e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'8px'}},'招待コード'),
+                  e('div',{style:{fontSize:'36px',fontWeight:700,color:'#e8b86d',letterSpacing:'0.3em',fontFamily:"'Cormorant Garamond',serif"}},invCode),
+                  e('button',{style:{marginTop:'12px',background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 16px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){
+                    if(navigator.clipboard){navigator.clipboard.writeText(invCode);}
+                    var el=document.createElement('textarea');el.value=invCode;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
+                  }},'コードをコピー')
+                ),
                 e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
                 e('div',{style:{fontSize:'13px',color:'#e8b86d',fontWeight:700,marginBottom:'10px'}},'招待リンク'),
                 e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'招待リンクで参加したメンバーはmini契約不要。参加時に¥1,000/人が請求されます。'),
@@ -4029,8 +4033,7 @@ function App(){
                       );
                     })
               )
-            )
-            :e('div',{style:{textAlign:'center',color:'#6b7280',padding:'40px 0'}},'ルームに参加後に利用できます')
+              :e('div',{style:{textAlign:'center',color:'#6b7280',padding:'40px 0'}},'ルームに参加後に利用できます')
         )
       );
     }
