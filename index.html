@@ -213,8 +213,10 @@ function LoginScreen(){
       ?auth.signInWithEmailAndPassword(email,pass)
       :auth.createUserWithEmailAndPassword(email,pass);
     fn.catch(function(e){
+      if(e.code==='auth/email-already-in-use'){
+        setMode('login');setErr('このメールアドレスはすでに登録済みです。ログインしてください。');setLoading(false);return;
+      }
       var msg=e.code==='auth/user-not-found'||e.code==='auth/wrong-password'?'メールアドレスまたはパスワードが違います'
-        :e.code==='auth/email-already-in-use'?'このメールアドレスはすでに使用されています'
         :e.code==='auth/weak-password'?'パスワードは6文字以上にしてください'
         :'ログインに失敗しました';
       setErr(msg);setLoading(false);
@@ -3604,6 +3606,9 @@ function App(){
     var uid2=user.uid;
     window._castManagerDeleting=true;
     var userRef=db.collection('users').doc(uid2);
+    function cancelStripeSubscription(){
+      return fetch('/api/stripe-cancel-account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid2})}).catch(function(){});
+    }
     function deleteFirestoreData(){
       return userRef.collection('rooms').get().catch(function(){return{docs:[]};}).then(function(roomSnap){
         var roomHandles=roomSnap.docs.map(function(rd){
@@ -3646,7 +3651,8 @@ function App(){
         return Promise.all([
           userRef.collection('data').doc('main').delete().catch(function(){}),
           userRef.collection('meta').doc('consent').delete().catch(function(){}),
-          userRef.collection('attendance').doc('settings').delete().catch(function(){})
+          userRef.collection('attendance').doc('settings').delete().catch(function(){}),
+          userRef.collection('subscription').doc('main').delete().catch(function(){})
         ]);
       }).then(function(){return userRef.delete().catch(function(){});});
     }
@@ -3662,7 +3668,7 @@ function App(){
       });
     }
     // onAuthStateChangedはアンサブしない — 削除後のnullイベントで自動的にstateリセット
-    deleteFirestoreData().then(doDeleteAuth).then(function(){
+    cancelStripeSubscription().then(deleteFirestoreData).then(doDeleteAuth).then(function(){
       window._castManagerDeleting=false;
       setDeletingAccount(false);
       setLoading(false);
