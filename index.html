@@ -3182,14 +3182,15 @@ function App(){
   function joinViaInviteToken(){
     if(!pendingInvite||!user)return;
     setPendingInviteJoining(true);
-    var rid=pendingInvite.roomId;var ownerUid=pendingInvite.ownerUid;var token=pendingInvite.token;
+    var rid=pendingInvite.roomId;var rName=pendingInvite.roomName||'';
+    var ownerUid=pendingInvite.ownerUid;var token=pendingInvite.token;
     var now=new Date().toISOString();
     db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({
       role:'member',userName:userName||'',joinedAt:now,isInvited:true,invitedBy:ownerUid
     }).then(function(){
       return Promise.all([
         db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({
-          name:pendingInvite.roomName||'',role:'member',joinedAt:now
+          name:rName,role:'member',joinedAt:now
         }),
         db.collection('rooms').doc(rid).collection('inviteTokens').doc(token).update({used:true,usedBy:user.uid,usedAt:now})
       ]);
@@ -3199,6 +3200,11 @@ function App(){
     }).then(function(){
       setPendingInvite(null);setPendingInviteJoining(false);
       window.history.replaceState({},'','/');
+      setRoomId(rid);setRoomRole('member');
+      setCurrentRoom({id:rid,name:rName,inviteCode:''});
+      setRoomsList([{roomId:rid,name:rName,role:'member'}]);
+      db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
+      loadRoomData(rid,rName);
       notify('ルームに参加しました');
     }).catch(function(_e){
       setPendingInviteJoining(false);
@@ -3670,15 +3676,19 @@ function App(){
   }
     if(loading)return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...'));
   if(!user)return e(LoginScreen,null);
-  if(pendingInvite)return e('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'24px'}},
-    e('div',{style:{background:'#12122a',borderRadius:'16px',padding:'32px 24px',maxWidth:'360px',width:'100%',textAlign:'center'}},
-      e('div',{style:{fontSize:'13px',color:'#6b7280',marginBottom:'8px'}},'招待されました'),
-      e('div',{style:{fontSize:'20px',fontWeight:700,color:'#f3f4f6',marginBottom:'24px'}},pendingInvite.roomName),
-      e('div',{style:{fontSize:'13px',color:'#9ca3af',marginBottom:'24px'}},'このルームに参加しますか？\n参加後、月額¥1,000がオーナーに請求されます。'),
-      e('button',{style:{width:'100%',padding:'12px',background:'linear-gradient(135deg,#e8b86d,#c9983a)',border:'none',borderRadius:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'10px'},onClick:joinViaInviteToken,disabled:pendingInviteJoining},pendingInviteJoining?'参加中...':'参加する'),
-      e('button',{style:{width:'100%',padding:'10px',background:'transparent',border:'1px solid #374151',borderRadius:'10px',color:'#6b7280',fontSize:'14px',cursor:'pointer'},onClick:function(){setPendingInvite(null);window.history.replaceState({},'','/');}},'断る')
-    )
-  );
+
+  // 招待ダイアログ（同意・ユーザー名入力中は表示しない）
+  if(pendingInvite&&consentState!=='needed'&&consentState!=='username'){
+    return e('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9999,padding:'24px'}},
+      e('div',{style:{background:'#12122a',borderRadius:'16px',padding:'32px 24px',maxWidth:'360px',width:'100%',textAlign:'center'}},
+        e('div',{style:{fontSize:'13px',color:'#6b7280',marginBottom:'8px'}},'招待されました'),
+        e('div',{style:{fontSize:'20px',fontWeight:700,color:'#f3f4f6',marginBottom:'24px'}},pendingInvite.roomName),
+        e('div',{style:{fontSize:'13px',color:'#9ca3af',marginBottom:'24px'}},'このルームに参加しますか？'),
+        e('button',{style:{width:'100%',padding:'12px',background:'linear-gradient(135deg,#e8b86d,#c9983a)',border:'none',borderRadius:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'10px'},onClick:joinViaInviteToken,disabled:pendingInviteJoining},pendingInviteJoining?'参加中...':'参加する'),
+        e('button',{style:{width:'100%',padding:'10px',background:'transparent',border:'1px solid #374151',borderRadius:'10px',color:'#6b7280',fontSize:'14px',cursor:'pointer'},onClick:function(){setPendingInvite(null);window.history.replaceState({},'','/');}},'断る')
+      )
+    );
+  }
 
   // 利用規約同意画面
   if(consentState==='needed'){
@@ -3715,11 +3725,21 @@ function App(){
           var uName=userName.trim();
           db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
           setUserName(uName);
-          planSelectShownAtRef.current=Date.now();
-          setConsentState('planselect');
+          var params=new URLSearchParams(window.location.search);
+          if(params.get('inviteToken')&&params.get('rid')){
+            setConsentState('invite-waiting');
+          }else{
+            planSelectShownAtRef.current=Date.now();
+            setConsentState('planselect');
+          }
         }},'登録する')
       )
     );
+  }
+
+  // 招待待機中（招待URLから来た新規ユーザー：pendingInviteがセットされるまで待つ）
+  if(consentState==='invite-waiting'){
+    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',alignItems:'center',justifyContent:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...'));
   }
 
   // プラン選択画面
