@@ -1874,7 +1874,7 @@ function MiniApp(){
       var roomFolderIds=new Set(folders.map(function(f){return f.id;}));
       (pd.casts||[]).forEach(function(c){
         if(!roomCastIds.has(c.id)){
-          var arch=c._archived||!c._personal;
+          var arch=!!c._archived;
           casts.push(Object.assign({},c,{_personal:true},arch?{_archived:true}:{}));
         }
       });
@@ -1883,7 +1883,7 @@ function MiniApp(){
       (pd.folders||[]).forEach(function(f){
         if(!roomFolderIds.has(f.id)){
           var filteredCids=(f.castIds||[]).filter(function(cid){return !roomCastIds.has(cid);});
-          var arch=f._archived||!f._personal;
+          var arch=!!f._archived;
           folders.push(Object.assign({},f,{castIds:filteredCids,_personal:true},arch?{_archived:true}:{}));
         }
       });
