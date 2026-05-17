@@ -4160,11 +4160,12 @@ function App(){
               }
             }).catch(function(){notify('削除に失敗しました','error');});
           }},'ルームを削除する（管理者のみ）'),
-          roomRole!=='admin'&&currentRoom&&e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
+          currentRoom&&e('button',{style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:'pointer',marginBottom:'8px'},onClick:function(){
             if(!confirm('ルーム「'+currentRoom.name+'」から退室しますか？'))return;
             var rid=roomId;
             db.collection('rooms').doc(rid).get().then(function(roomDoc){
               var ownerUid=roomDoc.exists?roomDoc.data().ownerUid:null;
+              if(ownerUid&&ownerUid===user.uid){notify('オーナーは退室できません。先にオーナーを引き継いでください。','error');return;}
               Promise.all([
                 db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
                 db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
