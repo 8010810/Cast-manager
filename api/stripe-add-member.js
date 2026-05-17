@@ -55,6 +55,15 @@ export default async function handler(req, res) {
     var subscription = await stripe.subscriptions.retrieve(subscriptionId);
     var item = subscription.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
 
+    // サブスクから支払い方法を取得（invoices.payに必要）
+    var paymentMethodId = subscription.default_payment_method;
+    if (!paymentMethodId) {
+      var customer = await stripe.customers.retrieve(customerId);
+      paymentMethodId = customer.invoice_settings && customer.invoice_settings.default_payment_method
+        || customer.default_source
+        || null;
+    }
+
     var newQuantity;
     if (item) {
       newQuantity = (item.quantity || 0) + 1;
@@ -84,7 +93,8 @@ export default async function handler(req, res) {
       auto_advance: false,
     });
     await stripe.invoices.finalizeInvoice(invoice.id);
-    await stripe.invoices.pay(invoice.id);
+    var payOpts = paymentMethodId ? { payment_method: paymentMethodId } : {};
+    await stripe.invoices.pay(invoice.id, payOpts);
 
     await db.collection('users').doc(ownerUid).collection('subscription').doc('main').update({
       memberCount: newQuantity,
