@@ -3198,14 +3198,22 @@ function App(){
       return fetch('/api/stripe-add-member',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({ownerUid:ownerUid,roomId:rid,memberUid:user.uid})});
     }).then(function(){
-      setPendingInvite(null);setPendingInviteJoining(false);
-      window.history.replaceState({},'','/');
-      setRoomId(rid);setRoomRole('member');
-      setCurrentRoom({id:rid,name:rName,inviteCode:''});
-      setRoomsList([{roomId:rid,name:rName,role:'member'}]);
-      db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
-      loadRoomData(rid,rName);
-      notify('ルームに参加しました');
+      return loadFromRoom(rid);
+    }).then(function(d){
+      var roomData=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:{},quota:{}},d);
+      setupPersonalCastInRoom(db,user.uid,userName||'',rid,rName,roomData,uid,function(updatedData){
+        var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},updatedData);
+        if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+        setPendingInvite(null);setPendingInviteJoining(false);
+        window.history.replaceState({},'','/');
+        setRoomId(rid);setRoomRole('member');
+        setCurrentRoom({id:rid,name:rName,inviteCode:''});
+        setRoomsList([{roomId:rid,name:rName,role:'member'}]);
+        db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
+        setData(nd);setLoading(false);setConsentState('done');
+        doMiniSync(rid,rName,nd);
+        notify('ルームに参加しました');
+      });
     }).catch(function(_e){
       setPendingInviteJoining(false);
       notify('参加処理に失敗しました','error');
