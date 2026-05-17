@@ -1787,6 +1787,8 @@ function MiniApp(){
   var s_jri=useState('');var miniJoinInput=s_jri[0];var setMiniJoinInput=s_jri[1];
   var s_jrl=useState(false);var miniJoinLoading=s_jrl[0];var setMiniJoinLoading=s_jrl[1];
   var s_jrm=useState('');var miniJoinMsg=s_jrm[0];var setMiniJoinMsg=s_jrm[1];
+  var s_cp=useState('monthly');var checkoutPeriod=s_cp[0];var setCheckoutPeriod=s_cp[1];
+  var s_cl=useState(false);var checkoutLoading=s_cl[0];var setCheckoutLoading=s_cl[1];
   var s_ty=useState(String(new Date().getFullYear()));var targetYear=s_ty[0];var setTargetYear=s_ty[1];
   var s_tc=useState(null);var targetCast=s_tc[0];var setTargetCast=s_tc[1];
   var s_etmk=useState(null);var editTargetMK=s_etmk[0];var setEditTargetMK=s_etmk[1];
@@ -1908,7 +1910,23 @@ function MiniApp(){
             if(!consentDone){setConsentState('needed');consentDone=true;checkAllDone();}
           }else{
             setUserName(cd.userName||'');
-            if(!consentDone){setConsentState(cd.userName?'done':'username');consentDone=true;checkAllDone();}
+            if(!consentDone){
+              consentDone=true;
+              if(!cd.userName){setConsentState('username');checkAllDone();}
+              else{
+                // サブスクまたはルーム所属を確認。どちらもなければプラン選択
+                Promise.all([
+                  db.collection('users').doc(u.uid).collection('subscription').doc('main').get(),
+                  db.collection('users').doc(u.uid).collection('rooms').limit(1).get()
+                ]).then(function(results){
+                  var subDoc=results[0];var roomsSnap=results[1];
+                  var hasSub=subDoc.exists&&subDoc.data().status==='active';
+                  var hasRoom=!roomsSnap.empty;
+                  if(!hasSub&&!hasRoom){setConsentState('plan');}else{setConsentState('done');}
+                  checkAllDone();
+                }).catch(function(){setConsentState('done');checkAllDone();});
+              }
+            }
           }
         },function(){if(!consentDone){setConsentState('needed');consentDone=true;checkAllDone();}});
         db.collection('users').doc(u.uid).collection('meta').doc('pendingJoins').get().then(function(doc){
@@ -2227,19 +2245,39 @@ function MiniApp(){
       var OB_WRAP={minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'};
       var OB_CARD={background:'#12122a',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'16px',padding:'28px',maxWidth:'480px',width:'100%'};
       var OB_TITLE={fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'};
+      var miniMonthlyPrice='price_1TXgkgQaq3EwNY4QyYQ6sea2';
+      var miniYearlyPrice='price_1TXgmOQaq3EwNY4QKovRRNqb';
       return e('div',{style:OB_WRAP},
         e('div',{style:OB_CARD},
           e('div',{style:OB_TITLE},'CAST MANAGER mini'),
-          e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'どのように使いますか？'),
-          e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'24px'}},'後から設定で変更できます'),
-          e('button',{style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'12px',padding:'16px',color:'#0d0d1a',fontWeight:700,fontSize:'15px',cursor:'pointer',marginBottom:'10px'},onClick:function(){setMiniJoinInput('');setMiniJoinMsg('');setConsentState('joinRoom');}},
-            'ルームに参加する'
+          e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'4px'}},'プランへの登録が必要です'),
+          e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'20px'}},'miniプランに登録するか、招待コードでルームに参加してください'),
+          e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
+            e('button',{style:{flex:1,padding:'8px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod==='monthly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod==='monthly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod==='monthly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod('monthly');}},'月額'),
+            e('button',{style:{flex:1,padding:'8px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod==='yearly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod==='yearly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod==='yearly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod('yearly');}},'年額')
           ),
-          e('p',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'16px'}},'招待コードでルームに参加します'),
-          e('button',{style:{width:'100%',background:'transparent',border:'1px solid #2d2d4e',borderRadius:'12px',padding:'16px',color:'#9ca3af',fontWeight:600,fontSize:'14px',cursor:'pointer'},onClick:function(){setConsentState('done');}},
-            'まずは個人で使う'
+          e('button',{style:{width:'100%',background:'linear-gradient(135deg,#7c3aed,#a78bfa)',border:'none',borderRadius:'12px',padding:'16px',color:'#fff',fontWeight:700,fontSize:'15px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1,marginBottom:'16px'},disabled:checkoutLoading,onClick:function(){
+            if(checkoutLoading||!user)return;
+            setCheckoutLoading(true);
+            var priceId=checkoutPeriod==='yearly'?miniYearlyPrice:miniMonthlyPrice;
+            fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,successPath:'/mini?checkout=success',cancelPath:'/mini?checkout=cancel'})})
+              .then(function(r){return r.json();})
+              .then(function(d){
+                if(d.url){window.location.href=d.url;return;}
+                if(d.sessionId&&d.publishableKey&&window.Stripe){
+                  var strp=window.Stripe(d.publishableKey);
+                  strp.redirectToCheckout({sessionId:d.sessionId}).then(function(r){
+                    if(r&&r.error){setCheckoutLoading(false);notify(r.error.message,'error');}
+                  }).catch(function(_e){setCheckoutLoading(false);notify(_e.message,'error');});
+                }
+              }).catch(function(_e){setCheckoutLoading(false);notify('決済に失敗しました','error');});
+          }},checkoutLoading?'処理中...':'miniプランに登録する'),
+          e('div',{style:{height:'1px',background:'#1e2035',marginBottom:'16px'}}),
+          e('button',{style:{width:'100%',background:'transparent',border:'1px solid #2d2d4e',borderRadius:'12px',padding:'14px',color:'#9ca3af',fontWeight:600,fontSize:'14px',cursor:'pointer'},onClick:function(){setMiniJoinInput('');setMiniJoinMsg('');setConsentState('joinRoom');}},
+            '招待コードでルームに参加する'
           ),
-          e('p',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginTop:'8px'}},'後から設定 › ルームで参加できます')
+          e('p',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginTop:'8px'}},'ルームに参加するとmini機能が使えます'),
+          e('button',{style:{background:'transparent',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',marginTop:'16px',padding:'8px'},onClick:function(){fbSignOut();}},'ログアウト')
         )
       );
     }
