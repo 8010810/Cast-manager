@@ -3896,14 +3896,15 @@ function App(){
     var SETTINGS_OVERLAY_STYLE={position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.7)',zIndex:200,display:'flex',flexDirection:'column'};
     var SETTINGS_PANEL={background:'#0d0d1a',flex:1,overflowY:'auto',padding:'0 0 40px 0'};
     var SETTINGS_HEADER={display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(232,184,109,0.1)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
+    var SETTINGS_TOAST=toast&&e('div',{style:Object.assign({},S.toast,{background:toast.type==='error'?'#7f1d1d':'#14532d',zIndex:9999})},toast.msg);
 
     // プロフィールページ
     if(settingsPage==='profile'){
-      return e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});},data:data,persist:persist});
+      return e(React.Fragment,null,SETTINGS_TOAST,e(ProfileSettingsPage,{user:user,userName:userName,setUserName:setUserName,storeName:storeName,onBack:function(){setSettingsPage('settings');},db:db,notify:function(msg){setToast({msg:msg,type:'success'});setTimeout(function(){setToast(null);},2800);},refreshUser:function(){if(auth.currentUser)auth.currentUser.reload().then(function(){setUser(auth.currentUser);});},data:data,persist:persist}));
     }
     // 利用規約ページ
     if(settingsPage==='terms'){
-      return e('div',{style:SETTINGS_OVERLAY_STYLE},
+      return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
         e('div',{style:SETTINGS_HEADER},
           e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
           e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'利用規約'),
@@ -3912,19 +3913,19 @@ function App(){
         e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'20px 18px',lineHeight:1.8,fontSize:'13px',color:'#9ca3af'})},
           e('p',null,'（利用規約の内容をここに入れてください）')
         )
-      );
+      ));
     }
 
     // 店舗情報・メンバーページ
     if(settingsPage==='store'){
-      return e(StoreSettingsPage,{
+      return e(React.Fragment,null,SETTINGS_TOAST,e(StoreSettingsPage,{
         roomId:roomId,roomRole:roomRole,currentRoom:currentRoom,
         user:user,userName:userName,db:db,
         ownerUid:user?user.uid:null,
         onTransferOwner:handleTransferOwner,
         onBack:function(){setSettingsPage('settings');},
         notify:notify
-      });
+      }));
     }
 
     // ルームページ
@@ -3960,7 +3961,7 @@ function App(){
           })
           .catch(function(){setSettRoomLoading(false);notify('作成に失敗しました','error');});
       }
-      return e('div',{style:SETTINGS_OVERLAY_STYLE},
+      return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
         e('div',{style:SETTINGS_HEADER},
           e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
           e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'ルーム'),
@@ -4003,7 +4004,7 @@ function App(){
           ),
           joinReqMsg&&e('div',{style:{color:joinReqMsg.includes('失敗')||joinReqMsg.includes('見つかり')||joinReqMsg.includes('すでに')?'#f87171':'#34d399',fontSize:'12px',marginTop:'8px',textAlign:'center'}},joinReqMsg)
         )
-      );
+      ));
     }
     // 招待ページ
     if(settingsPage==='invite'){
@@ -4017,7 +4018,7 @@ function App(){
         }).catch(function(){});
       }
       var invUrl=invCode?('https://cast-manager-seven.vercel.app/?join='+invCode):'';
-      return e('div',{style:SETTINGS_OVERLAY_STYLE},
+      return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
         e('div',{style:SETTINGS_HEADER},
           e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
           e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'招待'),
@@ -4073,12 +4074,12 @@ function App(){
               )
               :e('div',{style:{textAlign:'center',color:'#6b7280',padding:'40px 0'}},'ルームに参加後に利用できます')
         )
-      );
+      ));
     }
 
     // プライバシーポリシーページ
     if(settingsPage==='privacy'){
-      return e('div',{style:SETTINGS_OVERLAY_STYLE},
+      return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
         e('div',{style:SETTINGS_HEADER},
           e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
           e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'プライバシーポリシー'),
@@ -4087,11 +4088,11 @@ function App(){
         e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'20px 18px',lineHeight:1.8,fontSize:'13px',color:'#9ca3af'})},
           e('p',null,'（プライバシーポリシーの内容をここに入れてください）')
         )
-      );
+      ));
     }
 
     // 設定トップページ
-    return e('div',{style:SETTINGS_OVERLAY_STYLE},
+    return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
       e('div',{style:SETTINGS_HEADER},
         e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage(null);}},'✕ 閉じる'),
         e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'設定'),
@@ -4215,7 +4216,7 @@ function App(){
           }},'アカウントを削除する'),
         )
       )
-    );
+    ));
   }
 
 
