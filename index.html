@@ -3121,6 +3121,7 @@ function App(){
   var unsubAttRef=React.useRef(null);
   var unsubRoleRef=React.useRef(null);
   var unsubRoomsListRef=React.useRef(null);
+  var roomsListRef=React.useRef([]);
   var unsubConsentRef=React.useRef(null);
   var planSelectShownAtRef=React.useRef(0);
   var s2=useState(null);var data=s2[0];var setData=s2[1];
@@ -3137,7 +3138,8 @@ function App(){
   var s_sn=useState('');var storeName=s_sn[0];var setStoreName=s_sn[1];
   var s_ri=useState(null);var roomId=s_ri[0];var setRoomId=s_ri[1];
   var s_rr=useState('member');var roomRole=s_rr[0];var setRoomRole=s_rr[1];
-  var s_rl=useState([]);var roomsList=s_rl[0];var setRoomsList=s_rl[1]; // [{roomId,name,role}]
+  var s_rl=useState([]);var roomsList=s_rl[0];var _setRoomsList=s_rl[1];
+  function setRoomsList(v){_setRoomsList(function(prev){var next=typeof v==='function'?v(prev):v;roomsListRef.current=next;return next;});} // [{roomId,name,role}]
   var s_rc=useState(null);var currentRoom=s_rc[0];var setCurrentRoom=s_rc[1]; // {id,name,inviteCode}
   var s11=useState(null);var settingsPage=s11[0];var setSettingsPage=s11[1]; // null|'settings'|'profile'|'terms'|'privacy'
   var s12=useState(false);var deletingAccount=s12[0];var setDeletingAccount=s12[1];
@@ -3220,6 +3222,31 @@ function App(){
     });
   }
 
+  function makeRoleListener(rid){
+    return function(doc){
+      if(!doc.exists){
+        // 管理者によって退室させられた
+        db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete().catch(function(){});
+        var remaining=roomsListRef.current.filter(function(r){return r.roomId!==rid;});
+        setRoomsList(remaining);
+        if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+        if(remaining.length>0){
+          var next=remaining[0];
+          setRoomId(next.roomId);setRoomRole(next.role||'member');
+          setCurrentRoom({id:next.roomId,name:next.name,inviteCode:next.inviteCode||''});
+          loadRoomData(next.roomId,next.name);
+        }else{
+          setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
+          setConsentState('roomselect');setLoading(false);
+        }
+        setNavStack(['home']);setSubBack(null);setSettingsPage(null);
+        notify('ルームから退室させられました','error');
+        return;
+      }
+      if(doc.data().role){setRoomRole(doc.data().role);}
+    };
+  }
+
   function handleTransferOwner(newMemberUid,newMemberName){
     if(!confirm(newMemberName+'さんにオーナーを引き継ぎますか？\nサブスクリプションも移行されます。'))return;
     fetch('/api/stripe-transfer-owner',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -3287,9 +3314,7 @@ function App(){
         if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
       },function(){});
       if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
-      unsubRoleRef.current=db.collection('rooms').doc(r.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
-        if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-      },function(){});
+      unsubRoleRef.current=db.collection('rooms').doc(r.roomId).collection('members').doc(user.uid).onSnapshot(makeRoleListener(r.roomId),function(){});
       setSettingsPage(null);
       setNavStack(['home']);setSubBack(null);
     }).catch(function(){notify('切り替えに失敗しました','error');});
@@ -3388,9 +3413,7 @@ function App(){
               if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
             },function(){});
             if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
-            unsubRoleRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('members').doc(u.uid).onSnapshot(function(doc){
-              if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-            },function(){});
+            unsubRoleRef.current=db.collection('rooms').doc(roomInfo.roomId).collection('members').doc(u.uid).onSnapshot(makeRoleListener(roomInfo.roomId),function(){});
           }
           if(unsubRoomsListRef.current){unsubRoomsListRef.current();unsubRoomsListRef.current=null;}
           var appliedRooms=false;
@@ -4113,9 +4136,7 @@ function App(){
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
                   },function(){});
-                  unsubRoleRef.current=db.collection('rooms').doc(next.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
-                    if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-                  },function(){});
+                  unsubRoleRef.current=db.collection('rooms').doc(next.roomId).collection('members').doc(user.uid).onSnapshot(makeRoleListener(next.roomId),function(){});
                   notify('ルームを削除しました');setSettingsPage(null);setNavStack(['home']);setSubBack(null);
                 }).catch(function(){notify('削除後の切替に失敗しました','error');});
               }else{
@@ -4161,9 +4182,7 @@ function App(){
                   unsubAttRef.current=db.collection('rooms').doc(next.roomId).collection('attendance').doc(tsR).onSnapshot(function(doc){
                     if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
                   },function(){});
-                  unsubRoleRef.current=db.collection('rooms').doc(next.roomId).collection('members').doc(user.uid).onSnapshot(function(doc){
-                    if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-                  },function(){});
+                  unsubRoleRef.current=db.collection('rooms').doc(next.roomId).collection('members').doc(user.uid).onSnapshot(makeRoleListener(next.roomId),function(){});
                   notify('退室しました');setSettingsPage(null);setNavStack(['home']);setSubBack(null);
                 }).catch(function(){notify('退室後の切替に失敗しました','error');});
               }else{
@@ -4213,9 +4232,7 @@ function App(){
           if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
         },function(){});
         if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
-        unsubRoleRef.current=db.collection('rooms').doc(rid).collection('members').doc(user.uid).onSnapshot(function(doc){
-          if(doc.exists&&doc.data().role){setRoomRole(doc.data().role);}
-        },function(){});
+        unsubRoleRef.current=db.collection('rooms').doc(rid).collection('members').doc(user.uid).onSnapshot(makeRoleListener(rid),function(){});
         setConsentState('done');
       }
     });
