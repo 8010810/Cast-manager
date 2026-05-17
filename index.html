@@ -3239,13 +3239,7 @@ function App(){
           setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
           setNavStack(['home']);setSubBack(null);setSettingsPage(null);
           notify('ルームから退室させられました','error');
-          db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
-            if(subDoc.exists&&subDoc.data().plan==='mini'&&subDoc.data().status==='active'){
-              window.location.href='/mini';
-            }else{
-              setConsentState('roomselect');setLoading(false);
-            }
-          }).catch(function(){setConsentState('roomselect');setLoading(false);});
+          window.location.href='/mini';
           return;
         }
         setNavStack(['home']);setSubBack(null);setSettingsPage(null);
