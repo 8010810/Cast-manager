@@ -1,0 +1,53 @@
+import Stripe from 'stripe';
+
+const BASE_URL = 'https://cast-manager-seven.vercel.app';
+
+const MINI_PRICES = [
+  'price_1TXgkgQaq3EwNY4QyYQ6sea2',
+  'price_1TXgmOQaq3EwNY4QKovRRNqb',
+];
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    var priceId = req.body.priceId;
+    var quantity = req.body.quantity || 1;
+    var uid = req.body.uid || '';
+    var successPath = req.body.successPath || '/?checkout=success';
+    var cancelPath = req.body.cancelPath || '/?checkout=cancel';
+    var plan = MINI_PRICES.includes(priceId) ? 'mini' : 'standard';
+
+    if (!priceId) {
+      return res.status(400).json({ error: 'priceId is required' });
+    }
+
+    var session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: quantity }],
+      client_reference_id: uid,
+      metadata: { uid: uid, plan: plan },
+      success_url: BASE_URL + successPath + (successPath.includes('?') ? '&' : '?') + 'session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: BASE_URL + cancelPath,
+    });
+
+    return res.status(200).json({
+      sessionId: session.id,
+      url: session.url,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || '',
+    });
+  } catch (_e) {
+    return res.status(500).json({ error: _e.message });
+  }
+}
