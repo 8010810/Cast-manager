@@ -3192,7 +3192,7 @@ function App(){
     }).then(function(){
       return Promise.all([
         db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({
-          name:rName,role:'member',joinedAt:now
+          name:rName,role:'member',inviteCode:pendingInvite.inviteCode||'',joinedAt:now
         }),
         db.collection('rooms').doc(rid).collection('inviteTokens').doc(token).update({used:true,usedBy:user.uid,usedAt:now})
       ]);
@@ -3208,9 +3208,10 @@ function App(){
         if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
         setPendingInvite(null);setPendingInviteJoining(false);
         window.history.replaceState({},'','/');
+        var ic=pendingInvite?pendingInvite.inviteCode||'':'';
         setRoomId(rid);setRoomRole('member');
-        setCurrentRoom({id:rid,name:rName,inviteCode:pendingInvite.inviteCode||''});
-        setRoomsList([{roomId:rid,name:rName,role:'member'}]);
+        setCurrentRoom({id:rid,name:rName,inviteCode:ic});
+        setRoomsList([{roomId:rid,name:rName,role:'member',inviteCode:ic}]);
         db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
         setData(nd);setLoading(false);setConsentState('done');
         doMiniSync(rid,rName,nd);
@@ -4007,6 +4008,14 @@ function App(){
     // 招待ページ
     if(settingsPage==='invite'){
       var invCode=currentRoom&&currentRoom.inviteCode||'';
+      // 管理者なのにinvCodeが空の場合、roomsドキュメントから取得して補完
+      if(!invCode&&roomRole==='admin'&&roomId){
+        db.collection('rooms').doc(roomId).get().then(function(doc){
+          if(doc.exists&&doc.data().inviteCode){
+            setCurrentRoom(function(prev){return Object.assign({},prev,{inviteCode:doc.data().inviteCode});});
+          }
+        }).catch(function(){});
+      }
       var invUrl=invCode?('https://cast-manager-seven.vercel.app/?join='+invCode):'';
       return e('div',{style:SETTINGS_OVERLAY_STYLE},
         e('div',{style:SETTINGS_HEADER},
