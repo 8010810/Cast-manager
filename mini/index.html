@@ -2445,11 +2445,17 @@ function MiniApp(){
           e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'20px 18px'})},
             e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'アプリ'),
             e('button',{style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:'rgba(232,184,109,0.08)',border:'1px solid rgba(232,184,109,0.3)',borderRadius:'12px',padding:'16px',marginBottom:'16px',cursor:'pointer',textAlign:'left'},onClick:function(){
-              db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
-                if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='standard'){
+              db.collection('users').doc(user.uid).collection('rooms').limit(1).get().then(function(snap){
+                if(!snap.empty){
                   window.location.href='/?from=mini';
                 }else{
-                  notify('std.プランの機能です','error');
+                  db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
+                    if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='standard'){
+                      window.location.href='/?from=mini';
+                    }else{
+                      notify('ルームに参加するとstd.アプリを利用できます','error');
+                    }
+                  }).catch(function(_e){notify('std.プランの機能です','error');});
                 }
               }).catch(function(_e){notify('std.プランの機能です','error');});
             }},
