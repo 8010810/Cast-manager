@@ -3303,14 +3303,8 @@ function App(){
   }
 
     useEffect(function(){
-    auth.getRedirectResult().then(function(){
-      var pendingUid=localStorage.getItem('pending_reauth_delete');
-      if(pendingUid){
-        localStorage.removeItem('pending_reauth_delete');
-        var u=auth.currentUser;
-        if(u&&u.uid===pendingUid){u.delete().catch(function(){auth.signOut().catch(function(){});});}
-      }
-    }).catch(function(){localStorage.removeItem('pending_reauth_delete');});
+    localStorage.removeItem('pending_reauth_delete');
+    auth.getRedirectResult().catch(function(){});
     unsubAuthRef.current=null;
     var currentAuthGen=0;
     var unsubAuth=auth.onAuthStateChanged(function(u){
@@ -3657,15 +3651,9 @@ function App(){
       }).then(function(){return userRef.delete().catch(function(){});});
     }
     function doDeleteAuth(){
-      if(!auth.currentUser)return auth.signOut().catch(function(){});
-      return auth.currentUser.delete().catch(function(e){
-        if(e.code==='auth/requires-recent-login'){
-          localStorage.setItem('pending_reauth_delete',uid2);
-          auth.currentUser.reauthenticateWithRedirect(new firebase.auth.GoogleAuthProvider());
-          return;
-        }
-        return auth.signOut();
-      });
+      return fetch('/api/delete-auth-account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid2})})
+        .catch(function(){})
+        .then(function(){return auth.signOut().catch(function(){});});
     }
     // onAuthStateChangedはアンサブしない — 削除後のnullイベントで自動的にstateリセット
     cancelStripeSubscription().then(deleteFirestoreData).then(doDeleteAuth).then(function(){
