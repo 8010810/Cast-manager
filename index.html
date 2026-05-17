@@ -3291,7 +3291,18 @@ function App(){
           function applyRooms(rooms){
             clearTimeout(authTimeout);
             setRoomsList(rooms);
-            if(rooms.length===0){setConsentState('roomselect');setLoading(false);return;}
+            if(rooms.length===0){
+              db.collection('users').doc(u.uid).collection('subscription').doc('main').get().then(function(subDoc){
+                if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='mini'){
+                  window.location.href='/mini';
+                }else if(subDoc.exists&&subDoc.data().status==='active'){
+                  setConsentState('roomselect');setLoading(false);
+                }else{
+                  setConsentState('planselect');setLoading(false);
+                }
+              }).catch(function(_e){setConsentState('roomselect');setLoading(false);});
+              return;
+            }
             var lastRoomId=cd.lastRoomId||rooms[0].roomId;
             var roomInfo=rooms.find(function(r){return r.roomId===lastRoomId;})||rooms[0];
             setRoomId(roomInfo.roomId);
