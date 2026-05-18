@@ -3309,7 +3309,13 @@ function App(){
       setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
       setNavStack(['home']);setSubBack(null);setSettingsPage(null);
       notify('ルームから退室させられました','error');
-      window.location.href='/mini';
+      db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
+        if(subDoc.exists&&subDoc.data().status==='active'){
+          window.location.href='/mini';
+        }else{
+          setConsentState('planselect');setLoading(false);
+        }
+      }).catch(function(){setConsentState('planselect');setLoading(false);});
       return;
     }
     setNavStack(['home']);setSubBack(null);setSettingsPage(null);
