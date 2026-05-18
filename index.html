@@ -3191,6 +3191,7 @@ function App(){
   var unsubConsentRef=React.useRef(null);
   var unsubSubRef=React.useRef(null);
   var planSelectShownAtRef=React.useRef(0);
+  var adminSubCheckedRef=React.useRef(null);
   var s2=useState(null);var data=s2[0];var setData=s2[1];
   var s3=useState(true);var loading=s3[0];var setLoading=s3[1];
   // navStack: ['home', 'mycast', ...] スタック方式
@@ -3669,14 +3670,31 @@ function App(){
           }).catch(function(){ownedRooms.push({id:d.id,name:d.data().name||''});});
         });
         Promise.all(promises).then(function(){
+          window.history.replaceState({},'','/');
           if(ownedRooms.length>0){
-            window.history.replaceState({},'','/');
             setRoomResumeDialog({ownedRooms:ownedRooms});
           }
+          // 引き継ぎ後の新管理者: 既にメンバーとして参加済みなのでそのままルームを使用
         });
       }).catch(function(){});
     }).catch(function(){});
   },[user]);
+
+  // 管理者として初期ロードされた際のサブスク確認（オーナー引き継ぎ後オフライン起動対応）
+  useEffect(function(){
+    if(!user||!roomId||roomRole!=='admin'||consentState!=='done')return;
+    var checkKey=user.uid+':'+roomId;
+    if(adminSubCheckedRef.current===checkKey)return;
+    adminSubCheckedRef.current=checkKey;
+    var params=new URLSearchParams(window.location.search);
+    if(params.get('checkout')==='success')return;
+    db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
+      if(!subDoc.exists||!subDoc.data().subscriptionId||(subDoc.data().status!=='active'&&subDoc.data().status!=='trialing')){
+        setSettingsPage(null);setNavStack(['home']);setSubBack(null);
+        setConsentState('planselect');setLoading(false);
+      }
+    }).catch(function(){});
+  },[user,roomId,roomRole,consentState]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){
