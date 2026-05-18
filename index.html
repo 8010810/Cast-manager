@@ -2574,8 +2574,8 @@ function StoreSettingsPage(p){
       var list=[];
       snap.forEach(function(d){list.push(Object.assign({uid:d.id},d.data()));});
       list.sort(function(a,b){
-        if(a.role==='admin'&&b.role!=='admin')return -1;
-        if(a.role!=='admin'&&b.role==='admin')return 1;
+        var rank=function(r){return r==='admin'?0:r==='sub-admin'?1:2;};
+        if(rank(a.role)!==rank(b.role))return rank(a.role)-rank(b.role);
         return(a.userName||'').localeCompare(b.userName||'','ja');
       });
       setMembers(list);setMembersLoading(false);
@@ -2590,40 +2590,55 @@ function StoreSettingsPage(p){
       .catch(function(){setStoreLoading(false);p.notify('保存に失敗しました');});
   }
 
-  function promoteToAdmin(targetUid,targetName){
-    if(!confirm(targetName+'さんに管理者権限を付与しますか？'))return;
-    setPromotingId(targetUid);
-    p.db.collection('rooms').doc(p.roomId).collection('members').doc(targetUid).update({role:'admin'})
-      .then(function(){
-        p.db.collection('users').doc(targetUid).collection('rooms').doc(p.roomId).update({role:'admin'}).catch(function(){});
-        setMembers(function(prev){
-          var updated=prev.map(function(m){return m.uid===targetUid?Object.assign({},m,{role:'admin'}):m;});
-          return updated.sort(function(a,b){
-            if(a.role==='admin'&&b.role!=='admin')return -1;
-            if(a.role!=='admin'&&b.role==='admin')return 1;
-            return(a.userName||'').localeCompare(b.userName||'','ja');
-          });
-        });
-        setPromotingId(null);p.notify(targetName+'さんを管理者にしました');
-      }).catch(function(){setPromotingId(null);p.notify('権限付与に失敗しました');});
+  function memberSort(list){
+    var rank=function(r){return r==='admin'?0:r==='sub-admin'?1:2;};
+    return list.sort(function(a,b){
+      if(rank(a.role)!==rank(b.role))return rank(a.role)-rank(b.role);
+      return(a.userName||'').localeCompare(b.userName||'','ja');
+    });
   }
 
-  function demoteAdmin(targetUid,targetName){
-    if(!confirm(targetName+'さんの管理者権限を剥奪しますか？'))return;
+  function promoteToSubAdmin(targetUid,targetName){
+    var existingSubAdmin=members.find(function(m){return m.role==='sub-admin'&&m.uid!==targetUid;});
+    var msg=existingSubAdmin
+      ?targetName+'さんをサブ管理者にします。現在のサブ管理者（'+( existingSubAdmin.userName||'不明')+' ）は解除されます。よろしいですか？'
+      :targetName+'さんをサブ管理者にしますか？';
+    if(!confirm(msg))return;
+    setPromotingId(targetUid);
+    var batch=p.db.batch();
+    if(existingSubAdmin){
+      batch.update(p.db.collection('rooms').doc(p.roomId).collection('members').doc(existingSubAdmin.uid),{role:'member'});
+    }
+    batch.update(p.db.collection('rooms').doc(p.roomId).collection('members').doc(targetUid),{role:'sub-admin'});
+    batch.commit().then(function(){
+      if(existingSubAdmin){
+        p.db.collection('users').doc(existingSubAdmin.uid).collection('rooms').doc(p.roomId).update({role:'member'}).catch(function(){});
+      }
+      p.db.collection('users').doc(targetUid).collection('rooms').doc(p.roomId).update({role:'sub-admin'}).catch(function(){});
+      setMembers(function(prev){
+        var updated=prev.map(function(m){
+          if(m.uid===targetUid)return Object.assign({},m,{role:'sub-admin'});
+          if(existingSubAdmin&&m.uid===existingSubAdmin.uid)return Object.assign({},m,{role:'member'});
+          return m;
+        });
+        return memberSort(updated);
+      });
+      setPromotingId(null);p.notify(targetName+'さんをサブ管理者にしました');
+    }).catch(function(){setPromotingId(null);p.notify('権限付与に失敗しました');});
+  }
+
+  function demoteSubAdmin(targetUid,targetName){
+    if(!confirm(targetName+'さんのサブ管理者権限を解除しますか？'))return;
     setEditingMemberId(null);
     p.db.collection('rooms').doc(p.roomId).collection('members').doc(targetUid).update({role:'member'})
       .then(function(){
         p.db.collection('users').doc(targetUid).collection('rooms').doc(p.roomId).update({role:'member'}).catch(function(){});
         setMembers(function(prev){
           var updated=prev.map(function(m){return m.uid===targetUid?Object.assign({},m,{role:'member'}):m;});
-          return updated.sort(function(a,b){
-            if(a.role==='admin'&&b.role!=='admin')return -1;
-            if(a.role!=='admin'&&b.role==='admin')return 1;
-            return(a.userName||'').localeCompare(b.userName||'','ja');
-          });
+          return memberSort(updated);
         });
-        p.notify(targetName+'さんの管理者権限を剥奪しました');
-      }).catch(function(){p.notify('権限剥奪に失敗しました');});
+        p.notify(targetName+'さんのサブ管理者権限を解除しました');
+      }).catch(function(){p.notify('権限解除に失敗しました');});
   }
 
   function removeMember(targetUid,targetName){
@@ -2713,10 +2728,14 @@ function StoreSettingsPage(p){
         :members.length===0
           ?e('div',{style:{color:'#4b5563',fontSize:'13px',padding:'12px 0'}},'メンバーが見つかりません')
           :members.map(function(m){
-            var isAdmin=m.role==='admin';
+            var isAdminRole=m.role==='admin';
+            var isSubAdmin=m.role==='sub-admin';
             var isSelf=m.uid===p.user.uid;
             var promoting=promotingId===m.uid;
             var isEditing=editingMemberId===m.uid;
+            var roleLabel=isAdminRole?'管理者':isSubAdmin?'サブ管理者':'メンバー';
+            var roleColor=isAdminRole?'#e8b86d':isSubAdmin?'#a78bfa':'#6b7280';
+            var canEdit=p.roomRole==='admin'||p.roomRole==='sub-admin';
             return e('div',{key:m.uid,style:CARD},
               e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px'}},
                 e('div',null,
@@ -2724,14 +2743,14 @@ function StoreSettingsPage(p){
                     e('span',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},m.userName||'名前未設定'),
                     isSelf&&e('span',{style:{fontSize:'10px',color:'#6b7280',background:'#1e2035',borderRadius:'10px',padding:'1px 7px'}},'自分')
                   ),
-                  e('span',{style:{fontSize:'11px',color:isAdmin?'#e8b86d':'#6b7280',marginTop:'2px',display:'block'}},isAdmin?'管理者':'メンバー')
+                  e('span',{style:{fontSize:'11px',color:roleColor,marginTop:'2px',display:'block'}},roleLabel)
                 ),
-                p.roomRole==='admin'&&!isSelf&&e('button',{style:{background:'transparent',border:'1px solid #4b5563',borderRadius:'8px',padding:'4px 10px',color:'#9ca3af',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setEditingMemberId(isEditing?null:m.uid);}},isEditing?'閉じる':'編集')
+                canEdit&&!isSelf&&!isAdminRole&&e('button',{style:{background:'transparent',border:'1px solid #4b5563',borderRadius:'8px',padding:'4px 10px',color:'#9ca3af',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setEditingMemberId(isEditing?null:m.uid);}},isEditing?'閉じる':'編集')
               ),
               isEditing&&e('div',{style:{display:'flex',gap:'8px',marginTop:'10px',flexWrap:'wrap'}},
-                !isAdmin&&e('button',{style:{background:'transparent',border:'1px solid #e8b86d44',borderRadius:'8px',padding:'6px 12px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:promoting?'not-allowed':'pointer',opacity:promoting?0.5:1,whiteSpace:'nowrap'},onClick:function(){if(!promoting)promoteToAdmin(m.uid,m.userName||'このユーザー');},disabled:promoting},promoting?'付与中...':'管理者にする'),
-                isAdmin&&e('button',{style:{background:'transparent',border:'1px solid #e8b86d44',borderRadius:'8px',padding:'6px 12px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){demoteAdmin(m.uid,m.userName||'このユーザー');}},'管理者を剥奪'),
-                p.roomRole==='admin'&&p.user&&p.user.uid===p.ownerUid&&!isSelf&&isAdmin&&e('button',{style:{background:'transparent',border:'1px solid #a78bfa44',borderRadius:'8px',padding:'6px 12px',color:'#a78bfa',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){if(p.onTransferOwner)p.onTransferOwner(m.uid,m.userName||'このユーザー');}},'オーナー引き継ぎ'),
+                p.roomRole==='admin'&&!isSubAdmin&&e('button',{style:{background:'transparent',border:'1px solid #a78bfa44',borderRadius:'8px',padding:'6px 12px',color:'#a78bfa',fontSize:'12px',fontWeight:700,cursor:promoting?'not-allowed':'pointer',opacity:promoting?0.5:1,whiteSpace:'nowrap'},onClick:function(){if(!promoting)promoteToSubAdmin(m.uid,m.userName||'このユーザー');},disabled:promoting},promoting?'付与中...':'サブ管理者にする'),
+                p.roomRole==='admin'&&isSubAdmin&&e('button',{style:{background:'transparent',border:'1px solid #a78bfa44',borderRadius:'8px',padding:'6px 12px',color:'#a78bfa',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){demoteSubAdmin(m.uid,m.userName||'このユーザー');}},'サブ管理者を解除'),
+                p.roomRole==='admin'&&p.user&&p.user.uid===p.ownerUid&&!isSelf&&isSubAdmin&&e('button',{style:{background:'transparent',border:'1px solid #a78bfa44',borderRadius:'8px',padding:'6px 12px',color:'#a78bfa',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){if(p.onTransferOwner)p.onTransferOwner(m.uid,m.userName||'このユーザー');}},'オーナー引き継ぎ'),
                 e('button',{style:{background:'transparent',border:'1px solid #ef444444',borderRadius:'8px',padding:'6px 12px',color:'#ef4444',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){removeMember(m.uid,m.userName||'このユーザー');}},'退室させる')
               )
             );
@@ -3071,7 +3090,7 @@ function RoomSelectScreen(p){
               }).catch(function(){setLoading(false);});
             }},
               e('span',{style:{color:'#f3f4f6'}},r.name),
-              e('span',{style:{fontSize:'11px',color:r.role==='admin'?'#e8b86d':'#6b7280'}},r.role==='admin'?'管理者':'メンバー')
+              e('span',{style:{fontSize:'11px',color:r.role==='admin'?'#e8b86d':r.role==='sub-admin'?'#a78bfa':'#6b7280'}},r.role==='admin'?'管理者':r.role==='sub-admin'?'サブ管理者':'メンバー')
             );
           })
         ),
@@ -3530,7 +3549,7 @@ function App(){
       }).catch(function(_e){});
     }).catch(function(_e){});
   },[user]);
-  useEffect(function(){if(settingsPage==='invite'&&roomRole==='admin'&&roomId){loadJoinRequests();}else if(settingsPage!=='invite'){setJoinRequests([]);}}, [settingsPage]);
+  useEffect(function(){if(settingsPage==='invite'&&(roomRole==='admin'||roomRole==='sub-admin')&&roomId){loadJoinRequests();}else if(settingsPage!=='invite'){setJoinRequests([]);}}, [settingsPage]);
   useEffect(function(){if(!roomId){setRoomHolidays([]);return;}var unsub=db.collection('rooms').doc(roomId).onSnapshot(function(doc){setRoomHolidays(doc.exists?(doc.data().holidays||[]):[]);},function(){setRoomHolidays([]);});return function(){unsub();};},[roomId]);
 
   // サブスクリプション監視：解約完了 → プラン選択画面へ
@@ -3679,7 +3698,7 @@ function App(){
     }).catch(function(){setJoinReqMsg('申請に失敗しました');setJoinRoomLoading(false);});
   }
   function loadJoinRequests(){
-    if(!roomId||roomRole!=='admin')return;
+    if(!roomId||(roomRole!=='admin'&&roomRole!=='sub-admin'))return;
     setJoinReqsLoading(true);
     db.collection('rooms').doc(roomId).collection('joinRequests').where('status','==','pending').get().then(function(snap){
       setJoinRequests(snap.docs.map(function(d){return Object.assign({id:d.id},d.data());}));
@@ -4119,7 +4138,7 @@ function App(){
               return e('button',{key:r.roomId,style:{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',background:isCurrent?'#e8b86d12':'#12122a',border:'1px solid '+(isCurrent?'#e8b86d44':'#1e2035'),borderRadius:'12px',padding:'16px',marginBottom:'8px',cursor:isCurrent?'default':'pointer',textAlign:'left'},onClick:function(){if(!isCurrent)switchToRoom(r);}},
                 e('div',null,
                   e('div',{style:{fontWeight:700,fontSize:'14px',color:'#f3f4f6'}},r.name),
-                  e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},r.role==='admin'?'管理者':'メンバー')
+                  e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'2px'}},r.role==='admin'?'管理者':r.role==='sub-admin'?'サブ管理者':'メンバー')
                 ),
                 isCurrent
                   ?e('span',{style:{fontSize:'11px',color:'#e8b86d',fontWeight:700,background:'#e8b86d18',border:'1px solid #e8b86d44',borderRadius:'20px',padding:'3px 10px'}},'現在のルーム')
@@ -4146,7 +4165,7 @@ function App(){
     if(settingsPage==='invite'){
       var invCode=currentRoom&&currentRoom.inviteCode||'';
       // 管理者なのにinvCodeが空の場合、roomsドキュメントから取得して補完
-      if(!invCode&&roomRole==='admin'&&roomId){
+      if(!invCode&&(roomRole==='admin'||roomRole==='sub-admin')&&roomId){
         db.collection('rooms').doc(roomId).get().then(function(doc){
           if(doc.exists&&doc.data().inviteCode){
             setCurrentRoom(function(prev){return Object.assign({},prev,{inviteCode:doc.data().inviteCode});});
@@ -4161,10 +4180,10 @@ function App(){
           e('div',{style:{width:'40px'}})
         ),
         e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'24px 18px'})},
-          roomRole!=='admin'
+          roomRole!=='admin'&&roomRole!=='sub-admin'
             ?e('div',{style:{textAlign:'center',padding:'40px 0'}},
                 e('div',{style:{fontSize:'24px',marginBottom:'12px'}},'🔒'),
-                e('div',{style:{color:'#6b7280',fontSize:'13px'}},'管理者権限です')
+                e('div',{style:{color:'#6b7280',fontSize:'13px'}},'管理者権限が必要です')
               )
             :invCode
               ?e('div',null,
