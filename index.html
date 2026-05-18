@@ -4432,7 +4432,7 @@ function App(){
       roomsList:roomsList,
       db:db,
       uid:uid,
-      onBack:roomsList.length===0?function(){setConsentState('planselect');}:null,
+      onBack:null,
       onRoomReady:function(rid,role,roomInfo,data){
         setRoomId(rid);
         setRoomRole(role);
