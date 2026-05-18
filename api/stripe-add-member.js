@@ -52,21 +52,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Owner has no active subscription' });
     }
 
+    // Firestoreの実際の招待メンバー数を正とする（Stripeの数字に依存しない）
+    var membersSnap = await db.collection('rooms').doc(roomId).collection('members')
+      .where('isInvited', '==', true).get();
+    var newQuantity = membersSnap.size;
+
     var subscription = await stripe.subscriptions.retrieve(subscriptionId);
     var item = subscription.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
 
-    // サブスクから支払い方法を取得（invoices.payに必要）
-    var paymentMethodId = subscription.default_payment_method;
-    if (!paymentMethodId) {
-      var customer = await stripe.customers.retrieve(customerId);
-      paymentMethodId = customer.invoice_settings && customer.invoice_settings.default_payment_method
-        || customer.default_source
-        || null;
-    }
-
-    var newQuantity;
     if (item) {
-      newQuantity = (item.quantity || 0) + 1;
       await stripe.subscriptionItems.update(item.id, {
         quantity: newQuantity,
         proration_behavior: 'none',
@@ -75,15 +69,15 @@ export default async function handler(req, res) {
       await stripe.subscriptionItems.create({
         subscription: subscriptionId,
         price: ACCOUNT_ADD_PRICE,
-        quantity: 1,
+        quantity: newQuantity,
         proration_behavior: 'none',
       });
-      newQuantity = 1;
     }
 
-    // 即時¥1,000請求
+    // 即時¥1,000請求：サブスクに紐付けて作成することでCheckout決済方法が使える
     var invoiceItem = await stripe.invoiceItems.create({
       customer: customerId,
+      subscription: subscriptionId,
       amount: 1000,
       currency: 'jpy',
       description: 'メンバー追加費用（招待）',
@@ -92,14 +86,13 @@ export default async function handler(req, res) {
     try {
       invoice = await stripe.invoices.create({
         customer: customerId,
+        subscription: subscriptionId,
         auto_advance: false,
       });
       await stripe.invoices.finalizeInvoice(invoice.id);
-      var payOpts = paymentMethodId ? { payment_method: paymentMethodId, off_session: true } : { off_session: true };
-      await stripe.invoices.pay(invoice.id, payOpts);
+      await stripe.invoices.pay(invoice.id, { off_session: true });
     } catch (_payErr) {
       console.error('[stripe-add-member] Invoice pay failed:', _payErr.message);
-      // 決済失敗時は請求書を無効化して翌月分に持ち越されないようにする
       if (invoice) {
         await stripe.invoices.voidInvoice(invoice.id).catch(function(_e2) {
           console.error('[stripe-add-member] Failed to void invoice:', _e2.message);

@@ -32,6 +32,7 @@ export default async function handler(req, res) {
   try {
     var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     var ownerUid = req.body.ownerUid;
+    var roomId = req.body.roomId;
 
     if (!ownerUid) {
       return res.status(400).json({ error: 'ownerUid is required' });
@@ -52,11 +53,20 @@ export default async function handler(req, res) {
     var subscription = await stripe.subscriptions.retrieve(subscriptionId);
     var item = subscription.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
 
-    if (!item || item.quantity <= 0) {
+    if (!item) {
       return res.status(200).json({ success: true, message: 'No ACCOUNT_ADD item to decrease' });
     }
 
-    var newQuantity = Math.max(0, (item.quantity || 1) - 1);
+    // Firestoreの実際の招待メンバー数を正とする（Stripeの数字に依存しない）
+    var newQuantity;
+    if (roomId) {
+      var membersSnap = await db.collection('rooms').doc(roomId).collection('members')
+        .where('isInvited', '==', true).get();
+      newQuantity = membersSnap.size;
+    } else {
+      newQuantity = Math.max(0, (item.quantity || 1) - 1);
+    }
+
     await stripe.subscriptionItems.update(item.id, {
       quantity: newQuantity,
       proration_behavior: 'none',
