@@ -87,9 +87,31 @@ export default async function handler(req, res) {
         subscriptionId: session.subscription || '',
         customerId: session.customer || '',
         createdAt: new Date().toISOString(),
+        cancelAtPeriodEnd: false,
+        cancelAt: null,
       });
 
       console.log('[stripe-webhook] Subscription saved for uid:', uid);
+    }
+
+    if (event.type === 'customer.subscription.deleted') {
+      // 期間末キャンセルが実際に完了したとき
+      var subscription = event.data.object;
+      var customerId = subscription.customer;
+      var db2 = getDb();
+
+      // customerIdからuidを検索
+      var usersSnap = await db2.collectionGroup('subscription').where('customerId', '==', customerId).limit(1).get();
+      if (!usersSnap.empty) {
+        var subRef = usersSnap.docs[0].ref;
+        await subRef.update({
+          status: 'canceled',
+          canceledAt: new Date().toISOString(),
+        });
+        console.log('[stripe-webhook] Subscription marked canceled for customer:', customerId);
+      } else {
+        console.log('[stripe-webhook] No subscription doc found for customer:', customerId);
+      }
     }
 
     return res.status(200).json({ received: true });
