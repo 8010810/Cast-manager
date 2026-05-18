@@ -3187,6 +3187,7 @@ function App(){
   var unsubRoomsListRef=React.useRef(null);
   var processedKicksRef=React.useRef({});
   var roomsListRef=React.useRef([]);
+  var roomRoleRef=React.useRef('member');
   var unsubConsentRef=React.useRef(null);
   var unsubSubRef=React.useRef(null);
   var planSelectShownAtRef=React.useRef(0);
@@ -3203,7 +3204,8 @@ function App(){
   var s10=useState('');var userName=s10[0];var setUserName=s10[1];
   var s_sn=useState('');var storeName=s_sn[0];var setStoreName=s_sn[1];
   var s_ri=useState(null);var roomId=s_ri[0];var setRoomId=s_ri[1];
-  var s_rr=useState('member');var roomRole=s_rr[0];var setRoomRole=s_rr[1];
+  var s_rr=useState('member');var roomRole=s_rr[0];var _setRoomRole=s_rr[1];
+  function setRoomRole(v){var next=typeof v==='function'?v(roomRoleRef.current):v;roomRoleRef.current=next;_setRoomRole(next);}
   var s_rl=useState([]);var roomsList=s_rl[0];var _setRoomsList=s_rl[1];
   function setRoomsList(v){_setRoomsList(function(prev){var next=typeof v==='function'?v(prev):v;roomsListRef.current=next;return next;});} // [{roomId,name,role}]
   var s_rc=useState(null);var currentRoom=s_rc[0];var setCurrentRoom=s_rc[1]; // {id,name,inviteCode}
@@ -3327,7 +3329,21 @@ function App(){
   function makeRoleListener(rid){
     return function(doc){
       if(!doc.exists){handleKickedFromRoom(rid);return;}
-      if(doc.data().role){setRoomRole(doc.data().role);}
+      var newRole=doc.data().role;
+      if(newRole&&newRole!==roomRoleRef.current){
+        var prevRole=roomRoleRef.current;
+        setRoomRole(newRole);
+        if(newRole==='admin'&&prevRole!=='admin'){
+          db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
+            if(!subDoc.exists||subDoc.data().status!=='active'){
+              setSettingsPage(null);setNavStack(['home']);setSubBack(null);
+              setConsentState('planselect');setLoading(false);
+            }
+          }).catch(function(){});
+        }
+      }else if(newRole){
+        setRoomRole(newRole);
+      }
     };
   }
   function makeUserRoomListener(rid){
