@@ -82,19 +82,35 @@ export default async function handler(req, res) {
     }
 
     // 即時¥1,000請求
-    await stripe.invoiceItems.create({
+    var invoiceItem = await stripe.invoiceItems.create({
       customer: customerId,
       amount: 1000,
       currency: 'jpy',
       description: 'メンバー追加費用（招待）',
     });
-    var invoice = await stripe.invoices.create({
-      customer: customerId,
-      auto_advance: false,
-    });
-    await stripe.invoices.finalizeInvoice(invoice.id);
-    var payOpts = paymentMethodId ? { payment_method: paymentMethodId } : {};
-    await stripe.invoices.pay(invoice.id, payOpts);
+    var invoice = null;
+    try {
+      invoice = await stripe.invoices.create({
+        customer: customerId,
+        auto_advance: false,
+      });
+      await stripe.invoices.finalizeInvoice(invoice.id);
+      var payOpts = paymentMethodId ? { payment_method: paymentMethodId, off_session: true } : { off_session: true };
+      await stripe.invoices.pay(invoice.id, payOpts);
+    } catch (_payErr) {
+      console.error('[stripe-add-member] Invoice pay failed:', _payErr.message);
+      // 決済失敗時は請求書を無効化して翌月分に持ち越されないようにする
+      if (invoice) {
+        await stripe.invoices.voidInvoice(invoice.id).catch(function(_e2) {
+          console.error('[stripe-add-member] Failed to void invoice:', _e2.message);
+        });
+      } else {
+        await stripe.invoiceItems.del(invoiceItem.id).catch(function(_e2) {
+          console.error('[stripe-add-member] Failed to delete invoiceItem:', _e2.message);
+        });
+      }
+      throw _payErr;
+    }
 
     await db.collection('users').doc(ownerUid).collection('subscription').doc('main').update({
       memberCount: newQuantity,
