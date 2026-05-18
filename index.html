@@ -3793,12 +3793,13 @@ function App(){
               return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){})
                 .then(function(){return rd.ref.delete().catch(function(){});});
             }
-            // 管理者1人・他メンバーあり → 最古参を管理者に昇格
+            // 管理者1人・他メンバーあり → サブ管理者を優先、次に最古参を管理者に昇格
             others.sort(function(a,b){
               var aj=a.data().joinedAt||'';var bj=b.data().joinedAt||'';
               return aj<bj?-1:aj>bj?1:0;
             });
-            var newAdmin=others[0];
+            var subAdminMember=others.find(function(m){return m.data().role==='sub-admin';});
+            var newAdmin=subAdminMember||others[0];
             return db.collection('rooms').doc(rid).collection('members').doc(newAdmin.id).update({role:'admin'}).catch(function(){})
               .then(function(){return db.collection('users').doc(newAdmin.id).collection('rooms').doc(rid).update({role:'admin'}).catch(function(){});})
               .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){});})
