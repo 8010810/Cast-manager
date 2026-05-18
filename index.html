@@ -3269,6 +3269,9 @@ function App(){
       return fetch('/api/stripe-add-member',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({ownerUid:ownerUid,roomId:rid,memberUid:user.uid})});
     }).then(function(){
+      // miniサブスクがあればキャンセル
+      fetch('/api/stripe-cancel-account',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({uid:user.uid})}).catch(function(){});
       return loadFromRoom(rid);
     }).then(function(d){
       var roomData=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:{},quota:{}},d);
