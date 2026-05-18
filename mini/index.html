@@ -2515,13 +2515,10 @@ function MiniApp(){
         ));
       }
       if(settingsPage==='plan'){
-        var STD_MONTHLY_PRICE='price_1TXgnIQaq3EwNY4QcKOSwHGF';
-        var STD_YEARLY_PRICE='price_1TXgo0Qaq3EwNY4Q98Zkhml5';
         var mPlanLabel=miniSubData&&miniSubData.plan==='mini'?'miniプラン':'standardプラン';
         var mPlanStatus=miniSubData&&miniSubData.status==='active'?'有効':'解約済み';
         var mIsCancelScheduled=miniSubData&&miniSubData.cancelAtPeriodEnd;
         var mCancelAtStr=mIsCancelScheduled&&miniSubData.cancelAt?new Date(miniSubData.cancelAt).toLocaleDateString('ja-JP'):'';
-        var isMiniPlan=miniSubData&&miniSubData.plan==='mini'&&miniSubData.status==='active'&&!mIsCancelScheduled;
         function handleMiniCancelSub(){
           if(!user)return;
           if(!confirm('サブスクリプションを解約しますか？\n現在の契約期間が終了するまでは引き続きご利用いただけます。'))return;
@@ -2549,18 +2546,6 @@ function MiniApp(){
             })
             .catch(function(){setMiniCancelLoading(false);notify('解約キャンセルに失敗しました','error');});
         }
-        function handleUpgradeToStd(){
-          if(!user||checkoutLoading)return;
-          var priceId=checkoutPeriod==='yearly'?STD_YEARLY_PRICE:STD_MONTHLY_PRICE;
-          setCheckoutLoading(true);
-          fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,successPath:'/?checkout=success',cancelPath:'/mini'})})
-            .then(function(r){return r.json();})
-            .then(function(d){
-              setCheckoutLoading(false);
-              if(d.url){window.location.href=d.url;}else{notify('決済ページへの遷移に失敗しました','error');}
-            })
-            .catch(function(){setCheckoutLoading(false);notify('決済ページへの遷移に失敗しました','error');});
-        }
         return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
           e('div',{style:SETTINGS_HEADER},
             e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
@@ -2578,40 +2563,12 @@ function MiniApp(){
                     '解約予約済み：'+mCancelAtStr+'に終了します'
                   )
                 ),
-                isMiniPlan&&e('div',null,
-                  e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'8px 0 20px'}}),
-                  e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.4)',borderRadius:'12px',padding:'20px',marginBottom:'14px'}},
-                    e('div',{style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:'12px'}},
-                      e('div',{style:{width:'32px',height:'32px',borderRadius:'8px',background:'rgba(232,184,109,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px'}},'🏠'),
-                      e('div',null,
-                        e('div',{style:{fontSize:'14px',fontWeight:700,color:'#e8b86d'}},'standardプラン'),
-                        e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'1px'}},'フル機能・管理者向け')
-                      )
-                    ),
-                    e('ul',{style:{margin:'0 0 14px',paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:2}},
-                      e('li',null,'ルームの作成・管理'),
-                      e('li',null,'メンバー招待・管理（+¥1,000/人）'),
-                      e('li',null,'シフト管理・勤怠管理'),
-                      e('li',null,'詳細な売上分析')
-                    ),
-                    e('div',{style:{display:'flex',gap:'6px',marginBottom:'14px'}},
-                      e('button',{style:{flex:1,padding:'7px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod==='monthly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod('monthly');}},'月額 ¥3,800'),
-                      e('button',{style:{flex:1,padding:'7px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod==='yearly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod==='yearly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod('yearly');}},'年額 ¥38,000')
-                    ),
-                    checkoutPeriod==='yearly'&&e('div',{style:{fontSize:'11px',color:'#34d399',marginBottom:'12px',textAlign:'center'}},'年額は月額換算 ¥3,167（約2ヶ月分お得）'),
-                    e('button',{
-                      style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'12px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},
-                      onClick:handleUpgradeToStd,
-                      disabled:checkoutLoading
-                    },checkoutLoading?'処理中...':'standardにアップグレード')
-                  )
-                ),
                 mIsCancelScheduled&&miniSubData.status==='active'&&e('button',{
                   style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'12px',padding:'14px',color:'#e8b86d',fontSize:'14px',cursor:miniCancelLoading?'not-allowed':'pointer',opacity:miniCancelLoading?0.6:1},
                   onClick:handleMiniResumeSub,disabled:miniCancelLoading
                 },miniCancelLoading?'処理中...':'解約をキャンセルする'),
                 !mIsCancelScheduled&&miniSubData.status==='active'&&e('button',{
-                  style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:miniCancelLoading?'not-allowed':'pointer',opacity:miniCancelLoading?0.6:1,marginTop:isMiniPlan?'8px':'0'},
+                  style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:miniCancelLoading?'not-allowed':'pointer',opacity:miniCancelLoading?0.6:1},
                   onClick:handleMiniCancelSub,disabled:miniCancelLoading
                 },miniCancelLoading?'処理中...':'解約する')
               )
