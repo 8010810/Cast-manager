@@ -1804,6 +1804,7 @@ function MiniApp(){
   var s_phpv=useState('');var editMiniPhoneVal=s_phpv[0];var setEditMiniPhoneVal=s_phpv[1];
   var s_subm=useState(null);var miniSubData=s_subm[0];var setMiniSubData=s_subm[1];
   var s_mcld=useState(false);var miniCancelLoading=s_mcld[0];var setMiniCancelLoading=s_mcld[1];
+  var s_upgc=useState(false);var upgradeConfirm=s_upgc[0];var setUpgradeConfirm=s_upgc[1];
   React.useEffect(function(){
     if(!user)return;
     var unsub=db.collection('users').doc(user.uid).collection('meta').doc('consent').onSnapshot(function(doc){
@@ -2549,17 +2550,20 @@ function MiniApp(){
             })
             .catch(function(){setMiniCancelLoading(false);notify('解約キャンセルに失敗しました','error');});
         }
-        function handleUpgradeToStd(){
+        function doUpgradeToStd(){
           if(!user||checkoutLoading)return;
           var priceId=checkoutPeriod==='yearly'?STD_YEARLY_PRICE:STD_MONTHLY_PRICE;
           setCheckoutLoading(true);
-          fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,successPath:'/?checkout=success',cancelPath:'/mini'})})
+          setUpgradeConfirm(false);
+          fetch('/api/stripe-upgrade-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid,priceId:priceId})})
             .then(function(r){return r.json();})
             .then(function(d){
               setCheckoutLoading(false);
-              if(d.url){window.location.href=d.url;}else{notify('決済ページへの遷移に失敗しました','error');}
+              if(d.error){notify('アップグレードに失敗しました：'+d.error,'error');return;}
+              notify('standardプランにアップグレードしました');
+              setTimeout(function(){window.location.href='/';},1200);
             })
-            .catch(function(){setCheckoutLoading(false);notify('決済ページへの遷移に失敗しました','error');});
+            .catch(function(){setCheckoutLoading(false);notify('アップグレードに失敗しました','error');});
         }
         return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
           e('div',{style:SETTINGS_HEADER},
@@ -2599,11 +2603,24 @@ function MiniApp(){
                       e('button',{style:{flex:1,padding:'7px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod==='yearly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod==='yearly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod('yearly');}},'年額 ¥38,000')
                     ),
                     checkoutPeriod==='yearly'&&e('div',{style:{fontSize:'11px',color:'#34d399',marginBottom:'12px',textAlign:'center'}},'年額は月額換算 ¥3,167（約2ヶ月分お得）'),
-                    e('button',{
-                      style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'12px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},
-                      onClick:handleUpgradeToStd,
-                      disabled:checkoutLoading
-                    },checkoutLoading?'処理中...':'standardにアップグレード')
+                    !upgradeConfirm&&e('button',{
+                      style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'12px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:'pointer'},
+                      onClick:function(){setUpgradeConfirm(true);}
+                    },'standardにアップグレード'),
+                    upgradeConfirm&&e('div',{style:{background:'rgba(232,184,109,0.08)',border:'1px solid rgba(232,184,109,0.3)',borderRadius:'10px',padding:'14px'}},
+                      e('div',{style:{fontSize:'13px',color:'#f3f4f6',marginBottom:'4px',fontWeight:700}},'アップグレードの確認'),
+                      e('div',{style:{fontSize:'12px',color:'#9ca3af',marginBottom:'12px'}},'登録済みのカードで即時決済されます。差額は日割りで請求されます。'),
+                      e('div',{style:{display:'flex',gap:'8px'}},
+                        e('button',{
+                          style:{flex:1,background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',padding:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'13px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},
+                          onClick:doUpgradeToStd,disabled:checkoutLoading
+                        },checkoutLoading?'処理中...':'アップグレードする'),
+                        e('button',{
+                          style:{flex:1,background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'10px',color:'#9ca3af',fontSize:'13px',cursor:'pointer'},
+                          onClick:function(){setUpgradeConfirm(false);}
+                        },'キャンセル')
+                      )
+                    )
                   )
                 ),
                 mIsCancelScheduled&&miniSubData.status==='active'&&e('button',{
