@@ -27,20 +27,26 @@ export default async function handler(req, res) {
     var uid = req.body.uid || '';
     var successPath = req.body.successPath || '/?checkout=success';
     var cancelPath = req.body.cancelPath || '/?checkout=cancel';
+    var trialEnd = req.body.trialEnd || null;
     var plan = MINI_PRICES.includes(priceId) ? 'mini' : 'standard';
 
     if (!priceId) {
       return res.status(400).json({ error: 'priceId is required' });
     }
 
-    var session = await stripe.checkout.sessions.create({
+    var sessionParams = {
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: quantity }],
       client_reference_id: uid,
       metadata: { uid: uid, plan: plan },
       success_url: BASE_URL + successPath + (successPath.includes('?') ? '&' : '?') + 'session_id={CHECKOUT_SESSION_ID}',
       cancel_url: BASE_URL + cancelPath,
-    });
+    };
+    if (trialEnd && trialEnd > Math.floor(Date.now() / 1000)) {
+      sessionParams.subscription_data = { trial_end: trialEnd };
+    }
+
+    var session = await stripe.checkout.sessions.create(sessionParams);
 
     return res.status(200).json({
       sessionId: session.id,

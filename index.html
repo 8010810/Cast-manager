@@ -3367,7 +3367,13 @@ function App(){
   function handleCheckout(priceId,successPath,cancelPath){
     if(checkoutLoading||!user)return;
     setCheckoutLoading(true);
-    fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel'})})
+    db.collection('users').doc(user.uid).collection('meta').doc('consent').get().then(function(metaDoc){
+      var trialEnd=metaDoc.exists&&metaDoc.data().transferTrialEnd||null;
+      if(trialEnd){
+        metaDoc.ref.update({transferTrialEnd:null}).catch(function(){});
+      }
+      return fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel',trialEnd:trialEnd})});
+    })
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.url){window.location.href=d.url;return;}
