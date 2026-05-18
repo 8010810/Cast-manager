@@ -41,6 +41,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'ownerUid, memberUid and roomId are required' });
     }
 
+    var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     var db = getDb();
     var now = new Date().toISOString();
 
@@ -62,6 +63,18 @@ export default async function handler(req, res) {
       db.collection('rooms').doc(roomId).collection('joinRequests').doc(memberUid).delete(),
     ]);
 
+    // メンバーのminiサブスクがあればキャンセル
+    var memberSubDoc = await db.collection('users').doc(memberUid).collection('subscription').doc('main').get();
+    if (memberSubDoc.exists && memberSubDoc.data().subscriptionId) {
+      try {
+        await stripe.subscriptions.cancel(memberSubDoc.data().subscriptionId);
+        await db.collection('users').doc(memberUid).collection('subscription').doc('main').delete();
+        console.log('[approve-member] Cancelled mini subscription for member:', memberUid);
+      } catch (_subErr) {
+        console.log('[approve-member] Mini sub cancel skipped:', _subErr.message);
+      }
+    }
+
     // Stripe即時課金（stripe-add-memberと同じロジック）
     var subDoc = await db.collection('users').doc(ownerUid).collection('subscription').doc('main').get();
     if (!subDoc.exists || !subDoc.data().subscriptionId) {
@@ -69,7 +82,6 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, billed: false });
     }
 
-    var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     var subData = subDoc.data();
     var subscriptionId = subData.subscriptionId;
     var customerId = subData.customerId;
