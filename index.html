@@ -3263,7 +3263,7 @@ function App(){
       var next=remaining[0];
       setRoomId(next.roomId);setRoomRole(next.role||'member');
       setCurrentRoom({id:next.roomId,name:next.name,inviteCode:next.inviteCode||''});
-      loadRoomData(next.roomId,next.name);
+      loadRoomData(next.roomId,next.name,next.role||'member');
     }else{
       setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
       setNavStack(['home']);setSubBack(null);setSettingsPage(null);
@@ -3461,7 +3461,7 @@ function App(){
               setRoomId(roomInfo.roomId);
               setRoomRole(roomInfo.role||'member');
               setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
-              loadRoomData(roomInfo.roomId,roomInfo.name||'');
+              loadRoomData(roomInfo.roomId,roomInfo.name||'',roomInfo.role||'member');
               var now2=new Date();if(now2.getHours()<9)now2.setDate(now2.getDate()-1);
               var ts=now2.getFullYear()+'-'+pad(now2.getMonth()+1)+'-'+pad(now2.getDate());
               if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
@@ -3479,7 +3479,7 @@ function App(){
               var roomInfo=rooms.find(function(r){return r.roomId===lastRoomId;})||rooms[0];
               setRoomId(roomInfo.roomId);setRoomRole(roomInfo.role||'member');
               setCurrentRoom({id:roomInfo.roomId,name:roomInfo.name||'',inviteCode:roomInfo.inviteCode||''});
-              loadRoomData(roomInfo.roomId,roomInfo.name||'');
+              loadRoomData(roomInfo.roomId,roomInfo.name||'',roomInfo.role||'member');
             });
           }
           if(unsubRoomsListRef.current){unsubRoomsListRef.current();unsubRoomsListRef.current=null;}
@@ -3655,17 +3655,23 @@ function App(){
       }
     }).catch(function(){});
   }
-  function loadRoomData(rid,rName){
+  function loadRoomData(rid,rName,role){
     if(!rid){setLoading(false);return;}
     loadFromRoom(rid).then(function(d){
       var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
       if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-      setupPersonalCastInRoom(db,user?user.uid:'',userName||'',rid,rName||'',nd,uid,function(ud){
-        var final=Object.assign({},ud);
-        if(!final.folders||final.folders.length===0){final.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-        setData(final);setLoading(false);setConsentState('done');
-        doMiniSync(rid,rName||'',final);
-      });
+      var needsFolder=(role==='member'||role==='sub-admin')&&user;
+      if(needsFolder){
+        setupPersonalCastInRoom(db,user.uid,userName||'',rid,rName||'',nd,uid,function(ud){
+          var final=Object.assign({},ud);
+          if(!final.folders||final.folders.length===0){final.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+          setData(final);setLoading(false);setConsentState('done');
+          doMiniSync(rid,rName||'',final);
+        });
+      }else{
+        setData(nd);setLoading(false);setConsentState('done');
+        doMiniSync(rid,rName||'',nd);
+      }
     }).catch(function(){
       var empty={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}};
       setData(empty);setLoading(false);setConsentState('done');
