@@ -3541,8 +3541,17 @@ function App(){
             else if(rooms.length>0){setRoomsList(rooms);}
             else if(!snap.metadata.fromCache){
               if(appliedRooms){
-                // 一度読み込んだ後に空になった = ルームを全退出
-                clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
+                // 一度読み込んだ後に空になった = ルームを全退出 → サブスク確認
+                clearTimeout(authTimeout);
+                db.collection('users').doc(u.uid).collection('subscription').doc('main').get().then(function(subDoc){
+                  if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='mini'){
+                    window.location.href='/mini';
+                  }else if(subDoc.exists&&subDoc.data().status==='active'){
+                    setConsentState('roomselect');setLoading(false);
+                  }else{
+                    setConsentState('planselect');setLoading(false);
+                  }
+                }).catch(function(){setConsentState('planselect');setLoading(false);});
               }else{
                 // 初回ロード中に空スナップが来た可能性がある (race condition)
                 // 3秒待って、その間に実際のルームが届かなければサブスクリプション確認
