@@ -3560,7 +3560,7 @@ function App(){
       if(!doc.exists){setSubscriptionData(null);return;}
       var sd=doc.data();
       setSubscriptionData(sd);
-      if(sd.status==='canceled'){
+      if(sd.status==='canceled'&&roomRole==='admin'){
         if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}
         setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
         setNavStack(['home']);setSubBack(null);setSettingsPage(null);
