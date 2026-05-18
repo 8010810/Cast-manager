@@ -39,15 +39,26 @@ export default async function handler(req, res) {
 
     var db = getDb();
 
-    // 旧サブスクを期間末キャンセル（失敗しても引き継ぎは続行）
+    // 旧サブスクを即時キャンセルし、残り期間を新オーナーのトライアルとして引き継ぐ
     var oldSubDoc = await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').get();
+    var trialEnd = null;
     if (oldSubDoc.exists && oldSubDoc.data().subscriptionId) {
       try {
-        await stripe.subscriptions.update(oldSubDoc.data().subscriptionId, { cancel_at_period_end: true });
-        await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').update({ cancelAtPeriodEnd: true });
+        var oldSub = await stripe.subscriptions.retrieve(oldSubDoc.data().subscriptionId);
+        trialEnd = oldSub.current_period_end; // Unixタイムスタンプ（秒）
+        await stripe.subscriptions.cancel(oldSubDoc.data().subscriptionId);
+        await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').update({
+          status: 'canceled', cancelAtPeriodEnd: false,
+        });
       } catch (_stripeErr) {
-        console.log('[stripe-transfer-owner] Stripe update skipped:', _stripeErr.message);
+        console.log('[stripe-transfer-owner] Stripe cancel skipped:', _stripeErr.message);
       }
+    }
+
+    // 新オーナーのmetaに残り期間を保存（チェックアウト時のトライアル用）
+    if (trialEnd) {
+      await db.collection('users').doc(newOwnerUid).collection('meta').doc('consent')
+        .set({ transferTrialEnd: trialEnd }, { merge: true });
     }
 
     // Firestore: ルームのオーナー更新
