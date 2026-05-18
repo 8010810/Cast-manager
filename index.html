@@ -2639,7 +2639,7 @@ function StoreSettingsPage(p){
       p.notify(targetName+'さんをルームから退室させました');
       if(isInvited&&p.ownerUid){
         fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({ownerUid:p.ownerUid})}).catch(function(_e){console.error('Remove member billing error:',_e);});
+          body:JSON.stringify({ownerUid:p.ownerUid,roomId:p.roomId})}).catch(function(_e){console.error('Remove member billing error:',_e);});
       }
       return p.db.collection('rooms').doc(p.roomId).collection('members').get();
     }).then(function(snap){
