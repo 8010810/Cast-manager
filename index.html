@@ -3688,21 +3688,24 @@ function App(){
   }
   function approveRequest(req){
     setJoinRequests(function(prev){return prev.filter(function(r){return r.uid!==req.uid;});});
-    var now=new Date().toISOString();
-    db.collection('rooms').doc(roomId).collection('members').doc(req.uid).set({role:'member',userName:req.userName||'',joinedAt:now})
-      .then(function(){
-        return Promise.all([
-          db.collection('rooms').doc(roomId).collection('joinRequests').doc(req.uid).delete(),
-          db.collection('users').doc(req.uid).collection('rooms').doc(roomId).set({
-            name:currentRoom?currentRoom.name||'':'',
-            role:'member',
-            inviteCode:currentRoom?currentRoom.inviteCode||'':'',
-            joinedAt:now
-          }).catch(function(){})
-        ]);
-      })
-      .then(function(){notify((req.userName||'メンバー')+'を承認しました');syncMemberCount(roomId,user?user.uid:null);})
-      .catch(function(){setJoinRequests(function(prev){return [req].concat(prev);});notify('承認に失敗しました','error');});
+    fetch('/api/approve-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      ownerUid:user?user.uid:null,
+      memberUid:req.uid,
+      memberUserName:req.userName||'',
+      roomId:roomId,
+      roomName:currentRoom?currentRoom.name||'':'',
+      inviteCode:currentRoom?currentRoom.inviteCode||'':'',
+    })}).then(function(r){return r.json();}).then(function(d){
+      if(d.error){
+        setJoinRequests(function(prev){return [req].concat(prev);});
+        notify('承認に失敗しました','error');
+        return;
+      }
+      notify((req.userName||'メンバー')+'を承認しました');
+    }).catch(function(){
+      setJoinRequests(function(prev){return [req].concat(prev);});
+      notify('承認に失敗しました','error');
+    });
   }
   function rejectRequest(req){
     db.collection('rooms').doc(roomId).collection('joinRequests').doc(req.uid).delete()
