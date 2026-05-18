@@ -2558,12 +2558,16 @@ function MiniApp(){
           fetch('/api/stripe-upgrade-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid,priceId:priceId})})
             .then(function(r){return r.json();})
             .then(function(d){
-              setCheckoutLoading(false);
-              if(d.error){notify('アップグレードに失敗しました：'+d.error,'error');return;}
-              notify('standardプランにアップグレードしました');
-              setTimeout(function(){window.location.href='/';},1200);
+              if(d.error){setCheckoutLoading(false);notify('アップグレードに失敗しました：'+d.error,'error');return;}
+              window.location.href='/';
             })
             .catch(function(){setCheckoutLoading(false);notify('アップグレードに失敗しました','error');});
+        }
+        if(checkoutLoading){
+          return e('div',{style:{position:'fixed',inset:0,background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:9999}},
+            e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px',fontFamily:"'Cormorant Garamond',serif"}},'LOADING...'),
+            e('div',{style:{fontSize:'12px',color:'#6b7280',marginTop:'12px'}},'アップグレード処理中です')
+          );
         }
         return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
           e('div',{style:SETTINGS_HEADER},
