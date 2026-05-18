@@ -3660,8 +3660,12 @@ function App(){
     loadFromRoom(rid).then(function(d){
       var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
       if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
-      setData(nd);setLoading(false);setConsentState('done');
-      doMiniSync(rid,rName||'',nd);
+      setupPersonalCastInRoom(db,user?user.uid:'',userName||'',rid,rName||'',nd,uid,function(ud){
+        var final=Object.assign({},ud);
+        if(!final.folders||final.folders.length===0){final.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+        setData(final);setLoading(false);setConsentState('done');
+        doMiniSync(rid,rName||'',final);
+      });
     }).catch(function(){
       var empty={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}};
       setData(empty);setLoading(false);setConsentState('done');
