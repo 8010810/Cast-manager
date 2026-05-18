@@ -39,25 +39,16 @@ export default async function handler(req, res) {
 
     var db = getDb();
 
-    // 旧オーナーのサブスク取得
+    // 旧サブスクを期間末キャンセル（失敗しても引き継ぎは続行）
     var oldSubDoc = await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').get();
-    if (!oldSubDoc.exists) {
-      return res.status(404).json({ error: 'Old owner subscription not found' });
+    if (oldSubDoc.exists && oldSubDoc.data().subscriptionId) {
+      try {
+        await stripe.subscriptions.update(oldSubDoc.data().subscriptionId, { cancel_at_period_end: true });
+        await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').update({ cancelAtPeriodEnd: true });
+      } catch (_stripeErr) {
+        console.log('[stripe-transfer-owner] Stripe update skipped:', _stripeErr.message);
+      }
     }
-    var oldSubData = oldSubDoc.data();
-    var oldSubscriptionId = oldSubData.subscriptionId;
-
-    if (!oldSubscriptionId) {
-      return res.status(400).json({ error: 'Old owner has no active subscription' });
-    }
-
-    // 旧サブスクを期間末キャンセル
-    await stripe.subscriptions.update(oldSubscriptionId, { cancel_at_period_end: true });
-
-    // Firestore: 旧オーナーのサブスクを期間末解約状態に
-    await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').update({
-      cancelAtPeriodEnd: true,
-    });
 
     // Firestore: ルームのオーナー更新
     await db.collection('rooms').doc(roomId).update({ ownerUid: newOwnerUid });
