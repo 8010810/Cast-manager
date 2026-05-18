@@ -45,6 +45,13 @@ export default async function handler(req, res) {
     var db = getDb();
     var now = new Date().toISOString();
 
+    // 管理者のサブスクが有効かを先に確認してブロック
+    var subDoc = await db.collection('users').doc(ownerUid).collection('subscription').doc('main').get();
+    if (!subDoc.exists || !subDoc.data().subscriptionId || subDoc.data().status !== 'active') {
+      console.log('[approve-member] No active subscription for owner, blocking approval');
+      return res.status(400).json({ error: '管理者のサブスクリプションが有効ではないため承認できません' });
+    }
+
     // Admin SDK でセキュリティルールを迂回して両コレクションに書き込む
     await Promise.all([
       db.collection('rooms').doc(roomId).collection('members').doc(memberUid).set({
@@ -76,12 +83,6 @@ export default async function handler(req, res) {
     }
 
     // Stripe即時課金（stripe-add-memberと同じロジック）
-    var subDoc = await db.collection('users').doc(ownerUid).collection('subscription').doc('main').get();
-    if (!subDoc.exists || !subDoc.data().subscriptionId) {
-      console.log('[approve-member] No subscription for owner, skip billing');
-      return res.status(200).json({ success: true, billed: false });
-    }
-
     var subData = subDoc.data();
     var subscriptionId = subData.subscriptionId;
     var customerId = subData.customerId;
