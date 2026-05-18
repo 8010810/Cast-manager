@@ -3185,6 +3185,7 @@ function App(){
   var unsubRoleRef=React.useRef(null);
   var unsubUserRoomRef=React.useRef(null);
   var unsubRoomsListRef=React.useRef(null);
+  var processedKicksRef=React.useRef({});
   var roomsListRef=React.useRef([]);
   var unsubConsentRef=React.useRef(null);
   var unsubSubRef=React.useRef(null);
@@ -3292,14 +3293,13 @@ function App(){
   }
 
   function handleKickedFromRoom(rid){
-    // 二重発火ガード：すでにリストから消えていたら何もしない
-    var isInList=roomsListRef.current.find(function(r){return r.roomId===rid;});
-    if(!isInList)return;
+    if(processedKicksRef.current[rid])return;
+    processedKicksRef.current[rid]=true;
+    if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+    if(unsubUserRoomRef.current){unsubUserRoomRef.current();unsubUserRoomRef.current=null;}
     db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete().catch(function(){});
     var remaining=roomsListRef.current.filter(function(r){return r.roomId!==rid;});
     setRoomsList(remaining);
-    if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
-    if(unsubUserRoomRef.current){unsubUserRoomRef.current();unsubUserRoomRef.current=null;}
     if(remaining.length>0){
       var next=remaining[0];
       setRoomId(next.roomId);setRoomRole(next.role||'member');
