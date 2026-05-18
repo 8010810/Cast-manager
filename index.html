@@ -2759,6 +2759,47 @@ function StoreSettingsPage(p){
   );
 }
 
+function ContactPage(p){
+  var useState=React.useState;var e=React.createElement;
+  var s0=useState(p.userEmail||'');var contactEmail=s0[0];var setContactEmail=s0[1];
+  var s1=useState('');var contactPhone=s1[0];var setContactPhone=s1[1];
+  var s2=useState('');var contactMsg=s2[0];var setContactMsg=s2[1];
+  var s3=useState(false);var sending=s3[0];var setSending=s3[1];
+  var s4=useState(false);var sent=s4[0];var setSent=s4[1];
+  var INP={width:'100%',background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'10px',padding:'12px 14px',color:'#f3f4f6',fontSize:'14px',marginBottom:'14px',boxSizing:'border-box',fontFamily:'inherit'};
+  function submit(){
+    if(!contactMsg.trim()){p.notify('お問い合わせ内容を入力してください','error');return;}
+    if(!contactEmail.trim()&&!contactPhone.trim()){p.notify('メールアドレスまたは電話番号を入力してください','error');return;}
+    setSending(true);
+    fetch('/api/contact',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      email:contactEmail.trim(),phone:contactPhone.trim(),message:contactMsg.trim(),userName:p.userName||''
+    })}).then(function(r){return r.json();}).then(function(d){
+      setSending(false);
+      if(d.error){p.notify(d.error,'error');return;}
+      setSent(true);
+      setContactMsg('');setContactPhone('');
+    }).catch(function(){setSending(false);p.notify('送信に失敗しました','error');});
+  }
+  if(sent){
+    return e('div',{style:{textAlign:'center',padding:'40px 0'}},
+      e('div',{style:{fontSize:'32px',marginBottom:'16px'}},'✓'),
+      e('div',{style:{fontWeight:700,fontSize:'16px',color:'#f3f4f6',marginBottom:'8px'}},'送信しました'),
+      e('div',{style:{fontSize:'13px',color:'#6b7280',marginBottom:'24px'}},'お問い合わせを受け付けました。\n担当者よりご連絡いたします。'),
+      e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'10px',padding:'10px 24px',color:'#9ca3af',fontSize:'14px',cursor:'pointer'},onClick:function(){setSent(false);}},'もう一件送る')
+    );
+  }
+  return e('div',null,
+    e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'20px'}},'ご不明な点やトラブルがあればお気軽にお問い合わせください。'),
+    e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'メールアドレス'),
+    e('input',{type:'email',style:INP,placeholder:'example@email.com',value:contactEmail,onChange:function(ev){setContactEmail(ev.target.value);}}),
+    e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'電話番号'),
+    e('input',{type:'tel',style:INP,placeholder:'09012345678',value:contactPhone,onChange:function(ev){setContactPhone(ev.target.value);}}),
+    e('label',{style:{fontSize:'12px',color:'#9ca3af',display:'block',marginBottom:'4px'}},'お問い合わせ内容'),
+    e('textarea',{style:Object.assign({},INP,{minHeight:'120px',resize:'vertical',lineHeight:'1.6'}),placeholder:'ご質問・ご要望・不具合報告など',value:contactMsg,onChange:function(ev){setContactMsg(ev.target.value);}}),
+    e('button',{style:{width:'100%',background:sending||sent?'transparent':'linear-gradient(135deg,#d4a017,#e8b86d)',border:sending?'1px solid #374151':'none',borderRadius:'10px',color:sending?'#6b7280':'#0d0d1a',fontWeight:700,fontSize:'14px',padding:'14px',cursor:sending?'not-allowed':'pointer',opacity:sending?0.6:1},onClick:submit,disabled:sending},sending?'送信中...':'送信する')
+  );
+}
+
 function ProfileSettingsPage(p){
   var useState=React.useState,useEffect=React.useEffect;var e=React.createElement;
   var s0=useState(p.userName||'');var editName=s0[0];var setEditName=s0[1];
@@ -4257,6 +4298,20 @@ function App(){
       ));
     }
 
+    // お問い合わせページ
+    if(settingsPage==='contact'){
+      return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
+        e('div',{style:SETTINGS_HEADER},
+          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setSettingsPage('settings');}},'‹ 戻る'),
+          e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'お問い合わせ'),
+          e('div',{style:{width:'40px'}})
+        ),
+        e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'24px 18px'})},
+          e(ContactPage,{userName:userName,userEmail:user&&user.email||'',notify:notify})
+        )
+      ));
+    }
+
     // プランページ
     if(settingsPage==='plan'){
       var planLabel=subscriptionData&&subscriptionData.plan==='mini'?'miniプラン':'standardプラン';
@@ -4338,6 +4393,7 @@ function App(){
             {label:'店舗情報・メンバー',action:function(){setSettingsPage('store');}},
             {label:'ルーム',action:function(){setSettingsPage('room');}},
             {label:'招待',action:function(){setSettingsPage('invite');}},
+            {label:'お問い合わせ',action:function(){setSettingsPage('contact');}},
             {label:'利用規約',action:function(){setSettingsPage('terms');}},
             {label:'プライバシーポリシー',action:function(){setSettingsPage('privacy');}},
           ].map(function(item,i){
