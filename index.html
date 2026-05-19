@@ -3619,8 +3619,8 @@ function App(){
   },[user]);
   useEffect(function(){if(settingsPage==='invite'&&(roomRole==='admin'||roomRole==='sub-admin')&&roomId){loadJoinRequests();}else if(settingsPage!=='invite'){setJoinRequests([]);}}, [settingsPage]);
   useEffect(function(){if(!roomId){setRoomHolidays([]);setBillingDeadline(null);return;}var unsub=db.collection('rooms').doc(roomId).onSnapshot(function(doc){setRoomHolidays(doc.exists?(doc.data().holidays||[]):[]);setBillingDeadline(doc.exists?(doc.data().billingDeadline||null):null);},function(){setRoomHolidays([]);setBillingDeadline(null);});return function(){unsub();};},[roomId]);
-  // 管理者が決済登録完了したら billingDeadline をクリア（webhookの非同期遅延を補完）
-  useEffect(function(){if(!roomId||!billingDeadline||roomRole!=='admin')return;if(!subscriptionData||subscriptionData.status!=='active')return;db.collection('rooms').doc(roomId).update({billingDeadline:null}).catch(function(){});},[roomId,billingDeadline,roomRole,subscriptionData]);
+  // 管理者が決済登録完了したら billingDeadline をクリア（Admin SDK API経由でセキュリティルールを回避）
+  useEffect(function(){if(!roomId||!billingDeadline||roomRole!=='admin')return;if(!subscriptionData||subscriptionData.status!=='active')return;fetch('/api/clear-billing-deadline',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:roomId,uid:user?user.uid:''})}).catch(function(){});},[roomId,billingDeadline,roomRole,subscriptionData]);
 
   // サブスクリプション監視：解約完了 → プラン選択画面へ
   useEffect(function(){
