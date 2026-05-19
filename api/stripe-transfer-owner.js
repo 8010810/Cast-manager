@@ -43,10 +43,15 @@ export default async function handler(req, res) {
     var oldSubDoc = await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').get();
     if (oldSubDoc.exists && oldSubDoc.data().subscriptionId) {
       try {
-        await stripe.subscriptions.update(oldSubDoc.data().subscriptionId, { cancel_at_period_end: true });
+        var updatedSub = await stripe.subscriptions.update(oldSubDoc.data().subscriptionId, { cancel_at_period_end: true });
         await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').update({
           cancelAtPeriodEnd: true,
         });
+        // Store the billing deadline in the room so the new admin sees remaining days in the banner
+        var cancelAt = updatedSub.current_period_end || null;
+        if (cancelAt) {
+          await db.collection('rooms').doc(roomId).update({ billingDeadline: cancelAt }).catch(function(){});
+        }
       } catch (_stripeErr) {
         console.log('[stripe-transfer-owner] Stripe cancel_at_period_end skipped:', _stripeErr.message);
       }
