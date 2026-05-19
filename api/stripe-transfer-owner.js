@@ -39,26 +39,17 @@ export default async function handler(req, res) {
 
     var db = getDb();
 
-    // 旧サブスクを即時キャンセルし、残り期間を新オーナーのトライアルとして引き継ぐ
+    // 旧サブスクを期間末キャンセルに設定（即時解約ではなく残り期間は維持）
     var oldSubDoc = await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').get();
-    var trialEnd = null;
     if (oldSubDoc.exists && oldSubDoc.data().subscriptionId) {
       try {
-        var oldSub = await stripe.subscriptions.retrieve(oldSubDoc.data().subscriptionId);
-        trialEnd = oldSub.current_period_end; // Unixタイムスタンプ（秒）
-        await stripe.subscriptions.cancel(oldSubDoc.data().subscriptionId);
+        await stripe.subscriptions.update(oldSubDoc.data().subscriptionId, { cancel_at_period_end: true });
         await db.collection('users').doc(oldOwnerUid).collection('subscription').doc('main').update({
-          status: 'canceled', cancelAtPeriodEnd: false,
+          cancelAtPeriodEnd: true,
         });
       } catch (_stripeErr) {
-        console.log('[stripe-transfer-owner] Stripe cancel skipped:', _stripeErr.message);
+        console.log('[stripe-transfer-owner] Stripe cancel_at_period_end skipped:', _stripeErr.message);
       }
-    }
-
-    // 新オーナーのmetaに残り期間を保存（チェックアウト時のトライアル用）
-    if (trialEnd) {
-      await db.collection('users').doc(newOwnerUid).collection('meta').doc('consent')
-        .set({ transferTrialEnd: trialEnd }, { merge: true });
     }
 
     // Firestore: ルームのオーナー更新
