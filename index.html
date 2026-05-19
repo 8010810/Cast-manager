@@ -16,6 +16,7 @@
 <script>
 var firebaseConfig={apiKey:"AIzaSyBGxD2CQ-N-0mZYRZbkC5yVsDA4DdGKqeA",authDomain:"cast-manager-b0ae2.firebaseapp.com",projectId:"cast-manager-b0ae2",storageBucket:"cast-manager-b0ae2.firebasestorage.app",messagingSenderId:"111946332168",appId:"1:111946332168:web:a2cfc1de3cf519a46439bd"};
 firebase.initializeApp(firebaseConfig);var auth=firebase.auth();var db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(function(_e){console.log('[firestore] persistence unavailable:',_e.code);});
 function signInWithGoogle(){var provider=new firebase.auth.GoogleAuthProvider();return auth.signInWithPopup(provider);}
 function fbSignOut(){return auth.signOut();}
 function loadFromRoom(roomId){
@@ -3484,7 +3485,8 @@ function App(){
         // タイムアウト保険: 20秒でフォールバック
         var authTimeout=setTimeout(function(){
           if(gen!==currentAuthGen)return;
-          setLoading(false);setConsentState('roomselect');
+          setToast({msg:'エラー：もう一度お試しください',type:'error'});setTimeout(function(){setToast(null);},2800);
+          setConsentState('error');setLoading(false);
         },20000);
         // 同意状態確認
         var firstConsentSnap=true;
@@ -3589,18 +3591,18 @@ function App(){
                       }else{
                         setConsentState('planselect');setLoading(false);
                       }
-                    }).catch(function(_e){setConsentState('roomselect');setLoading(false);});
+                    }).catch(function(_e){setToast({msg:'エラー：もう一度お試しください',type:'error'});setTimeout(function(){setToast(null);},2800);setConsentState('error');setLoading(false);});
                   }
                 },3000);
               }
             }
           },function(){
             if(gen!==currentAuthGen)return;
-            clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
+            clearTimeout(authTimeout);setToast({msg:'エラー：もう一度お試しください',type:'error'});setTimeout(function(){setToast(null);},2800);setConsentState('error');setLoading(false);
           });
         },function(){
           if(gen!==currentAuthGen){clearTimeout(authTimeout);return;}
-          clearTimeout(authTimeout);setConsentState('roomselect');setLoading(false);
+          clearTimeout(authTimeout);setToast({msg:'エラー：もう一度お試しください',type:'error'});setTimeout(function(){setToast(null);},2800);setConsentState('error');setLoading(false);
         });
       }else{
         setData(null);setAttData({status:{},scheduledTime:{},extraCasts:[],confirmTypes:{}});setLoading(false);
@@ -4096,6 +4098,20 @@ function App(){
           )
         ),
         e('button',{style:{display:'block',margin:'20px auto 0',background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',textDecoration:'underline'},onClick:function(){auth.signOut();}},
+          'ログアウト'
+        )
+      )
+    );
+  }
+
+  if(consentState==='error'){
+    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      e('div',{style:{maxWidth:'360px',width:'100%',textAlign:'center'}},
+        e('div',{style:{color:'#ef4444',fontSize:'14px',marginBottom:'20px'}},'接続エラーが発生しました'),
+        e('button',{style:{padding:'10px 28px',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:'pointer'},onClick:function(){window.location.reload();}},
+          '再試行'
+        ),
+        e('button',{style:{display:'block',margin:'16px auto 0',background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',textDecoration:'underline'},onClick:function(){auth.signOut();}},
           'ログアウト'
         )
       )
