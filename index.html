@@ -3233,7 +3233,7 @@ function App(){
   var s_sub=useState(null);var subscriptionData=s_sub[0];var setSubscriptionData=s_sub[1]; // {plan,status,cancelAtPeriodEnd,cancelAt,...}
   var s_cld=useState(false);var cancelLoading=s_cld[0];var setCancelLoading=s_cld[1];
   var s_rrd=useState(null);var roomResumeDialog=s_rrd[0];var setRoomResumeDialog=s_rrd[1]; // null | {ownedRooms:[{id,name}]}
-
+  var s_tps=useState(false);var transferPlanSelect=s_tps[0];var setTransferPlanSelect=s_tps[1];
   var PRICE_IDS={
     MINI_MONTHLY:'price_1TXgkgQaq3EwNY4QyYQ6sea2',
     MINI_YEARLY:'price_1TXgmOQaq3EwNY4QKovRRNqb',
@@ -3339,6 +3339,7 @@ function App(){
           db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
             if(!subDoc.exists||subDoc.data().status!=='active'){
               setSettingsPage(null);setNavStack(['home']);setSubBack(null);
+              setTransferPlanSelect(true);
               setConsentState('planselect');setLoading(false);
             }
           }).catch(function(){});
@@ -3693,6 +3694,7 @@ function App(){
     db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
       if(!subDoc.exists||!subDoc.data().subscriptionId||(subDoc.data().status!=='active'&&subDoc.data().status!=='trialing')){
         setSettingsPage(null);setNavStack(['home']);setSubBack(null);
+        setTransferPlanSelect(true);
         setConsentState('planselect');setLoading(false);
       }
     }).catch(function(){});
@@ -4049,10 +4051,10 @@ function App(){
     return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
       e('div',{style:{maxWidth:'480px',width:'100%'}},
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'}},'CAST MANAGER'),
-        e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'プランを選択してください'),
-        e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'28px'}},'後から変更はできません'),
+        e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},transferPlanSelect?'決済方法を登録してください':'プランを選択してください'),
+        e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'28px'}},transferPlanSelect?'管理者としてルームを継続するには決済が必要です':'後から変更はできません'),
         e('div',{style:{display:'flex',flexDirection:'column',gap:'14px'}},
-          e('div',{style:{background:'#12122a',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left'}},
+          !transferPlanSelect&&e('div',{style:{background:'#12122a',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left'}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
               e('div',{style:{width:'36px',height:'36px',borderRadius:'10px',background:'rgba(167,139,250,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'18px'}},'📱'),
               e('div',null,
