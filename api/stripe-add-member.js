@@ -33,6 +33,8 @@ export default async function handler(req, res) {
     var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     var ownerUid = req.body.ownerUid;
     var roomId = req.body.roomId;
+    var memberUid = req.body.memberUid || '';
+    var memberUserName = req.body.memberUserName || '';
 
     if (!ownerUid || !roomId) {
       return res.status(400).json({ error: 'ownerUid and roomId are required' });
@@ -108,6 +110,29 @@ export default async function handler(req, res) {
     await db.collection('users').doc(ownerUid).collection('subscription').doc('main').update({
       memberCount: newQuantity,
     });
+
+    // メンバーの個人フォルダをAdmin SDKで確実に作成
+    if (memberUid) {
+      try {
+        var dataDoc = await db.collection('rooms').doc(roomId).collection('data').doc('main').get();
+        var roomData = dataDoc.exists ? dataDoc.data() : {};
+        var folders = roomData.folders || [];
+        var folderExists = folders.find(function(f) { return f.ownerUid === memberUid; });
+        if (!folderExists) {
+          var newFolder = {
+            id: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+            name: memberUserName || 'メンバー',
+            castIds: [],
+            ownerUid: memberUid,
+          };
+          await db.collection('rooms').doc(roomId).collection('data').doc('main')
+            .set({ folders: folders.concat([newFolder]) }, { merge: true });
+          console.log('[stripe-add-member] Created personal folder for member:', memberUid);
+        }
+      } catch (_folderErr) {
+        console.error('[stripe-add-member] Folder creation error:', _folderErr.message);
+      }
+    }
 
     console.log('[stripe-add-member] Added member for owner:', ownerUid, 'quantity:', newQuantity);
     return res.status(200).json({ success: true, quantity: newQuantity });
