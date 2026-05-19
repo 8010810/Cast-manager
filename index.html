@@ -3359,7 +3359,7 @@ function App(){
   function handleCheckout(priceId,successPath,cancelPath){
     if(checkoutLoading||!user)return;
     setCheckoutLoading(true);
-    fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel'})})
+    fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,roomId:roomId||'',successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel'})})
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.url){window.location.href=d.url;return;}
