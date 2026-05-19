@@ -4666,7 +4666,7 @@ function App(){
     e('main',{style:S.main},
       isHomeLayer&&(function(){
         var _isAdmin=roomRole==='admin';
-        var _adminNoSub=_isAdmin&&(!subscriptionData||!subscriptionData.subscriptionId);
+        var _adminNoSub=_isAdmin&&(!subscriptionData||subscriptionData.status!=='active');
         var _memberNeedsBilling=!_isAdmin&&!!billingDeadline;
         var _showBanner=(_adminNoSub||_memberNeedsBilling)&&new URLSearchParams(window.location.search).get('checkout')!=='success';
         if(!_showBanner)return null;
