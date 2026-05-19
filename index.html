@@ -3300,6 +3300,7 @@ function App(){
 
   function handleKickedFromRoom(rid){
     if(processedKicksRef.current[rid])return;
+    if(window._castManagerDeleting)return;
     processedKicksRef.current[rid]=true;
     if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
     if(unsubUserRoomRef.current){unsubUserRoomRef.current();unsubUserRoomRef.current=null;}
@@ -3315,6 +3316,7 @@ function App(){
       setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
       setNavStack(['home']);setSubBack(null);setSettingsPage(null);
       notify('ルームから退室させられました','error');
+      setConsentState('loading');
       db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
         if(subDoc.exists&&subDoc.data().status==='active'){
           window.location.href='/mini';
@@ -3634,7 +3636,7 @@ function App(){
         if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}
         setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
         setNavStack(['home']);setSubBack(null);setSettingsPage(null);
-        setConsentState('planselect');setLoading(false);
+        setConsentState('loading');setTimeout(function(){setConsentState('planselect');setLoading(false);},0);
       }
     },function(){});
     return function(){if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}};
