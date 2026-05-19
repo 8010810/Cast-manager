@@ -4664,16 +4664,23 @@ function App(){
 
     // メインコンテンツ
     e('main',{style:S.main},
-      isHomeLayer&&roomRole==='admin'&&(!subscriptionData||!subscriptionData.subscriptionId)&&new URLSearchParams(window.location.search).get('checkout')!=='success'&&
-        e('div',{style:{background:'rgba(232,184,109,0.07)',border:'1px solid rgba(232,184,109,0.28)',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
-          e('p',{style:{margin:'0 0 10px',fontSize:'13px',color:'#d4a843',lineHeight:1.6}},
+      isHomeLayer&&(function(){
+        var _isAdmin=roomRole==='admin';
+        var _adminNoSub=_isAdmin&&(!subscriptionData||!subscriptionData.subscriptionId);
+        var _memberNeedsBilling=!_isAdmin&&!!billingDeadline;
+        var _showBanner=(_adminNoSub||_memberNeedsBilling)&&new URLSearchParams(window.location.search).get('checkout')!=='success';
+        if(!_showBanner)return null;
+        var _days=billingDeadline?Math.max(0,Math.ceil((billingDeadline-Math.floor(Date.now()/1000))/86400)):null;
+        return e('div',{style:{background:'rgba(232,184,109,0.07)',border:'1px solid rgba(232,184,109,0.28)',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
+          e('p',{style:{margin:_isAdmin?'0 0 10px':'0',fontSize:'13px',color:'#d4a843',lineHeight:1.6}},
             'ルームを継続するには管理者の決済方法の登録が必要です',
-            billingDeadline&&(function(){var days=Math.max(0,Math.ceil((billingDeadline-Math.floor(Date.now()/1000))/86400));return e('span',{style:{marginLeft:'6px',fontWeight:700}},'（残り'+days+'日）');})()
+            _days!==null&&e('span',{style:{marginLeft:'6px',fontWeight:700}},'（残り'+_days+'日）')
           ),
-          e('button',{style:{padding:'8px 18px',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',color:'#0d0d1a',fontWeight:700,fontSize:'13px',cursor:'pointer'},
+          _isAdmin&&e('button',{style:{marginTop:'10px',padding:'8px 18px',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',color:'#0d0d1a',fontWeight:700,fontSize:'13px',cursor:'pointer'},
             onClick:function(){planSelectShownAtRef.current=Date.now();setConsentState('planselect');}
           },'決済方法を登録する')
-        ),
+        );
+      })(),
       isHomeLayer&&e(HomeScreen,{data:data,onNavigate:navigate,roomName:currentRoom&&currentRoom.name||''}),
       layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',roomId:roomId||'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
