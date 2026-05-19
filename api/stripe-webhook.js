@@ -81,6 +81,7 @@ export default async function handler(req, res) {
       }
 
       var db = getDb();
+      var roomId2 = (session.metadata && session.metadata.roomId) || '';
       await db.collection('users').doc(uid).collection('subscription').doc('main').set({
         plan: plan,
         status: 'active',
@@ -90,6 +91,12 @@ export default async function handler(req, res) {
         cancelAtPeriodEnd: false,
         cancelAt: null,
       });
+
+      // 管理者交代後に新管理者が決済登録したらルームの billingDeadline を削除
+      if (roomId2) {
+        await db.collection('rooms').doc(roomId2).update({ billingDeadline: null }).catch(function(){});
+        console.log('[stripe-webhook] Cleared billingDeadline for room:', roomId2);
+      }
 
       console.log('[stripe-webhook] Subscription saved for uid:', uid);
     }
