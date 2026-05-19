@@ -3271,7 +3271,7 @@ function App(){
       ]);
     }).then(function(){
       return fetch('/api/stripe-add-member',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ownerUid:ownerUid,roomId:rid,memberUid:user.uid})});
+        body:JSON.stringify({ownerUid:ownerUid,roomId:rid,memberUid:user.uid,memberUserName:userName||''})});
     }).then(function(){
       // miniサブスクがあればキャンセル
       fetch('/api/stripe-cancel-account',{method:'POST',headers:{'Content-Type':'application/json'},

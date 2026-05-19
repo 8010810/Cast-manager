@@ -70,6 +70,27 @@ export default async function handler(req, res) {
       db.collection('rooms').doc(roomId).collection('joinRequests').doc(memberUid).delete(),
     ]);
 
+    // メンバーの個人フォルダをAdmin SDKで確実に作成
+    try {
+      var dataDoc = await db.collection('rooms').doc(roomId).collection('data').doc('main').get();
+      var roomData2 = dataDoc.exists ? dataDoc.data() : {};
+      var folders2 = roomData2.folders || [];
+      var folderExists = folders2.find(function(f) { return f.ownerUid === memberUid; });
+      if (!folderExists) {
+        var newFolder = {
+          id: Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2),
+          name: memberUserName || 'メンバー',
+          castIds: [],
+          ownerUid: memberUid,
+        };
+        await db.collection('rooms').doc(roomId).collection('data').doc('main')
+          .set({ folders: folders2.concat([newFolder]) }, { merge: true });
+        console.log('[approve-member] Created personal folder for member:', memberUid);
+      }
+    } catch (_folderErr) {
+      console.error('[approve-member] Folder creation error:', _folderErr.message);
+    }
+
     // メンバーのminiサブスクがあればキャンセル
     var memberSubDoc = await db.collection('users').doc(memberUid).collection('subscription').doc('main').get();
     if (memberSubDoc.exists && memberSubDoc.data().subscriptionId) {
