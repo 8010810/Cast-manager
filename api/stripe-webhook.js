@@ -93,9 +93,22 @@ export default async function handler(req, res) {
       });
 
       // 管理者交代後に新管理者が決済登録したらルームの billingDeadline を削除
+      // metadata の roomId を優先、念のため ownerUid でも全件クリア
+      var roomId2 = (session.metadata && session.metadata.roomId) || '';
       if (roomId2) {
         await db.collection('rooms').doc(roomId2).update({ billingDeadline: null }).catch(function(){});
-        console.log('[stripe-webhook] Cleared billingDeadline for room:', roomId2);
+        console.log('[stripe-webhook] Cleared billingDeadline for room (metadata):', roomId2);
+      }
+      if (plan === 'standard') {
+        try {
+          var ownedSnap = await db.collection('rooms').where('ownerUid', '==', uid).get();
+          await Promise.all(ownedSnap.docs.map(function(d) {
+            return d.ref.update({ billingDeadline: null }).catch(function(){});
+          }));
+          if (!ownedSnap.empty) console.log('[stripe-webhook] Cleared billingDeadline for', ownedSnap.size, 'owned rooms, uid:', uid);
+        } catch (_re) {
+          console.error('[stripe-webhook] ownerUid billingDeadline clear error:', _re.message);
+        }
       }
 
       console.log('[stripe-webhook] Subscription saved for uid:', uid);
