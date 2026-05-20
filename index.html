@@ -4469,6 +4469,7 @@ function App(){
             var rid=roomId;
             db.collection('rooms').doc(rid).collection('members').get().then(function(membersSnap){
               var memberUids=membersSnap.docs.map(function(d){return d.id;});
+              fetch('/api/stripe-cancel-room-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:rid})}).catch(function(){});
               var dels=[
                 db.collection('rooms').doc(rid).collection('data').doc('main').delete(),
                 db.collection('rooms').doc(rid).delete(),
@@ -4504,7 +4505,14 @@ function App(){
                 }).catch(function(){notify('削除後の切替に失敗しました','error');});
               }else{
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
-                setSettingsPage(null);window.location.href='/mini';
+                setSettingsPage(null);
+                db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
+                  if(subDoc.exists&&subDoc.data().status==='paused'){
+                    fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})}).finally(function(){window.location.href='/mini';});
+                  }else{
+                    setConsentState('planselect');setLoading(false);
+                  }
+                }).catch(function(){setConsentState('planselect');setLoading(false);});
               }
             }).catch(function(){notify('削除に失敗しました','error');});
           }},'ルームを削除する（管理者のみ）'),
