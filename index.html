@@ -3374,8 +3374,9 @@ function App(){
     fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,roomId:targetRoomId,successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel'})})
     .then(function(r){return r.json();})
     .then(function(d){
-      if(d.url){window.location.href=d.url;return;}
+      if(d.url){if(targetRoomId)localStorage.setItem('_co_room',targetRoomId);window.location.href=d.url;return;}
       if(d.sessionId&&d.publishableKey&&window.Stripe){
+        if(targetRoomId)localStorage.setItem('_co_room',targetRoomId);
         var strp=window.Stripe(d.publishableKey);
         strp.redirectToCheckout({sessionId:d.sessionId}).then(function(r){
           if(r&&r.error){setCheckoutLoading(false);notify(r.error.message,'error');}
@@ -3512,6 +3513,42 @@ function App(){
           setToast({msg:'エラー：もう一度お試しください',type:'error'});setTimeout(function(){setToast(null);},2800);
           setConsentState('error');setLoading(false);
         },isPostCheckoutLoad?60000:20000);
+        // checkout=success後のファストパス: onSnapshot待ちをスキップしてキャッシュから即座に読込
+        var coRoomId=isPostCheckoutLoad?localStorage.getItem('_co_room'):null;
+        if(coRoomId){
+          localStorage.removeItem('_co_room');
+          clearTimeout(authTimeout);
+          Promise.all([
+            db.collection('users').doc(u.uid).collection('rooms').doc(coRoomId).get({source:'cache'}).catch(function(){return db.collection('users').doc(u.uid).collection('rooms').doc(coRoomId).get();}),
+            db.collection('rooms').doc(coRoomId).collection('data').doc('main').get({source:'cache'}).catch(function(){return db.collection('rooms').doc(coRoomId).collection('data').doc('main').get();}),
+          ]).then(function(results){
+            if(gen!==currentAuthGen)return;
+            var roomRef=results[0];var dataDoc=results[1];
+            var rd=roomRef.exists?roomRef.data():{name:'',inviteCode:''};
+            var d=dataDoc.exists?dataDoc.data():{};
+            var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+            if(!nd.folders||nd.folders.length===0){nd.folders=[{id:Math.random().toString(36).slice(2),name:'新入店',castIds:[]}];}
+            setRoomId(coRoomId);setRoomRole('admin');
+            setCurrentRoom({id:coRoomId,name:rd.name||'',inviteCode:rd.inviteCode||''});
+            setRoomsList(function(prev){if(prev.find(function(r){return r.roomId===coRoomId;}))return prev;return prev.concat([{roomId:coRoomId,name:rd.name||'',role:'admin',inviteCode:rd.inviteCode||''}]);});
+            setData(nd);
+            localStorage.removeItem('_co_retry');
+            setLoading(false);setConsentState('done');
+            // バックグラウンドでリスナー設定
+            if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
+            if(unsubUserRoomRef.current){unsubUserRoomRef.current();unsubUserRoomRef.current=null;}
+            unsubRoleRef.current=db.collection('rooms').doc(coRoomId).collection('members').doc(u.uid).onSnapshot(makeRoleListener(coRoomId),function(){});
+            unsubUserRoomRef.current=db.collection('users').doc(u.uid).collection('rooms').doc(coRoomId).onSnapshot(makeUserRoomListener(coRoomId),function(){});
+            db.collection('users').doc(u.uid).collection('meta').doc('consent').get({source:'cache'}).then(function(doc){
+              if(doc.exists&&doc.data().userName){setUserName(doc.data().userName||'');setStoreName(doc.data().storeName||'');}
+            }).catch(function(){});
+          }).catch(function(){
+            if(gen!==currentAuthGen)return;
+            // キャッシュ読み込み失敗: 通常の初期化フローへフォールバック
+            setLoading(false);setConsentState('planselect');
+          });
+          return;
+        }
         // 同意状態確認
         var firstConsentSnap=true;
         unsubConsentRef.current=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
