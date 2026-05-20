@@ -3389,7 +3389,7 @@ function App(){
   function syncMemberCount(forRoomId){
     var targetRoomId=forRoomId||roomId;
     if(!targetRoomId)return;
-    db.collection('rooms').doc(targetRoomId).collection('members').where('isInvited','==',true).get()
+    db.collection('rooms').doc(targetRoomId).collection('members').get()
     .then(function(snap){
       var memberCount=snap.size;
       return db.collection('rooms').doc(targetRoomId).collection('subscription').doc('main').get()

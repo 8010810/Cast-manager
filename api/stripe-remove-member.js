@@ -56,9 +56,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'No ACCOUNT_ADD item to decrease' });
     }
 
-    // Firestoreの実際の招待メンバー数を正とする（Stripeの数字に依存しない）
-    var membersSnap = await db.collection('rooms').doc(roomId).collection('members')
-      .where('isInvited', '==', true).get();
+    // 管理者含む全メンバー数を正とする（Stripeの数字に依存しない）
+    var membersSnap = await db.collection('rooms').doc(roomId).collection('members').get();
     var newQuantity = membersSnap.size;
 
     await stripe.subscriptionItems.update(item.id, {

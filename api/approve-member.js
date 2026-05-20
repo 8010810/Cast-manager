@@ -113,9 +113,8 @@ export default async function handler(req, res) {
     var subscriptionId = subData.subscriptionId;
     var customerId = subData.customerId;
 
-    // Firestoreの実際の招待メンバー数を正として数量更新
-    var membersSnap = await db.collection('rooms').doc(roomId).collection('members')
-      .where('isInvited', '==', true).get();
+    // 管理者含む全メンバー数を正として数量更新
+    var membersSnap = await db.collection('rooms').doc(roomId).collection('members').get();
     var newQuantity = membersSnap.size;
 
     var subscription = await stripe.subscriptions.retrieve(subscriptionId);
