@@ -2751,7 +2751,7 @@ function StoreSettingsPage(p){
               isEditing&&e('div',{style:{display:'flex',gap:'8px',marginTop:'10px',flexWrap:'wrap'}},
                 p.roomRole==='admin'&&!isSubAdmin&&e('button',{style:{background:'transparent',border:'1px solid #a78bfa44',borderRadius:'8px',padding:'6px 12px',color:'#a78bfa',fontSize:'12px',fontWeight:700,cursor:promoting?'not-allowed':'pointer',opacity:promoting?0.5:1,whiteSpace:'nowrap'},onClick:function(){if(!promoting)promoteToSubAdmin(m.uid,m.userName||'このユーザー');},disabled:promoting},promoting?'付与中...':'サブ管理者にする'),
                 p.roomRole==='admin'&&isSubAdmin&&e('button',{style:{background:'transparent',border:'1px solid #a78bfa44',borderRadius:'8px',padding:'6px 12px',color:'#a78bfa',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){demoteSubAdmin(m.uid,m.userName||'このユーザー');}},'サブ管理者を解除'),
-                p.roomRole==='admin'&&p.user&&p.user.uid===p.ownerUid&&!isSelf&&isSubAdmin&&e('button',{style:{background:'transparent',border:'1px solid #a78bfa44',borderRadius:'8px',padding:'6px 12px',color:'#a78bfa',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){if(p.onTransferOwner)p.onTransferOwner(m.uid,m.userName||'このユーザー');}},'管理者にする'),
+                p.roomRole==='admin'&&p.user&&p.user.uid===p.ownerUid&&!isSelf&&isSubAdmin&&e('button',{style:{background:'transparent',border:'1px solid rgba(232,184,109,0.5)',borderRadius:'8px',padding:'6px 12px',color:'#e8b86d',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){if(p.onTransferOwner)p.onTransferOwner(m.uid,m.userName||'このユーザー');}},'管理者引き継ぎ'),
                 e('button',{style:{background:'transparent',border:'1px solid #ef444444',borderRadius:'8px',padding:'6px 12px',color:'#ef4444',fontSize:'12px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){removeMember(m.uid,m.userName||'このユーザー');}},'退室させる')
               )
             );
@@ -3349,7 +3349,7 @@ function App(){
   }
 
   function handleTransferOwner(newMemberUid,newMemberName){
-    if(!confirm(newMemberName+'さんにオーナーを引き継ぎますか？\nルームの決済はそのまま引き継がれます。'))return;
+    if(!confirm(newMemberName+'さんに管理者を引き継ぎますか？'))return;
     fetch('/api/stripe-transfer-owner',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({oldOwnerUid:user.uid,newOwnerUid:newMemberUid,roomId:roomId})})
     .then(function(r){return r.json();})
@@ -4506,7 +4506,7 @@ function App(){
             var rid=roomId;
             db.collection('rooms').doc(rid).get().then(function(roomDoc){
               var ownerUid=roomDoc.exists?roomDoc.data().ownerUid:null;
-              if(ownerUid&&ownerUid===user.uid){notify('オーナーは退室できません。先にオーナーを引き継いでください。','error');return;}
+              if(ownerUid&&ownerUid===user.uid){notify('管理者は退室できません。先に管理者を引き継いでください。','error');return;}
               Promise.all([
                 db.collection('rooms').doc(rid).collection('members').doc(user.uid).delete(),
                 db.collection('users').doc(user.uid).collection('rooms').doc(rid).delete(),
