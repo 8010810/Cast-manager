@@ -73,6 +73,7 @@ export default async function handler(req, res) {
           var nowSec = Math.floor(Date.now() / 1000);
           if (billingDeadline && billingDeadline > nowSec + 86400) {
             sessionParams.subscription_data = { trial_end: billingDeadline };
+            sessionParams.payment_method_collection = 'always';
             console.log('[stripe-checkout] trial_end set to billingDeadline:', billingDeadline, 'for room:', roomId);
           }
         }
