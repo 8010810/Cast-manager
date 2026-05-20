@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 function getDb() {
   try {
@@ -59,8 +59,11 @@ export default async function handler(req, res) {
 
     // Firestore: ルームのオーナー更新
     await db.collection('rooms').doc(roomId).update({ ownerUid: newOwnerUid });
-    // 新オーナーのロールをadminに
-    await db.collection('rooms').doc(roomId).collection('members').doc(newOwnerUid).update({ role: 'admin' });
+    // 新オーナーのロールをadminに、isInvitedを削除（連携アカウント数カウントから除外）
+    await db.collection('rooms').doc(roomId).collection('members').doc(newOwnerUid).update({
+      role: 'admin',
+      isInvited: FieldValue.delete(),
+    });
     // 旧オーナーのロールをsub-adminに
     await db.collection('rooms').doc(roomId).collection('members').doc(oldOwnerUid).update({ role: 'sub-admin' });
     // users側のロールも更新
