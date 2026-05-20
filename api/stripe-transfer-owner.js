@@ -64,8 +64,11 @@ export default async function handler(req, res) {
       role: 'admin',
       isInvited: FieldValue.delete(),
     });
-    // 旧オーナーのロールをsub-adminに
-    await db.collection('rooms').doc(roomId).collection('members').doc(oldOwnerUid).update({ role: 'sub-admin' });
+    // 旧オーナーのロールをsub-adminに、isInvited=trueで連携アカウントとしてカウント
+    await db.collection('rooms').doc(roomId).collection('members').doc(oldOwnerUid).update({
+      role: 'sub-admin',
+      isInvited: true,
+    });
     // users側のロールも更新
     await db.collection('users').doc(newOwnerUid).collection('rooms').doc(roomId).update({ role: 'admin' }).catch(function(){});
     await db.collection('users').doc(oldOwnerUid).collection('rooms').doc(roomId).update({ role: 'sub-admin' }).catch(function(){});
