@@ -72,17 +72,12 @@ export default async function handler(req, res) {
       var session = event.data.object;
       var uid = session.client_reference_id || (session.metadata && session.metadata.uid) || '';
       var plan = (session.metadata && session.metadata.plan) || 'standard';
+      var roomId = (session.metadata && session.metadata.roomId) || '';
 
-      console.log('[stripe-webhook] checkout.session.completed uid:', uid, 'plan:', plan);
-
-      if (!uid) {
-        console.error('[stripe-webhook] No uid found in session');
-        return res.status(200).json({ received: true, warning: 'No uid' });
-      }
+      console.log('[stripe-webhook] checkout.session.completed uid:', uid, 'plan:', plan, 'roomId:', roomId);
 
       var db = getDb();
-      var roomId2 = (session.metadata && session.metadata.roomId) || '';
-      await db.collection('users').doc(uid).collection('subscription').doc('main').set({
+      var subData = {
         plan: plan,
         status: 'active',
         subscriptionId: session.subscription || '',
@@ -90,64 +85,33 @@ export default async function handler(req, res) {
         createdAt: new Date().toISOString(),
         cancelAtPeriodEnd: false,
         cancelAt: null,
-      });
+      };
 
-      // 管理者交代後に新管理者が決済登録したらルームの billingDeadline を削除
-      // metadata の roomId を優先、念のため ownerUid でも全件クリア
-      var roomId2 = (session.metadata && session.metadata.roomId) || '';
-      if (roomId2) {
-        await db.collection('rooms').doc(roomId2).update({ billingDeadline: null }).catch(function(){});
-        console.log('[stripe-webhook] Cleared billingDeadline for room (metadata):', roomId2);
+      if (plan === 'standard' && roomId) {
+        // Standard plan: save subscription to room doc
+        await db.collection('rooms').doc(roomId).collection('subscription').doc('main').set(
+          Object.assign({}, subData, { ownerUid: uid })
+        );
+        console.log('[stripe-webhook] Subscription saved to room:', roomId);
+      } else if (uid) {
+        // Mini plan: save subscription to user doc
+        await db.collection('users').doc(uid).collection('subscription').doc('main').set(subData);
+        console.log('[stripe-webhook] Subscription saved for uid:', uid);
+      } else {
+        console.error('[stripe-webhook] No uid or roomId found in session');
+        return res.status(200).json({ received: true, warning: 'No uid or roomId' });
       }
-      if (plan === 'standard') {
-        try {
-          var ownedSnap = await db.collection('rooms').where('ownerUid', '==', uid).get();
-          await Promise.all(ownedSnap.docs.map(function(d) {
-            return d.ref.update({ billingDeadline: null }).catch(function(){});
-          }));
-          if (!ownedSnap.empty) console.log('[stripe-webhook] Cleared billingDeadline for', ownedSnap.size, 'owned rooms, uid:', uid);
-        } catch (_re) {
-          console.error('[stripe-webhook] ownerUid billingDeadline clear error:', _re.message);
-        }
-      }
-
-      // 引き継ぎ後の新管理者のサブスクに既存メンバー数を同期（即時課金なし・次回サイクルから反映）
-      if (roomId2 && plan === 'standard' && session.subscription) {
-        try {
-          var membersSnap = await db.collection('rooms').doc(roomId2).collection('members')
-            .where('isInvited', '==', true).get();
-          var memberCount = membersSnap.size;
-          if (memberCount > 0) {
-            var ACCOUNT_ADD_PRICE = 'price_1TXgqSQaq3EwNY4QdQVc6rNT';
-            var stripe2 = new Stripe(process.env.STRIPE_SECRET_KEY);
-            var sub2 = await stripe2.subscriptions.retrieve(session.subscription);
-            var existingItem = sub2.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
-            if (existingItem) {
-              await stripe2.subscriptionItems.update(existingItem.id, { quantity: memberCount, proration_behavior: 'none' });
-            } else {
-              await stripe2.subscriptionItems.create({ subscription: session.subscription, price: ACCOUNT_ADD_PRICE, quantity: memberCount, proration_behavior: 'none' });
-            }
-            await db.collection('users').doc(uid).collection('subscription').doc('main').update({ memberCount: memberCount });
-            console.log('[stripe-webhook] Synced memberCount:', memberCount, 'for room:', roomId2);
-          }
-        } catch (_me) {
-          console.error('[stripe-webhook] memberCount sync error:', _me.message);
-        }
-      }
-
-      console.log('[stripe-webhook] Subscription saved for uid:', uid);
     }
 
     if (event.type === 'customer.subscription.deleted') {
-      // 期間末キャンセルが実際に完了したとき
       var subscription = event.data.object;
       var customerId = subscription.customer;
       var db2 = getDb();
 
-      // customerIdからuidを検索
-      var usersSnap = await db2.collectionGroup('subscription').where('customerId', '==', customerId).limit(1).get();
-      if (!usersSnap.empty) {
-        var subRef = usersSnap.docs[0].ref;
+      // Search in collectionGroup (matches both rooms/.../subscription and users/.../subscription)
+      var subSnap = await db2.collectionGroup('subscription').where('customerId', '==', customerId).limit(1).get();
+      if (!subSnap.empty) {
+        var subRef = subSnap.docs[0].ref;
         await subRef.update({
           status: 'canceled',
           canceledAt: new Date().toISOString(),

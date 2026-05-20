@@ -1,6 +1,4 @@
 import Stripe from 'stripe';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 
 const BASE_URL = 'https://cast-manager-seven.vercel.app';
 
@@ -8,24 +6,6 @@ const MINI_PRICES = [
   'price_1TXgkgQaq3EwNY4QyYQ6sea2',
   'price_1TXgmOQaq3EwNY4QKovRRNqb',
 ];
-
-function getDb() {
-  try {
-    if (getApps().length === 0) {
-      var privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-      initializeApp({ credential: cert({
-        type: 'service_account',
-        project_id: process.env.FIREBASE_PROJECT_ID || '',
-        private_key: privateKey,
-        client_email: process.env.FIREBASE_CLIENT_EMAIL || '',
-      }) });
-    }
-    return getFirestore();
-  } catch (_e) {
-    console.error('[stripe-checkout] Firebase init error:', _e.message);
-    throw _e;
-  }
-}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -62,25 +42,6 @@ export default async function handler(req, res) {
       success_url: BASE_URL + successPath + (successPath.includes('?') ? '&' : '?') + 'session_id={CHECKOUT_SESSION_ID}',
       cancel_url: BASE_URL + cancelPath,
     };
-
-    // 引き継ぎ後の新管理者：旧サブスクの残り期間を無料トライアルに設定
-    if (roomId && plan === 'standard') {
-      try {
-        var db = getDb();
-        var roomDoc = await db.collection('rooms').doc(roomId).get();
-        if (roomDoc.exists) {
-          var billingDeadline = roomDoc.data().billingDeadline || null;
-          var nowSec = Math.floor(Date.now() / 1000);
-          if (billingDeadline && billingDeadline > nowSec + 86400) {
-            sessionParams.subscription_data = { trial_end: billingDeadline };
-            sessionParams.payment_method_collection = 'always';
-            console.log('[stripe-checkout] trial_end set to billingDeadline:', billingDeadline, 'for room:', roomId);
-          }
-        }
-      } catch (_fe) {
-        console.log('[stripe-checkout] billingDeadline fetch skipped:', _fe.message);
-      }
-    }
 
     var session = await stripe.checkout.sessions.create(sessionParams);
 

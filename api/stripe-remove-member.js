@@ -31,15 +31,14 @@ export default async function handler(req, res) {
 
   try {
     var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    var ownerUid = req.body.ownerUid;
     var roomId = req.body.roomId;
 
-    if (!ownerUid) {
-      return res.status(400).json({ error: 'ownerUid is required' });
+    if (!roomId) {
+      return res.status(400).json({ error: 'roomId is required' });
     }
 
     var db = getDb();
-    var subDoc = await db.collection('users').doc(ownerUid).collection('subscription').doc('main').get();
+    var subDoc = await db.collection('rooms').doc(roomId).collection('subscription').doc('main').get();
     if (!subDoc.exists) {
       return res.status(200).json({ success: true, message: 'No subscription found' });
     }
@@ -58,25 +57,20 @@ export default async function handler(req, res) {
     }
 
     // Firestoreの実際の招待メンバー数を正とする（Stripeの数字に依存しない）
-    var newQuantity;
-    if (roomId) {
-      var membersSnap = await db.collection('rooms').doc(roomId).collection('members')
-        .where('isInvited', '==', true).get();
-      newQuantity = membersSnap.size;
-    } else {
-      newQuantity = Math.max(0, (item.quantity || 1) - 1);
-    }
+    var membersSnap = await db.collection('rooms').doc(roomId).collection('members')
+      .where('isInvited', '==', true).get();
+    var newQuantity = membersSnap.size;
 
     await stripe.subscriptionItems.update(item.id, {
       quantity: newQuantity,
       proration_behavior: 'none',
     });
 
-    await db.collection('users').doc(ownerUid).collection('subscription').doc('main').update({
+    await db.collection('rooms').doc(roomId).collection('subscription').doc('main').update({
       memberCount: newQuantity,
     });
 
-    console.log('[stripe-remove-member] Removed member for owner:', ownerUid, 'quantity:', newQuantity);
+    console.log('[stripe-remove-member] Removed member for room:', roomId, 'quantity:', newQuantity);
     return res.status(200).json({ success: true, quantity: newQuantity });
   } catch (_e) {
     console.error('[stripe-remove-member] Error:', _e.message);
