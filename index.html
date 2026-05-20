@@ -3550,7 +3550,7 @@ function App(){
             var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
             if(rooms.length>0&&!appliedRooms){clearTimeout(authTimeout);appliedRooms=true;applyRooms(rooms);}
             else if(rooms.length>0){setRoomsList(rooms);}
-            else if(!snap.metadata.fromCache){
+            else if(!snap.metadata.fromCache||!appliedRooms){
               if(appliedRooms){
                 // 一度読み込んだ後に空になった = ルームを全退出 → サブスク確認
                 clearTimeout(authTimeout);
