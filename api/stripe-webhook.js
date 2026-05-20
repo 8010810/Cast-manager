@@ -111,6 +111,30 @@ export default async function handler(req, res) {
         }
       }
 
+      // 引き継ぎ後の新管理者のサブスクに既存メンバー数を同期（即時課金なし・次回サイクルから反映）
+      if (roomId2 && plan === 'standard' && session.subscription) {
+        try {
+          var membersSnap = await db.collection('rooms').doc(roomId2).collection('members')
+            .where('isInvited', '==', true).get();
+          var memberCount = membersSnap.size;
+          if (memberCount > 0) {
+            var ACCOUNT_ADD_PRICE = 'price_1TXgqSQaq3EwNY4QdQVc6rNT';
+            var stripe2 = new Stripe(process.env.STRIPE_SECRET_KEY);
+            var sub2 = await stripe2.subscriptions.retrieve(session.subscription);
+            var existingItem = sub2.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
+            if (existingItem) {
+              await stripe2.subscriptionItems.update(existingItem.id, { quantity: memberCount, proration_behavior: 'none' });
+            } else {
+              await stripe2.subscriptionItems.create({ subscription: session.subscription, price: ACCOUNT_ADD_PRICE, quantity: memberCount, proration_behavior: 'none' });
+            }
+            await db.collection('users').doc(uid).collection('subscription').doc('main').update({ memberCount: memberCount });
+            console.log('[stripe-webhook] Synced memberCount:', memberCount, 'for room:', roomId2);
+          }
+        } catch (_me) {
+          console.error('[stripe-webhook] memberCount sync error:', _me.message);
+        }
+      }
+
       console.log('[stripe-webhook] Subscription saved for uid:', uid);
     }
 
