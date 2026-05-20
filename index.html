@@ -2663,6 +2663,7 @@ function StoreSettingsPage(p){
       return p.db.collection('rooms').doc(p.roomId).collection('members').get();
     }).then(function(snap){
       if(snap&&snap.empty){
+        fetch('/api/stripe-cancel-room-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:p.roomId})}).catch(function(){});
         Promise.all([
           p.db.collection('rooms').doc(p.roomId).collection('data').doc('main').delete().catch(function(){}),
           p.db.collection('rooms').doc(p.roomId).delete().catch(function(){}),
@@ -3860,7 +3861,8 @@ function App(){
           return db.collection('rooms').doc(rid).collection('members').get().catch(function(){return{docs:[]};}).then(function(membersSnap){
             var others=membersSnap.docs.filter(function(m){return m.id!==uid2;});
             if(others.length===0){
-              // 管理者1人のみ → ルームごと削除
+              // 管理者1人のみ → サブスク即時解約してルームごと削除
+              fetch('/api/stripe-cancel-room-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:rid})}).catch(function(){});
               var roomRef=db.collection('rooms').doc(rid);
               return roomRef.collection('data').doc('main').delete().catch(function(){})
                 .then(function(){return roomRef.collection('members').doc(uid2).delete().catch(function(){});})
@@ -4518,6 +4520,7 @@ function App(){
               ]).then(function(){
                 return db.collection('rooms').doc(rid).collection('members').get().then(function(snap){
                   if(snap.empty){
+                    fetch('/api/stripe-cancel-room-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:rid})}).catch(function(){});
                     return Promise.all([
                       db.collection('rooms').doc(rid).collection('data').doc('main').delete().catch(function(){}),
                       db.collection('rooms').doc(rid).delete().catch(function(){}),
