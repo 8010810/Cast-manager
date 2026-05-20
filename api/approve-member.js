@@ -37,19 +37,19 @@ export default async function handler(req, res) {
     var roomName = req.body.roomName || '';
     var inviteCode = req.body.inviteCode || '';
 
-    if (!ownerUid || !memberUid || !roomId) {
-      return res.status(400).json({ error: 'ownerUid, memberUid and roomId are required' });
+    if (!memberUid || !roomId) {
+      return res.status(400).json({ error: 'memberUid and roomId are required' });
     }
 
     var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     var db = getDb();
     var now = new Date().toISOString();
 
-    // 管理者のサブスクが有効かを先に確認してブロック
-    var subDoc = await db.collection('users').doc(ownerUid).collection('subscription').doc('main').get();
+    // ルームのサブスクが有効かを先に確認してブロック
+    var subDoc = await db.collection('rooms').doc(roomId).collection('subscription').doc('main').get();
     if (!subDoc.exists || !subDoc.data().subscriptionId || subDoc.data().status !== 'active') {
-      console.log('[approve-member] No active subscription for owner, blocking approval');
-      return res.status(400).json({ error: '管理者のサブスクリプションが有効ではないため承認できません' });
+      console.log('[approve-member] No active subscription for room, blocking approval');
+      return res.status(400).json({ error: 'ルームのサブスクリプションが有効ではないため承認できません' });
     }
 
     // Admin SDK でセキュリティルールを迂回して両コレクションに書き込む
@@ -59,7 +59,7 @@ export default async function handler(req, res) {
         userName: memberUserName,
         joinedAt: now,
         isInvited: true,
-        invitedBy: ownerUid,
+        invitedBy: ownerUid || '',
       }),
       db.collection('users').doc(memberUid).collection('rooms').doc(roomId).set({
         name: roomName,
@@ -103,7 +103,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Stripe即時課金（stripe-add-memberと同じロジック）
+    // Stripe即時課金
     var subData = subDoc.data();
     var subscriptionId = subData.subscriptionId;
     var customerId = subData.customerId;
@@ -138,7 +138,7 @@ export default async function handler(req, res) {
         subscription: subscriptionId,
         amount: 1000,
         currency: 'jpy',
-        description: 'メンバー追加費用（招待）',
+        description: 'メンバー追加費用（承認）',
       });
       invoice = await stripe.invoices.create({
         customer: customerId,
@@ -154,7 +154,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, billed: false, billingError: _e.message });
     }
 
-    await db.collection('users').doc(ownerUid).collection('subscription').doc('main').update({
+    await db.collection('rooms').doc(roomId).collection('subscription').doc('main').update({
       memberCount: newQuantity,
     });
 

@@ -30,14 +30,21 @@ export default async function handler(req, res) {
   try {
     var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     var uid = req.body.uid;
+    var roomId = req.body.roomId;
 
-    if (!uid) {
-      return res.status(400).json({ error: 'uid is required' });
+    if (!uid && !roomId) {
+      return res.status(400).json({ error: 'uid or roomId is required' });
     }
 
     var db = getDb();
-    var subDoc = await db.collection('users').doc(uid).collection('subscription').doc('main').get();
+    var subRef;
+    if (roomId) {
+      subRef = db.collection('rooms').doc(roomId).collection('subscription').doc('main');
+    } else {
+      subRef = db.collection('users').doc(uid).collection('subscription').doc('main');
+    }
 
+    var subDoc = await subRef.get();
     if (!subDoc.exists) {
       return res.status(200).json({ success: true, message: 'No subscription found' });
     }
@@ -53,12 +60,12 @@ export default async function handler(req, res) {
       cancel_at_period_end: false,
     });
 
-    await db.collection('users').doc(uid).collection('subscription').doc('main').update({
+    await subRef.update({
       cancelAtPeriodEnd: false,
       cancelAt: null,
     });
 
-    console.log('[stripe-resume-subscription] Resumed subscription for uid:', uid);
+    console.log('[stripe-resume-subscription] Resumed subscription for', roomId ? 'room:' + roomId : 'uid:' + uid);
     return res.status(200).json({ success: true });
   } catch (_e) {
     console.error('[stripe-resume-subscription] Error:', _e.message);
