@@ -3355,7 +3355,7 @@ function App(){
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.error)throw new Error(d.error);
-      notify('オーナーを引き継ぎました');setTransferOwnerPage(false);setSettingsPage(null);
+      notify('管理者を引き継ぎました');setTransferOwnerPage(false);setSettingsPage(null);
     }).catch(function(_e){notify('引き継ぎに失敗しました: '+_e.message,'error');});
   }
 
