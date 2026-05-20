@@ -3227,6 +3227,7 @@ function App(){
   var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|'ai-sales'|'ai-trends'|'ai-shift'|'ai-attendance'|'ai-visits'
   var s_cper=useState({mini:'monthly',std:'monthly'});var checkoutPeriod=s_cper[0];var setCheckoutPeriod=s_cper[1];
   var s_cl=useState(false);var checkoutLoading=s_cl[0];var setCheckoutLoading=s_cl[1];
+  var s_pco=useState(false);var postCheckout=s_pco[0];var setPostCheckout=s_pco[1];
   var s_pit=useState(null);var pendingInvite=s_pit[0];var setPendingInvite=s_pit[1]; // {roomId,roomName,token,ownerUid}
   var s_pij=useState(false);var pendingInviteJoining=s_pij[0];var setPendingInviteJoining=s_pij[1];
   var s_igl=useState('');var generatedInviteLink=s_igl[0];var setGeneratedInviteLink=s_igl[1];
@@ -3661,6 +3662,7 @@ function App(){
       if(!doc.exists){setSubscriptionData(null);return;}
       var sd=doc.data();
       setSubscriptionData(sd);
+      if(sd.status==='active'){setPostCheckout(false);}
       if(sd.status==='canceled'&&roomRole==='admin'){
         if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}
         setRoomId(null);setData(null);setCurrentRoom(null);setRoomRole('member');
@@ -3671,12 +3673,15 @@ function App(){
     return function(){if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}};
   },[user,roomId,roomRole]);
 
-  // checkout=success: ルームは事前作成済みなのでURLパラメータをクリアするだけ
+  // checkout=success: postCheckout=trueにしてURLをクリア。subscriptionがactiveになったら解除
   useEffect(function(){
     var params=new URLSearchParams(window.location.search);
     if(params.get('checkout')!=='success')return;
     if(!user)return;
+    setPostCheckout(true);
     window.history.replaceState({},'','/');
+    var fallback=setTimeout(function(){setPostCheckout(false);},60000);
+    return function(){clearTimeout(fallback);};
   },[user]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
@@ -4689,7 +4694,7 @@ function App(){
 
     // メインコンテンツ
     e('main',{style:S.main},
-      isHomeLayer&&roomRole==='admin'&&(!subscriptionData||subscriptionData.status!=='active')&&new URLSearchParams(window.location.search).get('checkout')!=='success'&&
+      isHomeLayer&&roomRole==='admin'&&(!subscriptionData||subscriptionData.status!=='active')&&!postCheckout&&
         e('div',{style:{background:'rgba(232,184,109,0.07)',border:'1px solid rgba(232,184,109,0.28)',borderRadius:'12px',padding:'14px 16px',marginBottom:'16px'}},
           e('p',{style:{margin:'0 0 10px',fontSize:'13px',color:'#d4a843',lineHeight:1.6}},
             'ルームを継続するには決済方法の登録が必要です'
