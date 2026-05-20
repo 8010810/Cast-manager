@@ -3217,6 +3217,7 @@ function App(){
   var s_att=useState({status:{},scheduledTime:{},extraCasts:[]});var attData=s_att[0];var setAttData=s_att[1];
   var s_srn=useState('');var settRoomName=s_srn[0];var setSettRoomName=s_srn[1];
   var s_srl=useState(false);var settRoomLoading=s_srl[0];var setSettRoomLoading=s_srl[1];
+  var s_srp=useState('monthly');var settRoomPeriod=s_srp[0];var setSettRoomPeriod=s_srp[1];
   var s_jri=useState('');var joinRoomInput=s_jri[0];var setJoinRoomInput=s_jri[1];
   var s_jrl=useState(false);var joinRoomLoading=s_jrl[0];var setJoinRoomLoading=s_jrl[1];
   var s_jrm=useState('');var joinReqMsg=s_jrm[0];var setJoinReqMsg=s_jrm[1];
@@ -4199,29 +4200,19 @@ function App(){
         var now=new Date().toISOString();
         var inviteCode=generateInviteCode();
         var rid=db.collection('rooms').doc().id;
-        var sFolderName=userName||'オーナー';
+        var sFolderName=userName||'管理者';
         var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:sFolderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
         db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode})
           .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
-          .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName,joinedAt:now});})
+          .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
           .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now});})
+          .then(function(){return db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});})
           .then(function(){
-            setRoomId(rid);setRoomRole('admin');
-            setCurrentRoom({id:rid,name:rn,inviteCode:inviteCode});
-            setRoomsList(function(prev){return prev.concat([{roomId:rid,name:rn,role:'admin',inviteCode:inviteCode}]);});
-            setData(initData);
-            db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});
-            var nowR=new Date();if(nowR.getHours()<9)nowR.setDate(nowR.getDate()-1);
-            var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
-            if(unsubAttRef.current){unsubAttRef.current();unsubAttRef.current=null;}
-            unsubAttRef.current=db.collection('rooms').doc(rid).collection('attendance').doc(tsR).onSnapshot(function(doc){
-              if(doc.exists){var ad=doc.data();setAttData({status:ad.status||{},scheduledTime:ad.scheduledTime||{},extraCasts:ad.extraCasts||[],confirmTypes:ad.confirmTypes||{}});}
-            },function(){});
-            setSettRoomName('');setSettRoomLoading(false);
-            notify(rn+' を作成しました');
-            setSettingsPage(null);setNavStack(['home']);setSubBack(null);
+            setSettRoomLoading(false);
+            var priceId=settRoomPeriod==='yearly'?PRICE_IDS.STD_YEARLY:PRICE_IDS.STD_MONTHLY;
+            handleCheckout(priceId,'/?checkout=success','/?checkout=cancel',rid);
           })
-          .catch(function(){setSettRoomLoading(false);notify('作成に失敗しました','error');});
+          .catch(function(_e){setSettRoomLoading(false);notify('作成に失敗しました','error');});
       }
       return e(React.Fragment,null,SETTINGS_TOAST,e('div',{style:SETTINGS_OVERLAY_STYLE},
         e('div',{style:SETTINGS_HEADER},
@@ -4255,8 +4246,12 @@ function App(){
           e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
           e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'新しいルームを作成'),
           e('input',{style:{width:'100%',background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'10px',padding:'12px 14px',color:'#f3f4f6',fontSize:'14px',marginBottom:'10px',boxSizing:'border-box'},placeholder:'ルーム名',value:settRoomName,onChange:function(ev){setSettRoomName(ev.target.value);}}),
+          e('div',{style:{display:'flex',gap:'8px',marginBottom:'10px'}},
+            e('button',{style:{flex:1,padding:'10px',borderRadius:'8px',border:settRoomPeriod==='monthly'?'1px solid #e8b86d':'1px solid #2d2d4e',background:settRoomPeriod==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:settRoomPeriod==='monthly'?'#e8b86d':'#6b7280',fontSize:'13px',cursor:'pointer',fontWeight:settRoomPeriod==='monthly'?700:400},onClick:function(){setSettRoomPeriod('monthly');}},'月払い'),
+            e('button',{style:{flex:1,padding:'10px',borderRadius:'8px',border:settRoomPeriod==='yearly'?'1px solid #e8b86d':'1px solid #2d2d4e',background:settRoomPeriod==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:settRoomPeriod==='yearly'?'#e8b86d':'#6b7280',fontSize:'13px',cursor:'pointer',fontWeight:settRoomPeriod==='yearly'?700:400},onClick:function(){setSettRoomPeriod('yearly');}},'年払い')
+          ),
           e('button',{style:{width:'100%',background:'linear-gradient(135deg,#d4a017,#e8b86d)',border:'none',borderRadius:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',padding:'14px',cursor:settRoomLoading||!settRoomName.trim()?'not-allowed':'pointer',opacity:settRoomLoading||!settRoomName.trim()?0.5:1},onClick:createSettingsRoom,disabled:settRoomLoading||!settRoomName.trim()},
-            settRoomLoading?'作成中...':'+ 新しいルームを作成'
+            settRoomLoading?'作成中...':'+ 新しいルームを作成して決済へ'
           ),
           e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
           e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'10px'}},'別のルームに参加'),
