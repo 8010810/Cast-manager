@@ -3273,8 +3273,8 @@ function App(){
       return fetch('/api/stripe-add-member',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({roomId:rid,memberUid:user.uid,memberUserName:userName||''})});
     }).then(function(){
-      // miniサブスクがあればキャンセル
-      fetch('/api/stripe-cancel-account',{method:'POST',headers:{'Content-Type':'application/json'},
+      // miniサブスクがあれば停止（退室時に自動再開）
+      fetch('/api/stripe-pause-mini',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({uid:user.uid})}).catch(function(){});
       return loadFromRoom(rid);
     }).then(function(d){
@@ -3319,8 +3319,13 @@ function App(){
       notify('ルームから退室させられました','error');
       setConsentState('loading');
       db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
-        if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='mini'){
-          window.location.href='/mini';
+        if(subDoc.exists&&subDoc.data().plan==='mini'){
+          if(subDoc.data().status==='paused'){
+            fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
+              .finally(function(){window.location.href='/mini';});
+          }else{
+            window.location.href='/mini';
+          }
         }else{
           setConsentState('planselect');setLoading(false);
         }
@@ -4546,7 +4551,15 @@ function App(){
                 }).catch(function(){notify('退室後の切替に失敗しました','error');});
               }else{
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
-                setSettingsPage(null);window.location.href='/mini';
+                setSettingsPage(null);
+                db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
+                  if(subDoc.exists&&subDoc.data().plan==='mini'&&subDoc.data().status==='paused'){
+                    fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
+                      .finally(function(){window.location.href='/mini';});
+                  }else{
+                    window.location.href='/mini';
+                  }
+                }).catch(function(){window.location.href='/mini';});
               }
             }).catch(function(){notify('退室に失敗しました','error');});
             }).catch(function(){notify('退室に失敗しました','error');});
