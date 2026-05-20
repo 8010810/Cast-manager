@@ -91,15 +91,20 @@ export default async function handler(req, res) {
       console.error('[approve-member] Folder creation error:', _folderErr.message);
     }
 
-    // メンバーのminiサブスクがあればキャンセル
+    // メンバーのminiサブスクがあれば停止（解約ではなく一時停止）
     var memberSubDoc = await db.collection('users').doc(memberUid).collection('subscription').doc('main').get();
     if (memberSubDoc.exists && memberSubDoc.data().subscriptionId) {
       try {
-        await stripe.subscriptions.cancel(memberSubDoc.data().subscriptionId);
-        await db.collection('users').doc(memberUid).collection('subscription').doc('main').delete();
-        console.log('[approve-member] Cancelled mini subscription for member:', memberUid);
+        await stripe.subscriptions.update(memberSubDoc.data().subscriptionId, {
+          pause_collection: { behavior: 'void' },
+        });
+        await db.collection('users').doc(memberUid).collection('subscription').doc('main').update({
+          status: 'paused',
+          pausedAt: new Date().toISOString(),
+        });
+        console.log('[approve-member] Paused mini subscription for member:', memberUid);
       } catch (_subErr) {
-        console.log('[approve-member] Mini sub cancel skipped:', _subErr.message);
+        console.log('[approve-member] Mini sub pause skipped:', _subErr.message);
       }
     }
 
