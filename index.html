@@ -2656,10 +2656,8 @@ function StoreSettingsPage(p){
     }).then(function(){
       setMembers(function(prev){return prev.filter(function(m){return m.uid!==targetUid;});});
       p.notify(targetName+'さんをルームから退室させました');
-      if(isInvited){
-        fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({roomId:p.roomId})}).catch(function(_e){console.error('Remove member billing error:',_e);});
-      }
+      fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({roomId:p.roomId})}).catch(function(_e){console.error('Remove member billing error:',_e);});
       return p.db.collection('rooms').doc(p.roomId).collection('members').get();
     }).then(function(snap){
       if(snap&&snap.empty){
@@ -3391,17 +3389,7 @@ function App(){
   function syncMemberCount(forRoomId){
     var targetRoomId=forRoomId||roomId;
     if(!targetRoomId)return;
-    db.collection('rooms').doc(targetRoomId).collection('members').get()
-    .then(function(snap){
-      var memberCount=snap.size;
-      return db.collection('rooms').doc(targetRoomId).collection('subscription').doc('main').get()
-      .then(function(subDoc){
-        if(!subDoc.exists)return;
-        var subData=subDoc.data();
-        if(!subData.subscriptionId)return;
-        return fetch('/api/stripe-update-quantity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriptionId:subData.subscriptionId,quantity:memberCount})}).catch(function(){});
-      });
-    }).catch(function(){});
+    fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:targetRoomId})}).catch(function(){});
   }
 
   function handleCreateRoomForCheckout(){
@@ -4058,8 +4046,8 @@ function App(){
               e('li',null,'軽量で使いやすい')
             ),
             e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
-              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='monthly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='monthly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='monthly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'monthly'});});}},'月額'),
-              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='yearly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='yearly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='yearly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'yearly'});});}},'年額')
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='monthly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='monthly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='monthly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'monthly'});});}},'月額 ¥1,980'),
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='yearly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='yearly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='yearly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'yearly'});});}},'年額 ¥19,800')
             ),
             e('button',{style:{width:'100%',background:'linear-gradient(135deg,#7c3aed,#a78bfa)',border:'none',borderRadius:'10px',padding:'12px',color:'#fff',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},onClick:function(){
               if(Date.now()-planSelectShownAtRef.current<400)return;
@@ -4080,8 +4068,8 @@ function App(){
               e('li',null,'詳細な売上分析')
             ),
             e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
-              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='monthly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'monthly'});});}},'月額'),
-              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='yearly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='yearly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'yearly'});});}},'年額')
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='monthly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'monthly'});});}},'月額 ¥3,800'),
+              e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='yearly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='yearly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'yearly'});});}},'年額 ¥38,000')
             ),
             e('button',{style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'12px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},onClick:function(){
               if(Date.now()-planSelectShownAtRef.current<400)return;
@@ -4612,10 +4600,12 @@ function App(){
                   if(subDoc.exists&&subDoc.data().plan==='mini'&&subDoc.data().status==='paused'){
                     fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
                       .finally(function(){window.location.href='/mini';});
-                  }else{
+                  }else if(subDoc.exists&&(subDoc.data().status==='active'||subDoc.data().status==='trialing')){
                     window.location.href='/mini';
+                  }else{
+                    setConsentState('planselect');setLoading(false);
                   }
-                }).catch(function(){window.location.href='/mini';});
+                }).catch(function(){setConsentState('planselect');setLoading(false);});
               }
             }).catch(function(){notify('退室に失敗しました','error');});
             }).catch(function(){notify('退室に失敗しました','error');});
