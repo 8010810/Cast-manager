@@ -1892,10 +1892,14 @@ function MiniApp(){
         if(u&&u.uid===pendingUid){u.delete().then(function(){window.location.href='/';}).catch(function(){auth.signOut().catch(function(){});window.location.href='/';});}
       }
     }).catch(function(){localStorage.removeItem('pending_reauth_delete');});
+    // bfcacheで復元された場合はloadingをリセット
+    function handlePageShow(e){if(e.persisted){setLoading(false);}}
+    window.addEventListener('pageshow',handlePageShow);
     var unsubRooms=null;
     var unsubConsent=null;
     var unsubPersonalData=null;
     var unsubRoomDoc=null;
+    var loadingTimeoutId=null;
 
     function cleanupRooms(){
       if(unsubConsent){unsubConsent();unsubConsent=null;}
@@ -1957,6 +1961,8 @@ function MiniApp(){
         setLoading(true);
         var consentDone=false,roomsReady=false;
         function checkAllDone(){if(consentDone&&roomsReady)setLoading(false);}
+        if(loadingTimeoutId)clearTimeout(loadingTimeoutId);
+        loadingTimeoutId=setTimeout(function(){setLoading(false);},20000);
         unsubConsent=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
           var cd=doc.exists?doc.data():null;
           if(!cd||!cd.agreedAt){
@@ -2068,7 +2074,7 @@ function MiniApp(){
         },function(){if(firstRoomsSnap){firstRoomsSnap=false;roomsReady=true;checkAllDone();}});
       }else{setData(null);setConsentState('done');setLoading(false);}
     });
-    return function(){unsubAuth();cleanupRooms();};
+    return function(){unsubAuth();cleanupRooms();window.removeEventListener('pageshow',handlePageShow);if(loadingTimeoutId)clearTimeout(loadingTimeoutId);};
   },[]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
