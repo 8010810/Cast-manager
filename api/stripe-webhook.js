@@ -92,6 +92,10 @@ export default async function handler(req, res) {
         await db.collection('rooms').doc(roomId).collection('subscription').doc('main').set(
           Object.assign({}, subData, { ownerUid: uid })
         );
+        // Clear pending payment flag so the owner can access the room
+        if (uid) {
+          await db.collection('users').doc(uid).collection('rooms').doc(roomId).update({ pendingPayment: false }).catch(function() {});
+        }
         console.log('[stripe-webhook] Subscription saved to room:', roomId);
       } else if (uid) {
         // Mini plan: save subscription to user doc
