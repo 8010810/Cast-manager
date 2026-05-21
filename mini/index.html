@@ -1977,7 +1977,7 @@ function MiniApp(){
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
                 if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
                 function checkSubAndProceed(retryCount){
-                  var getOpt=retryCount>0?{source:'server'}:{};
+                  var getOpt={source:'server'};
                   Promise.all([
                     db.collection('users').doc(u.uid).collection('subscription').doc('main').get(getOpt),
                     db.collection('users').doc(u.uid).collection('rooms').limit(1).get(getOpt)
