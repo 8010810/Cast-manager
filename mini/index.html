@@ -2208,7 +2208,16 @@ function MiniApp(){
     if(!user)return;
     var uid2=user.uid;
     var userRef=db.collection('users').doc(uid2);
-    userRef.collection('rooms').get().catch(function(){return{docs:[]};}).then(function(roomSnap){
+    // まずStripeサブスクをキャンセル
+    var cancelPromise=db.collection('users').doc(uid2).collection('subscription').doc('main').get()
+      .then(function(subDoc){
+        if(subDoc.exists&&subDoc.data().subscriptionId&&(subDoc.data().status==='active'||subDoc.data().status==='paused')){
+          return fetch('/api/stripe-cancel-account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid2})}).catch(function(){});
+        }
+      }).catch(function(){});
+    cancelPromise.then(function(){
+      return userRef.collection('rooms').get().catch(function(){return{docs:[]};});
+    }).then(function(roomSnap){
       var memberDeletes=roomSnap.docs.map(function(rd){
         return db.collection('rooms').doc(rd.id).collection('members').doc(uid2).delete().catch(function(){});
       });
@@ -2236,6 +2245,7 @@ function MiniApp(){
       auth.signOut().catch(function(){});
       window.location.href='/';
     });
+    }); // cancelPromise
   }
   function goBack(){
     if(subBack){
