@@ -2656,10 +2656,8 @@ function StoreSettingsPage(p){
     }).then(function(){
       setMembers(function(prev){return prev.filter(function(m){return m.uid!==targetUid;});});
       p.notify(targetName+'さんをルームから退室させました');
-      if(isInvited){
-        fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({roomId:p.roomId})}).catch(function(_e){console.error('Remove member billing error:',_e);});
-      }
+      fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({roomId:p.roomId})}).catch(function(_e){console.error('Remove member billing error:',_e);});
       return p.db.collection('rooms').doc(p.roomId).collection('members').get();
     }).then(function(snap){
       if(snap&&snap.empty){
@@ -3241,7 +3239,7 @@ function App(){
     MINI_MONTHLY:'price_1TXgkgQaq3EwNY4QyYQ6sea2',
     MINI_YEARLY:'price_1TXgmOQaq3EwNY4QKovRRNqb',
     STD_MONTHLY:'price_1TXgnIQaq3EwNY4QcKOSwHGF',
-    STD_YEARLY:'price_1TXgo0Qaq3EwNY4Q98Zkhml5',
+    STD_YEARLY:'price_1TZPrSQaq3EwNY4QKHNKuXv3',
     ACCOUNT_ADD:'price_1TXgqSQaq3EwNY4QdQVc6rNT'
   };
 
@@ -3391,17 +3389,7 @@ function App(){
   function syncMemberCount(forRoomId){
     var targetRoomId=forRoomId||roomId;
     if(!targetRoomId)return;
-    db.collection('rooms').doc(targetRoomId).collection('members').get()
-    .then(function(snap){
-      var memberCount=snap.size;
-      return db.collection('rooms').doc(targetRoomId).collection('subscription').doc('main').get()
-      .then(function(subDoc){
-        if(!subDoc.exists)return;
-        var subData=subDoc.data();
-        if(!subData.subscriptionId)return;
-        return fetch('/api/stripe-update-quantity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({subscriptionId:subData.subscriptionId,quantity:memberCount})}).catch(function(){});
-      });
-    }).catch(function(){});
+    fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:targetRoomId})}).catch(function(){});
   }
 
   function handleCreateRoomForCheckout(){
@@ -4612,10 +4600,12 @@ function App(){
                   if(subDoc.exists&&subDoc.data().plan==='mini'&&subDoc.data().status==='paused'){
                     fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
                       .finally(function(){window.location.href='/mini';});
-                  }else{
+                  }else if(subDoc.exists&&(subDoc.data().status==='active'||subDoc.data().status==='trialing')){
                     window.location.href='/mini';
+                  }else{
+                    setConsentState('planselect');setLoading(false);
                   }
-                }).catch(function(){window.location.href='/mini';});
+                }).catch(function(){setConsentState('planselect');setLoading(false);});
               }
             }).catch(function(){notify('退室に失敗しました','error');});
             }).catch(function(){notify('退室に失敗しました','error');});
