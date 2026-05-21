@@ -1962,7 +1962,7 @@ function MiniApp(){
         var consentDone=false,roomsReady=false;
         function checkAllDone(){if(consentDone&&roomsReady)setLoading(false);}
         if(loadingTimeoutId)clearTimeout(loadingTimeoutId);
-        loadingTimeoutId=setTimeout(function(){setLoading(false);setConsentState(function(cs){return cs==='loading'?'needed':cs;});},20000);
+        loadingTimeoutId=setTimeout(function(){setLoading(false);setConsentState(function(cs){return cs==='loading'?'done':cs;});},30000);
         unsubConsent=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
           var cd=doc.exists?doc.data():null;
           if(!cd||!cd.agreedAt){
@@ -1977,18 +1977,18 @@ function MiniApp(){
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
                 if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
                 function checkSubAndProceed(retryCount){
+                  var getOpt=retryCount>0?{source:'server'}:{};
                   Promise.all([
-                    db.collection('users').doc(u.uid).collection('subscription').doc('main').get(),
-                    db.collection('users').doc(u.uid).collection('rooms').limit(1).get()
+                    db.collection('users').doc(u.uid).collection('subscription').doc('main').get(getOpt),
+                    db.collection('users').doc(u.uid).collection('rooms').limit(1).get(getOpt)
                   ]).then(function(results){
                     var subDoc=results[0];var roomsSnap=results[1];
                     var hasSub=subDoc.exists&&subDoc.data().status==='active';
                     var hasRoom=!roomsSnap.empty;
-                    if(!hasSub&&!hasRoom&&isCheckoutSuccess&&retryCount<15){
+                    if(!hasSub&&!hasRoom&&isCheckoutSuccess&&retryCount<20){
                       setTimeout(function(){checkSubAndProceed(retryCount+1);},1000);
                     }else if(!hasSub&&!hasRoom){window.location.href='/';}
                     else{setConsentState('done');checkAllDone();}
-                    if(hasSub||hasRoom)checkAllDone();
                   }).catch(function(){setConsentState('done');checkAllDone();});
                 }
                 checkSubAndProceed(0);
