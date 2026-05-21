@@ -2254,7 +2254,7 @@ function MiniApp(){
     if(backFn){setTimeout(function(){setSubBack(function(){return backFn;});},0);}
   }
 
-  if(loading||consentState==='loading'){return e('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',color:'#e8b86d',fontSize:'14px',fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.2em'}},'LOADING...');}
+  if(loading||consentState==='loading'){return e('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#0d0d1a'}},e('div',{style:{textAlign:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...')));}
   if(!user){return e(LoginScreen,{onLogin:function(){auth.signInWithEmailAndPassword&&null;signInWithGoogle();}});}
     if(consentState==='needed'){
       return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
