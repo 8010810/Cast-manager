@@ -1973,25 +1973,24 @@ function MiniApp(){
               consentDone=true;
               if(!cd.userName){setConsentState('username');checkAllDone();}
               else{
-                // checkout=successの場合はサブスクが届くまで最大15秒待つ
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
                 if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
-                function checkSubAndProceed(retryCount){
-                  var getOpt={source:'server'};
-                  Promise.all([
-                    db.collection('users').doc(u.uid).collection('subscription').doc('main').get(getOpt),
-                    db.collection('users').doc(u.uid).collection('rooms').limit(1).get(getOpt)
-                  ]).then(function(results){
-                    var subDoc=results[0];var roomsSnap=results[1];
-                    var hasSub=subDoc.exists&&subDoc.data().status==='active';
-                    var hasRoom=!roomsSnap.empty;
-                    if(!hasSub&&!hasRoom&&isCheckoutSuccess&&retryCount<20){
-                      setTimeout(function(){checkSubAndProceed(retryCount+1);},1000);
-                    }else if(!hasSub&&!hasRoom){window.location.href='/';}
-                    else{setConsentState('done');checkAllDone();}
-                  }).catch(function(){setConsentState('done');checkAllDone();});
-                }
-                checkSubAndProceed(0);
+                var subResolved=false;
+                var fallbackTimer=setTimeout(function(){
+                  if(!subResolved){subResolved=true;if(unsubSubCheck)unsubSubCheck();window.location.href='/';}
+                },isCheckoutSuccess?30000:10000);
+                var unsubSubCheck=db.collection('users').doc(u.uid).collection('subscription').doc('main').onSnapshot(function(subDoc){
+                  if(subResolved)return;
+                  var hasSub=subDoc.exists&&subDoc.data().status==='active';
+                  if(hasSub){subResolved=true;clearTimeout(fallbackTimer);if(unsubSubCheck)unsubSubCheck();setConsentState('done');checkAllDone();}
+                  else if(!isCheckoutSuccess){
+                    db.collection('users').doc(u.uid).collection('rooms').limit(1).get({source:'server'}).then(function(rs){
+                      if(subResolved)return;
+                      if(!rs.empty){subResolved=true;clearTimeout(fallbackTimer);if(unsubSubCheck)unsubSubCheck();setConsentState('done');checkAllDone();}
+                      else{subResolved=true;clearTimeout(fallbackTimer);if(unsubSubCheck)unsubSubCheck();window.location.href='/';}
+                    }).catch(function(){if(!subResolved){subResolved=true;clearTimeout(fallbackTimer);setConsentState('done');checkAllDone();}});
+                  }
+                },function(){if(!subResolved){subResolved=true;clearTimeout(fallbackTimer);setConsentState('done');checkAllDone();}});
               }
             }
           }
