@@ -1966,12 +1966,12 @@ function MiniApp(){
         unsubConsent=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
           var cd=doc.exists?doc.data():null;
           if(!cd||!cd.agreedAt){
-            if(!consentDone){setConsentState('needed');consentDone=true;checkAllDone();}
+            if(!consentDone){consentDone=true;setConsentState('needed');setLoading(false);}
           }else{
             setUserName(cd.userName||'');
             if(!consentDone){
               consentDone=true;
-              if(!cd.userName){setConsentState('username');checkAllDone();}
+              if(!cd.userName){setConsentState('username');setLoading(false);}
               else{
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
                 if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
@@ -1979,7 +1979,7 @@ function MiniApp(){
               }
             }
           }
-        },function(){if(!consentDone){setConsentState('needed');consentDone=true;checkAllDone();}});
+        },function(){if(!consentDone){consentDone=true;setConsentState('needed');setLoading(false);}});
         db.collection('users').doc(u.uid).collection('meta').doc('pendingJoins').get().then(function(doc){
           if(!doc.exists)return;
           var pending=doc.data()||{};
@@ -2263,7 +2263,7 @@ function MiniApp(){
     if(backFn){setTimeout(function(){setSubBack(function(){return backFn;});},0);}
   }
 
-  if(loading||consentState==='loading'){return e('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#0d0d1a'}},e('div',{style:{textAlign:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...')));}
+  if(consentState==='loading'){return e('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#0d0d1a'}},e('div',{style:{textAlign:'center'}},e('div',{style:{color:'#e8b86d',fontSize:'14px',letterSpacing:'2px'}},'LOADING...')));}
   if(!user){return e(LoginScreen,{onLogin:function(){auth.signInWithEmailAndPassword&&null;signInWithGoogle();}});}
     if(consentState==='needed'){
       return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
