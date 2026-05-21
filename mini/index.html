@@ -1974,28 +1974,20 @@ function MiniApp(){
               if(!cd.userName){setConsentState('username');checkAllDone();}
               else{
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
-                if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
-                var subResolved=false;
-                function pollForSub(retryCount){
-                  if(subResolved)return;
+                if(isCheckoutSuccess){window.history.replaceState({},'','/mini');setConsentState('done');checkAllDone();}
+                else{
                   db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'})
                   .then(function(subDoc){
-                    if(subResolved)return;
                     var hasSub=subDoc.exists&&subDoc.data().status==='active';
-                    if(hasSub){subResolved=true;setConsentState('done');checkAllDone();}
-                    else if(retryCount<20){setTimeout(function(){pollForSub(retryCount+1);},1000);}
+                    if(hasSub){setConsentState('done');checkAllDone();}
                     else{
                       db.collection('users').doc(u.uid).collection('rooms').limit(1).get({source:'server'}).then(function(rs){
-                        if(!rs.empty){subResolved=true;setConsentState('done');checkAllDone();}
+                        if(!rs.empty){setConsentState('done');checkAllDone();}
                         else{window.location.href='/';}
-                      }).catch(function(){window.location.href='/';});
+                      }).catch(function(){setConsentState('done');checkAllDone();});
                     }
-                  }).catch(function(){
-                    if(retryCount<3){setTimeout(function(){pollForSub(retryCount+1);},2000);}
-                    else{subResolved=true;setConsentState('done');checkAllDone();}
-                  });
+                  }).catch(function(){setConsentState('done');checkAllDone();});
                 }
-                pollForSub(0);
               }
             }
           }
