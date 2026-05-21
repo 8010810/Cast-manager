@@ -1975,7 +1975,7 @@ function MiniApp(){
               else{
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
                 if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
-                setConsentState('done');checkAllDone();
+                setConsentState('done');setLoading(false);
               }
             }
           }
