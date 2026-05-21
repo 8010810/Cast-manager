@@ -1976,21 +1976,26 @@ function MiniApp(){
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
                 if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
                 var subResolved=false;
-                var fallbackTimer=setTimeout(function(){
-                  if(!subResolved){subResolved=true;if(unsubSubCheck)unsubSubCheck();window.location.href='/';}
-                },isCheckoutSuccess?30000:10000);
-                var unsubSubCheck=db.collection('users').doc(u.uid).collection('subscription').doc('main').onSnapshot(function(subDoc){
+                function pollForSub(retryCount){
                   if(subResolved)return;
-                  var hasSub=subDoc.exists&&subDoc.data().status==='active';
-                  if(hasSub){subResolved=true;clearTimeout(fallbackTimer);if(unsubSubCheck)unsubSubCheck();setConsentState('done');checkAllDone();}
-                  else if(!isCheckoutSuccess){
-                    db.collection('users').doc(u.uid).collection('rooms').limit(1).get({source:'server'}).then(function(rs){
-                      if(subResolved)return;
-                      if(!rs.empty){subResolved=true;clearTimeout(fallbackTimer);if(unsubSubCheck)unsubSubCheck();setConsentState('done');checkAllDone();}
-                      else{subResolved=true;clearTimeout(fallbackTimer);if(unsubSubCheck)unsubSubCheck();window.location.href='/';}
-                    }).catch(function(){if(!subResolved){subResolved=true;clearTimeout(fallbackTimer);setConsentState('done');checkAllDone();}});
-                  }
-                },function(){if(!subResolved){subResolved=true;clearTimeout(fallbackTimer);setConsentState('done');checkAllDone();}});
+                  db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'})
+                  .then(function(subDoc){
+                    if(subResolved)return;
+                    var hasSub=subDoc.exists&&subDoc.data().status==='active';
+                    if(hasSub){subResolved=true;setConsentState('done');checkAllDone();}
+                    else if(retryCount<20){setTimeout(function(){pollForSub(retryCount+1);},1000);}
+                    else{
+                      db.collection('users').doc(u.uid).collection('rooms').limit(1).get({source:'server'}).then(function(rs){
+                        if(!rs.empty){subResolved=true;setConsentState('done');checkAllDone();}
+                        else{window.location.href='/';}
+                      }).catch(function(){window.location.href='/';});
+                    }
+                  }).catch(function(){
+                    if(retryCount<3){setTimeout(function(){pollForSub(retryCount+1);},2000);}
+                    else{subResolved=true;setConsentState('done');checkAllDone();}
+                  });
+                }
+                pollForSub(0);
               }
             }
           }
