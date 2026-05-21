@@ -87,43 +87,17 @@ export default async function handler(req, res) {
         cancelAt: null,
       };
 
-      if (plan === 'standard' && roomId && uid) {
-        var roomName = (session.metadata && session.metadata.roomName) || 'ルーム';
-        var now = new Date().toISOString();
-
-        // Get user's name for folder initialization
-        var userDoc = await db.collection('users').doc(uid).collection('meta').doc('consent').get().catch(function() { return null; });
-        var userName = (userDoc && userDoc.exists) ? (userDoc.data().userName || '') : '';
-        var folderName = userName || 'オーナー';
-
-        // Generate invite code
-        var inviteCode = Math.random().toString(36).slice(2, 8).toUpperCase();
-
-        // Generate folder IDs
-        var fid1 = db.collection('_').doc().id;
-        var fid2 = db.collection('_').doc().id;
-
-        var initData = {
-          casts: [], records: {}, customers: {},
-          folders: [
-            { id: fid1, name: '新入店', castIds: [] },
-            { id: fid2, name: folderName, castIds: [], ownerUid: uid },
-          ],
-          shifts: {}, visits: [], quota: {},
-        };
-
-        // Create room
-        await db.collection('rooms').doc(roomId).set({ name: roomName, ownerUid: uid, createdAt: now, inviteCode: inviteCode });
-        await db.collection('rooms').doc(roomId).collection('data').doc('main').set(initData);
-        await db.collection('rooms').doc(roomId).collection('members').doc(uid).set({ role: 'admin', userName: userName, joinedAt: now });
-        await db.collection('users').doc(uid).collection('rooms').doc(roomId).set({ name: roomName, role: 'admin', inviteCode: inviteCode, joinedAt: now });
-        await db.collection('users').doc(uid).collection('meta').doc('consent').update({ lastRoomId: roomId }).catch(function() {});
-
-        // Save subscription
+      if (plan === 'standard' && roomId) {
+        // Save subscription to room doc
         await db.collection('rooms').doc(roomId).collection('subscription').doc('main').set(
           Object.assign({}, subData, { ownerUid: uid })
         );
-        console.log('[stripe-webhook] Room created and subscription saved:', roomId);
+        // Clear pendingPayment flag so the owner can access the room
+        if (uid) {
+          await db.collection('users').doc(uid).collection('rooms').doc(roomId).update({ pendingPayment: false }).catch(function() {});
+          await db.collection('rooms').doc(roomId).update({ pendingPayment: false }).catch(function() {});
+        }
+        console.log('[stripe-webhook] Subscription saved to room:', roomId);
       } else if (uid) {
         // Mini plan: save subscription to user doc
         await db.collection('users').doc(uid).collection('subscription').doc('main').set(subData);
