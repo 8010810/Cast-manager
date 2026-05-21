@@ -2289,7 +2289,15 @@ function MiniApp(){
             if(!alreadyExists){newData.folders=[{id:uid(),name:uName,castIds:[],ownerUid:user.uid}].concat(newData.folders||[]);}
             db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
             persist(newData);
-            setConsentState('done');
+            // サブスクまたはルーム所属がなければ / でプラン選択
+            Promise.all([
+              db.collection('users').doc(user.uid).collection('subscription').doc('main').get(),
+              db.collection('users').doc(user.uid).collection('rooms').limit(1).get()
+            ]).then(function(results){
+              var hasSub=results[0].exists&&results[0].data().status==='active';
+              var hasRoom=!results[1].empty;
+              if(!hasSub&&!hasRoom){window.location.href='/';}else{setConsentState('done');}
+            }).catch(function(){setConsentState('done');});
           }},'次へ')
         )
       );
