@@ -1893,7 +1893,7 @@ function MiniApp(){
       }
     }).catch(function(){localStorage.removeItem('pending_reauth_delete');});
     // bfcacheで復元された場合はloadingをリセット
-    function handlePageShow(e){if(e.persisted){setLoading(false);}}
+    function handlePageShow(e){if(e.persisted){setLoading(false);setConsentState(function(cs){return cs==='loading'?'needed':cs;});}}
     window.addEventListener('pageshow',handlePageShow);
     var unsubRooms=null;
     var unsubConsent=null;
