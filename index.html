@@ -3715,6 +3715,18 @@ function App(){
     return function(){clearTimeout(fallback);};
   },[user]);
 
+  // bfcacheで戻った場合 or checkout=cancelでcheckoutLoadingをリセット
+  useEffect(function(){
+    var params=new URLSearchParams(window.location.search);
+    if(params.get('checkout')==='cancel'){
+      setCheckoutLoading(false);
+      window.history.replaceState({},'','/');
+    }
+    function handlePageShow(e){if(e.persisted){setCheckoutLoading(false);}}
+    window.addEventListener('pageshow',handlePageShow);
+    return function(){window.removeEventListener('pageshow',handlePageShow);};
+  },[]);
+
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){
     if(!user||!roomId)return;
