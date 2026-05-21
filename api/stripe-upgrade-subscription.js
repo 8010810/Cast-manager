@@ -31,6 +31,7 @@ export default async function handler(req, res) {
     var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     var uid = req.body.uid;
     var newPriceId = req.body.priceId;
+    var roomId = req.body.roomId || '';
 
     if (!uid || !newPriceId) {
       return res.status(400).json({ error: 'uid and priceId are required' });
@@ -70,7 +71,25 @@ export default async function handler(req, res) {
       cancelAt: null,
     });
 
-    console.log('[stripe-upgrade-subscription] Upgraded to std for uid:', uid, 'price:', newPriceId);
+    // Save subscription to room doc and clear pendingPayment
+    if (roomId) {
+      var updatedSub = await db.collection('users').doc(uid).collection('subscription').doc('main').get();
+      var subInfo = updatedSub.data();
+      await db.collection('rooms').doc(roomId).collection('subscription').doc('main').set({
+        plan: 'standard',
+        status: 'active',
+        subscriptionId: subInfo.subscriptionId || '',
+        customerId: subInfo.customerId || '',
+        createdAt: new Date().toISOString(),
+        cancelAtPeriodEnd: false,
+        cancelAt: null,
+        ownerUid: uid,
+      });
+      await db.collection('users').doc(uid).collection('rooms').doc(roomId).update({ pendingPayment: false }).catch(function() {});
+      await db.collection('rooms').doc(roomId).update({ pendingPayment: false }).catch(function() {});
+    }
+
+    console.log('[stripe-upgrade-subscription] Upgraded to std for uid:', uid, 'price:', newPriceId, 'roomId:', roomId);
     return res.status(200).json({ success: true });
   } catch (_e) {
     console.error('[stripe-upgrade-subscription] Error:', _e.message);

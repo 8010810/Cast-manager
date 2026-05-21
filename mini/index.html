@@ -1845,6 +1845,7 @@ function MiniApp(){
   var s_subm=useState(null);var miniSubData=s_subm[0];var setMiniSubData=s_subm[1];
   var s_mcld=useState(false);var miniCancelLoading=s_mcld[0];var setMiniCancelLoading=s_mcld[1];
   var s_upgc=useState(false);var upgradeConfirm=s_upgc[0];var setUpgradeConfirm=s_upgc[1];
+  var s_upgn=useState('');var upgradeRoomName=s_upgn[0];var setUpgradeRoomName=s_upgn[1];
   React.useEffect(function(){
     if(!user)return;
     var unsub=db.collection('users').doc(user.uid).collection('meta').doc('consent').onSnapshot(function(doc){
@@ -2557,7 +2558,7 @@ function MiniApp(){
       }
       if(settingsPage==='plan'){
         var STD_MONTHLY_PRICE='price_1TXgnIQaq3EwNY4QcKOSwHGF';
-        var STD_YEARLY_PRICE='price_1TXgo0Qaq3EwNY4Q98Zkhml5';
+        var STD_YEARLY_PRICE='price_1TZPrSQaq3EwNY4QKHNKuXv3';
         var mPlanLabel=miniSubData&&miniSubData.plan==='mini'?'miniプラン':'standardプラン';
         var mPlanStatus=miniSubData&&miniSubData.status==='active'?'有効':'解約済み';
         var mIsCancelScheduled=miniSubData&&miniSubData.cancelAtPeriodEnd;
@@ -2590,18 +2591,48 @@ function MiniApp(){
             })
             .catch(function(){setMiniCancelLoading(false);notify('解約キャンセルに失敗しました','error');});
         }
+        function createUpgradeRoom(callback){
+          var rn=upgradeRoomName.trim();
+          if(!rn){notify('ルーム名を入力してください','error');return;}
+          var inviteCode=Math.random().toString(36).slice(2,8).toUpperCase();
+          var rid=db.collection('rooms').doc().id;
+          var now=new Date().toISOString();
+          var folderName=userName||'オーナー';
+          var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:folderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
+          setCheckoutLoading(true);
+          db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,pendingPayment:true})
+            .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
+            .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
+            .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now,pendingPayment:true});})
+            .then(function(){return db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});})
+            .then(function(){callback(rid,rn,inviteCode);})
+            .catch(function(_e){setCheckoutLoading(false);notify('ルームの作成に失敗しました: '+_e.message,'error');});
+        }
         function doUpgradeToStd(){
           if(!user||checkoutLoading)return;
-          var priceId=checkoutPeriod==='yearly'?STD_YEARLY_PRICE:STD_MONTHLY_PRICE;
-          setCheckoutLoading(true);
-          setUpgradeConfirm(false);
-          fetch('/api/stripe-upgrade-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid,priceId:priceId})})
-            .then(function(r){return r.json();})
-            .then(function(d){
-              if(d.error){setCheckoutLoading(false);notify('アップグレードに失敗しました：'+d.error,'error');return;}
-              window.location.href='/';
-            })
-            .catch(function(){setCheckoutLoading(false);notify('アップグレードに失敗しました','error');});
+          createUpgradeRoom(function(rid){
+            var priceId=checkoutPeriod==='yearly'?STD_YEARLY_PRICE:STD_MONTHLY_PRICE;
+            fetch('/api/stripe-upgrade-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid,priceId:priceId,roomId:rid})})
+              .then(function(r){return r.json();})
+              .then(function(d){
+                if(d.error){setCheckoutLoading(false);notify('アップグレードに失敗しました：'+d.error,'error');return;}
+                window.location.href='/';
+              })
+              .catch(function(){setCheckoutLoading(false);notify('アップグレードに失敗しました','error');});
+          });
+        }
+        function doUpgradeNewCard(){
+          if(!user||checkoutLoading)return;
+          createUpgradeRoom(function(rid,rn){
+            var priceId=checkoutPeriod==='yearly'?STD_YEARLY_PRICE:STD_MONTHLY_PRICE;
+            fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,roomId:rid,roomName:rn,successPath:'/?checkout=success',cancelPath:'/?checkout=cancel'})})
+              .then(function(r){return r.json();})
+              .then(function(d){
+                if(d.url){localStorage.setItem('_co_room',rid);window.location.href=d.url;return;}
+                setCheckoutLoading(false);notify('決済の初期化に失敗しました','error');
+              })
+              .catch(function(){setCheckoutLoading(false);notify('エラーが発生しました','error');});
+          });
         }
         if(checkoutLoading){
           return e('div',{style:{position:'fixed',inset:0,background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',zIndex:9999}},
@@ -2642,28 +2673,34 @@ function MiniApp(){
                       e('li',null,'シフト管理・勤怠管理'),
                       e('li',null,'詳細な売上分析')
                     ),
+                    e('div',{style:{marginBottom:'14px'}},
+                      e('label',{style:{display:'block',fontSize:'12px',color:'#9ca3af',marginBottom:'6px'}},'ルーム名'),
+                      e('input',{type:'text',value:upgradeRoomName,onChange:function(ev){setUpgradeRoomName(ev.target.value);setUpgradeConfirm(false);},placeholder:'例：キャバクラ○○',style:{width:'100%',boxSizing:'border-box',background:'#0d0d1a',border:'1px solid rgba(232,184,109,0.3)',borderRadius:'8px',padding:'10px 12px',color:'#f3f4f6',fontSize:'14px',outline:'none'}})
+                    ),
                     e('div',{style:{display:'flex',gap:'6px',marginBottom:'14px'}},
                       e('button',{style:{flex:1,padding:'7px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod==='monthly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod('monthly');}},'月額 ¥9,800'),
                       e('button',{style:{flex:1,padding:'7px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod==='yearly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod==='yearly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod('yearly');}},'年額 ¥98,000')
                     ),
                     checkoutPeriod==='yearly'&&e('div',{style:{fontSize:'11px',color:'#34d399',marginBottom:'12px',textAlign:'center'}},'年額は月額換算 ¥8,167（約2ヶ月分お得）'),
                     !upgradeConfirm&&e('button',{
-                      style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'12px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:'pointer'},
-                      onClick:function(){setUpgradeConfirm(true);}
+                      style:{width:'100%',background:upgradeRoomName.trim()?'linear-gradient(135deg,#c9983a,#e8b86d)':'#2d2d4e',border:'none',borderRadius:'10px',padding:'12px',color:upgradeRoomName.trim()?'#0d0d1a':'#6b7280',fontWeight:700,fontSize:'14px',cursor:upgradeRoomName.trim()?'pointer':'default'},
+                      onClick:function(){if(upgradeRoomName.trim())setUpgradeConfirm(true);}
                     },'standardにアップグレード'),
                     upgradeConfirm&&e('div',{style:{background:'rgba(232,184,109,0.08)',border:'1px solid rgba(232,184,109,0.3)',borderRadius:'10px',padding:'14px'}},
-                      e('div',{style:{fontSize:'13px',color:'#f3f4f6',marginBottom:'4px',fontWeight:700}},'アップグレードの確認'),
-                      e('div',{style:{fontSize:'12px',color:'#9ca3af',marginBottom:'12px'}},'登録済みのカードで即時決済されます。差額は日割りで請求されます。'),
-                      e('div',{style:{display:'flex',gap:'8px'}},
-                        e('button',{
-                          style:{flex:1,background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',padding:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'13px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},
-                          onClick:doUpgradeToStd,disabled:checkoutLoading
-                        },checkoutLoading?'処理中...':'アップグレードする'),
-                        e('button',{
-                          style:{flex:1,background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'10px',color:'#9ca3af',fontSize:'13px',cursor:'pointer'},
-                          onClick:function(){setUpgradeConfirm(false);}
-                        },'キャンセル')
-                      )
+                      e('div',{style:{fontSize:'13px',color:'#f3f4f6',marginBottom:'2px',fontWeight:700}},'決済方法を選択'),
+                      e('div',{style:{fontSize:'12px',color:'#9ca3af',marginBottom:'12px'}},'登録済みのカードで決済するか、新しいカードで決済するか選択してください。'),
+                      e('button',{
+                        style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'8px',padding:'10px',color:'#0d0d1a',fontWeight:700,fontSize:'13px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1,marginBottom:'8px'},
+                        onClick:doUpgradeToStd,disabled:checkoutLoading
+                      },checkoutLoading?'処理中...':'現在のカードで決済'),
+                      e('button',{
+                        style:{width:'100%',background:'transparent',border:'1px solid rgba(232,184,109,0.4)',borderRadius:'8px',padding:'10px',color:'#e8b86d',fontSize:'13px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1,marginBottom:'8px'},
+                        onClick:doUpgradeNewCard,disabled:checkoutLoading
+                      },'別のカードで決済（Stripe画面へ）'),
+                      e('button',{
+                        style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer',padding:'4px'},
+                        onClick:function(){setUpgradeConfirm(false);}
+                      },'キャンセル')
                     )
                   )
                 ),

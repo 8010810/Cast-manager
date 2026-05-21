@@ -96,6 +96,14 @@ export default async function handler(req, res) {
         if (uid) {
           await db.collection('users').doc(uid).collection('rooms').doc(roomId).update({ pendingPayment: false }).catch(function() {});
           await db.collection('rooms').doc(roomId).update({ pendingPayment: false }).catch(function() {});
+          // Cancel old mini subscription if exists (upgrade via new card flow)
+          var miniSubDoc = await db.collection('users').doc(uid).collection('subscription').doc('main').get().catch(function() { return null; });
+          if (miniSubDoc && miniSubDoc.exists && miniSubDoc.data().plan === 'mini' && miniSubDoc.data().subscriptionId) {
+            var stripeForCancel = new Stripe(process.env.STRIPE_SECRET_KEY);
+            await stripeForCancel.subscriptions.cancel(miniSubDoc.data().subscriptionId).catch(function() {});
+            await db.collection('users').doc(uid).collection('subscription').doc('main').update({ status: 'canceled' }).catch(function() {});
+            console.log('[stripe-webhook] Cancelled old mini subscription for uid:', uid);
+          }
         }
         console.log('[stripe-webhook] Subscription saved to room:', roomId);
       } else if (uid) {
