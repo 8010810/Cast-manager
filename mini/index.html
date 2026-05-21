@@ -1973,17 +1973,25 @@ function MiniApp(){
               consentDone=true;
               if(!cd.userName){setConsentState('username');checkAllDone();}
               else{
-                // サブスクまたはルーム所属を確認。どちらもなければプラン選択
-                Promise.all([
-                  db.collection('users').doc(u.uid).collection('subscription').doc('main').get(),
-                  db.collection('users').doc(u.uid).collection('rooms').limit(1).get()
-                ]).then(function(results){
-                  var subDoc=results[0];var roomsSnap=results[1];
-                  var hasSub=subDoc.exists&&subDoc.data().status==='active';
-                  var hasRoom=!roomsSnap.empty;
-                  if(!hasSub&&!hasRoom){window.location.href='/';}else{setConsentState('done');checkAllDone();}
-                  checkAllDone();
-                }).catch(function(){setConsentState('done');checkAllDone();});
+                // checkout=successの場合はサブスクが届くまで最大15秒待つ
+                var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
+                if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
+                function checkSubAndProceed(retryCount){
+                  Promise.all([
+                    db.collection('users').doc(u.uid).collection('subscription').doc('main').get(),
+                    db.collection('users').doc(u.uid).collection('rooms').limit(1).get()
+                  ]).then(function(results){
+                    var subDoc=results[0];var roomsSnap=results[1];
+                    var hasSub=subDoc.exists&&subDoc.data().status==='active';
+                    var hasRoom=!roomsSnap.empty;
+                    if(!hasSub&&!hasRoom&&isCheckoutSuccess&&retryCount<15){
+                      setTimeout(function(){checkSubAndProceed(retryCount+1);},1000);
+                    }else if(!hasSub&&!hasRoom){window.location.href='/';}
+                    else{setConsentState('done');checkAllDone();}
+                    if(hasSub||hasRoom)checkAllDone();
+                  }).catch(function(){setConsentState('done');checkAllDone();});
+                }
+                checkSubAndProceed(0);
               }
             }
           }
