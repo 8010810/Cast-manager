@@ -1962,7 +1962,7 @@ function MiniApp(){
         var consentDone=false,roomsReady=false;
         function checkAllDone(){if(consentDone&&roomsReady)setLoading(false);}
         if(loadingTimeoutId)clearTimeout(loadingTimeoutId);
-        loadingTimeoutId=setTimeout(function(){setLoading(false);setConsentState(function(cs){return cs==='loading'?'done':cs;});},30000);
+        loadingTimeoutId=setTimeout(function(){setLoading(false);setConsentState(function(cs){return cs==='loading'?'done':cs;});},3000);
         unsubConsent=db.collection('users').doc(u.uid).collection('meta').doc('consent').onSnapshot(function(doc){
           var cd=doc.exists?doc.data():null;
           if(!cd||!cd.agreedAt){
