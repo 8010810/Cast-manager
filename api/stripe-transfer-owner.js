@@ -1,0 +1,70 @@
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+
+function getDb() {
+  try {
+    if (getApps().length === 0) {
+      var privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+      initializeApp({ credential: cert({
+        type: 'service_account',
+        project_id: process.env.FIREBASE_PROJECT_ID || '',
+        private_key: privateKey,
+        client_email: process.env.FIREBASE_CLIENT_EMAIL || '',
+      }) });
+    }
+    return getFirestore();
+  } catch (_e) {
+    console.error('[stripe-transfer-owner] Firebase init error:', _e.message);
+    throw _e;
+  }
+}
+
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    var oldOwnerUid = req.body.oldOwnerUid;
+    var newOwnerUid = req.body.newOwnerUid;
+    var roomId = req.body.roomId;
+
+    if (!oldOwnerUid || !newOwnerUid || !roomId) {
+      return res.status(400).json({ error: 'oldOwnerUid, newOwnerUid, roomId are required' });
+    }
+
+    var db = getDb();
+
+    // ルームのオーナー更新
+    await db.collection('rooms').doc(roomId).update({ ownerUid: newOwnerUid });
+
+    // 新オーナーのロールをadminに、isInvitedを削除（連携アカウント数カウントから除外）
+    await db.collection('rooms').doc(roomId).collection('members').doc(newOwnerUid).update({
+      role: 'admin',
+      isInvited: FieldValue.delete(),
+    });
+
+    // 旧オーナーのロールをsub-adminに、isInvited=trueで連携アカウントとしてカウント
+    await db.collection('rooms').doc(roomId).collection('members').doc(oldOwnerUid).update({
+      role: 'sub-admin',
+      isInvited: true,
+    });
+
+    // users側のロールも更新
+    await db.collection('users').doc(newOwnerUid).collection('rooms').doc(roomId).update({ role: 'admin' }).catch(function(){});
+    await db.collection('users').doc(oldOwnerUid).collection('rooms').doc(roomId).update({ role: 'sub-admin' }).catch(function(){});
+
+    // ルームのサブスクのownerUidも更新
+    await db.collection('rooms').doc(roomId).collection('subscription').doc('main').update({
+      ownerUid: newOwnerUid,
+    }).catch(function(){});
+
+    console.log('[stripe-transfer-owner] Transferred from', oldOwnerUid, 'to', newOwnerUid);
+    return res.status(200).json({ success: true });
+  } catch (_e) {
+    console.error('[stripe-transfer-owner] Error:', _e.message);
+    return res.status(500).json({ error: _e.message });
+  }
+}

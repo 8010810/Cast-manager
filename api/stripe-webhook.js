@@ -72,24 +72,54 @@ export default async function handler(req, res) {
       var session = event.data.object;
       var uid = session.client_reference_id || (session.metadata && session.metadata.uid) || '';
       var plan = (session.metadata && session.metadata.plan) || 'standard';
+      var roomId = (session.metadata && session.metadata.roomId) || '';
 
-      console.log('[stripe-webhook] checkout.session.completed uid:', uid, 'plan:', plan);
-
-      if (!uid) {
-        console.error('[stripe-webhook] No uid found in session');
-        return res.status(200).json({ received: true, warning: 'No uid' });
-      }
+      console.log('[stripe-webhook] checkout.session.completed uid:', uid, 'plan:', plan, 'roomId:', roomId);
 
       var db = getDb();
-      await db.collection('users').doc(uid).collection('subscription').doc('main').set({
+      var subData = {
         plan: plan,
         status: 'active',
         subscriptionId: session.subscription || '',
         customerId: session.customer || '',
         createdAt: new Date().toISOString(),
-      });
+        cancelAtPeriodEnd: false,
+        cancelAt: null,
+      };
 
-      console.log('[stripe-webhook] Subscription saved for uid:', uid);
+      if (plan === 'standard' && roomId) {
+        // Standard plan: save subscription to room doc
+        await db.collection('rooms').doc(roomId).collection('subscription').doc('main').set(
+          Object.assign({}, subData, { ownerUid: uid })
+        );
+        console.log('[stripe-webhook] Subscription saved to room:', roomId);
+      } else if (uid) {
+        // Mini plan: save subscription to user doc
+        await db.collection('users').doc(uid).collection('subscription').doc('main').set(subData);
+        console.log('[stripe-webhook] Subscription saved for uid:', uid);
+      } else {
+        console.error('[stripe-webhook] No uid or roomId found in session');
+        return res.status(200).json({ received: true, warning: 'No uid or roomId' });
+      }
+    }
+
+    if (event.type === 'customer.subscription.deleted') {
+      var subscription = event.data.object;
+      var customerId = subscription.customer;
+      var db2 = getDb();
+
+      // Search in collectionGroup (matches both rooms/.../subscription and users/.../subscription)
+      var subSnap = await db2.collectionGroup('subscription').where('customerId', '==', customerId).limit(1).get();
+      if (!subSnap.empty) {
+        var subRef = subSnap.docs[0].ref;
+        await subRef.update({
+          status: 'canceled',
+          canceledAt: new Date().toISOString(),
+        });
+        console.log('[stripe-webhook] Subscription marked canceled for customer:', customerId);
+      } else {
+        console.log('[stripe-webhook] No subscription doc found for customer:', customerId);
+      }
     }
 
     return res.status(200).json({ received: true });
