@@ -26,6 +26,7 @@ export default async function handler(req, res) {
     var quantity = req.body.quantity || 1;
     var uid = req.body.uid || '';
     var roomId = req.body.roomId || '';
+    var roomName = req.body.roomName || '';
     var successPath = req.body.successPath || '/?checkout=success';
     var cancelPath = req.body.cancelPath || '/?checkout=cancel';
     var plan = MINI_PRICES.includes(priceId) ? 'mini' : 'standard';
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: quantity }],
       client_reference_id: uid,
-      metadata: { uid: uid, plan: plan, roomId: roomId },
+      metadata: { uid: uid, plan: plan, roomId: roomId, roomName: roomName },
       success_url: BASE_URL + successPath + (successPath.includes('?') ? '&' : '?') + 'session_id={CHECKOUT_SESSION_ID}',
       cancel_url: BASE_URL + cancelPath,
     };

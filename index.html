@@ -3365,11 +3365,11 @@ function App(){
     }).catch(function(_e){notify('引き継ぎに失敗しました: '+_e.message,'error');});
   }
 
-  function handleCheckout(priceId,successPath,cancelPath,overrideRoomId){
+  function handleCheckout(priceId,successPath,cancelPath,overrideRoomId,roomName){
     if(checkoutLoading||!user)return;
     setCheckoutLoading(true);
     var targetRoomId=overrideRoomId!==undefined?overrideRoomId:(roomId||'');
-    fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,roomId:targetRoomId,successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel'})})
+    fetch('/api/stripe-checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({priceId:priceId,uid:user.uid,roomId:targetRoomId,roomName:roomName||'',successPath:successPath||'/?checkout=success',cancelPath:cancelPath||'/?checkout=cancel'})})
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.url){if(targetRoomId)localStorage.setItem('_co_room',targetRoomId);window.location.href=d.url;return;}
@@ -3394,26 +3394,9 @@ function App(){
 
   function handleCreateRoomForCheckout(){
     if(!createRoomName.trim()||!user||createRoomStdLoading)return;
-    setCreateRoomStdLoading(true);
-    var inviteCode=generateInviteCode();
     var rid=db.collection('rooms').doc().id;
-    var now=new Date().toISOString();
-    var folderName=userName||'オーナー';
-    var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:folderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
-    db.collection('rooms').doc(rid).set({name:createRoomName.trim(),ownerUid:user.uid,createdAt:now,inviteCode:inviteCode})
-    .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
-    .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
-    .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:createRoomName.trim(),role:'admin',inviteCode:inviteCode,joinedAt:now,pendingPayment:true});})
-    .then(function(){return db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});})
-    .then(function(){
-      setCreateRoomStdLoading(false);
-      var priceId=createRoomStdPeriod==='yearly'?PRICE_IDS.STD_YEARLY:PRICE_IDS.STD_MONTHLY;
-      handleCheckout(priceId,'/?checkout=success','/?checkout=cancel',rid);
-    })
-    .catch(function(_e){
-      setCreateRoomStdLoading(false);
-      notify('ルームの作成に失敗しました: '+_e.message,'error');
-    });
+    var priceId=createRoomStdPeriod==='yearly'?PRICE_IDS.STD_YEARLY:PRICE_IDS.STD_MONTHLY;
+    handleCheckout(priceId,'/?checkout=success','/?checkout=cancel',rid,createRoomName.trim());
   }
 
   var layer=navStack[navStack.length-1]||'home';
@@ -3560,13 +3543,18 @@ function App(){
                 .then(function(memDoc){return memDoc.exists?r:null;})
                 .catch(function(){return r;});
             })).then(function(results){
-              var validRooms=results.filter(function(r){return r!==null&&!(r.pendingPayment&&r.role==='admin');});
-              // 無効なエントリを自分のコレクションから削除
+              var validRooms=results.filter(function(r){return r!==null;});
+              // 無効なエントリ・未払いルームをコレクションから削除
               results.forEach(function(r,i){
                 if(r===null){
                   db.collection('users').doc(u.uid).collection('rooms').doc(rooms[i].roomId).delete().catch(function(){});
                 }
               });
+              validRooms.filter(function(r){return r.pendingPayment&&r.role==='admin';}).forEach(function(r){
+                db.collection('users').doc(u.uid).collection('rooms').doc(r.roomId).delete().catch(function(){});
+                db.collection('rooms').doc(r.roomId).delete().catch(function(){});
+              });
+              validRooms=validRooms.filter(function(r){return !r.pendingPayment||r.role!=='admin';});
               setRoomsList(validRooms);
               if(validRooms.length===0){
                 db.collection('users').doc(u.uid).collection('subscription').doc('main').get().then(function(subDoc){
