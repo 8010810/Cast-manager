@@ -3579,7 +3579,7 @@ function App(){
               if(validRooms.length===0){
                 db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'}).then(function(subDoc){
                   if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='mini'){
-                    setConsentState('mini-redirect');setLoading(false);
+                    window.location.href='/mini';
                   }else{
                     setConsentState('planselect');setLoading(false);
                   }
@@ -3626,7 +3626,7 @@ function App(){
                 db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'}).then(function(subDoc){
                   if(subDoc.exists&&subDoc.data().plan==='mini'){
                     if(subDoc.data().status==='active'||subDoc.data().status==='trialing'){
-                      setConsentState('mini-redirect');setLoading(false);
+                      window.location.href='/mini';
                     }else if(subDoc.data().status==='paused'){
                       setConsentState('mini-resume-confirm');setLoading(false);
                     }else{
@@ -3647,7 +3647,7 @@ function App(){
                         // miniサブスクがactiveでも、ルームがあるか確認してから遷移
                         return db.collection('users').doc(u.uid).collection('rooms').limit(1).get().then(function(roomsSnap){
                           if(!roomsSnap.empty){setConsentState('planselect');setLoading(false);}
-                          else{setConsentState('mini-redirect');setLoading(false);}
+                          else{window.location.href='/mini';}
                         });
                       }else{
                         setConsentState('planselect');setLoading(false);
@@ -4223,21 +4223,6 @@ function App(){
             style:{width:'100%',background:'transparent',border:'none',color:'#6b7280',fontSize:'13px',cursor:'pointer',padding:'6px'},
             onClick:function(){setConsentState('planselect');}
           },'← 戻る')
-        )
-      )
-    );
-  }
-
-  if(consentState==='mini-redirect'){
-    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
-      e('div',{style:{maxWidth:'420px',width:'100%'}},
-        e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'24px'}},'CAST MANAGER'),
-        e('div',{style:{background:'#12122a',border:'1px solid rgba(167,139,250,0.25)',borderRadius:'16px',padding:'28px 24px',textAlign:'center'}},
-          e('div',{style:{fontSize:'14px',color:'#9ca3af',marginBottom:'8px'}},'miniアカウントが見つかりました'),
-          e('div',{style:{fontSize:'13px',color:'#6b7280',marginBottom:'24px'}},'このアカウントにはminiのサブスクリプションが紐づいています。'),
-          e('button',{style:{width:'100%',padding:'14px',borderRadius:'10px',border:'none',background:'linear-gradient(135deg,#a78bfa,#7c3aed)',color:'#fff',fontSize:'14px',fontWeight:700,cursor:'pointer',marginBottom:'10px'},onClick:function(){window.location.href='/mini';}},'miniを開く'),
-          e('button',{style:{width:'100%',padding:'14px',borderRadius:'10px',border:'1px solid rgba(255,255,255,0.15)',background:'transparent',color:'#9ca3af',fontSize:'13px',cursor:'pointer'},onClick:function(){setConsentState('planselect');}},
-            '新規登録（stdプラン）')
         )
       )
     );
