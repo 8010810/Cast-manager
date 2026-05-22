@@ -3621,8 +3621,14 @@ function App(){
                 // 一度読み込んだ後に空になった = ルームを全退出
                 clearTimeout(authTimeout);
                 db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'}).then(function(subDoc){
-                  if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='mini'){
-                    setConsentState('mini-redirect');setLoading(false);
+                  if(subDoc.exists&&subDoc.data().plan==='mini'){
+                    if(subDoc.data().status==='active'||subDoc.data().status==='trialing'){
+                      setConsentState('mini-redirect');setLoading(false);
+                    }else if(subDoc.data().status==='paused'){
+                      setConsentState('mini-resume-confirm');setLoading(false);
+                    }else{
+                      setConsentState('planselect');setLoading(false);
+                    }
                   }else{
                     setConsentState('planselect');setLoading(false);
                   }
