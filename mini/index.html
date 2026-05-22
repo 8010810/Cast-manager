@@ -1843,6 +1843,7 @@ function MiniApp(){
   var s_ephp=useState(false);var editingMiniPhone=s_ephp[0];var setEditingMiniPhone=s_ephp[1];
   var s_phpv=useState('');var editMiniPhoneVal=s_phpv[0];var setEditMiniPhoneVal=s_phpv[1];
   var s_subm=useState(null);var miniSubData=s_subm[0];var setMiniSubData=s_subm[1];
+  var s_rsd=useState(null);var roomSubData=s_rsd[0];var setRoomSubData=s_rsd[1];
   var s_mcld=useState(false);var miniCancelLoading=s_mcld[0];var setMiniCancelLoading=s_mcld[1];
   var s_upgc=useState(false);var upgradeConfirm=s_upgc[0];var setUpgradeConfirm=s_upgc[1];
   var s_upgn=useState('');var upgradeRoomName=s_upgn[0];var setUpgradeRoomName=s_upgn[1];
@@ -1869,6 +1870,7 @@ function MiniApp(){
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
+  var unsubRoomSubRef=React.useRef(null);
   var personalDataRef=React.useRef({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
   var pendingListenersRef=React.useRef({});
 
@@ -1909,6 +1911,8 @@ function MiniApp(){
       setRoomHolidays([]);
       Object.values(unsubDataMapRef.current).forEach(function(fn){fn();});
       unsubDataMapRef.current={};roomDataMapRef.current={};primaryRoomRef.current=null;
+      if(unsubRoomSubRef.current){unsubRoomSubRef.current();unsubRoomSubRef.current=null;}
+      setRoomSubData(null);
       personalDataRef.current={casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
       Object.values(pendingListenersRef.current).forEach(function(fn){fn();});
       pendingListenersRef.current={};
@@ -2006,11 +2010,20 @@ function MiniApp(){
           var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
           setRoomsList(rooms);
           if(rooms.length===0){
+            if(unsubRoomSubRef.current){unsubRoomSubRef.current();unsubRoomSubRef.current=null;}
+            setRoomSubData(null);
             rebuildData();
             if(firstRoomsSnap){firstRoomsSnap=false;roomsReady=true;checkAllDone();}
             return;
           }
-          if(!primaryRoomRef.current)primaryRoomRef.current=rooms[0].roomId;
+          var newPrimaryRid=rooms[0].roomId;
+          if(!primaryRoomRef.current||primaryRoomRef.current!==newPrimaryRid){
+            primaryRoomRef.current=newPrimaryRid;
+            if(unsubRoomSubRef.current){unsubRoomSubRef.current();unsubRoomSubRef.current=null;}
+            unsubRoomSubRef.current=db.collection('rooms').doc(newPrimaryRid).collection('subscription').doc('main').onSnapshot(function(doc){
+              setRoomSubData(doc.exists?doc.data():null);
+            },function(){setRoomSubData(null);});
+          }
           var currentRids=new Set(rooms.map(function(r){return r.roomId;}));
           Object.keys(unsubDataMapRef.current).forEach(function(rid){
             if(!currentRids.has(rid)){
@@ -2546,11 +2559,12 @@ function MiniApp(){
       if(settingsPage==='plan'){
         var STD_MONTHLY_PRICE='price_1TXgnIQaq3EwNY4QcKOSwHGF';
         var STD_YEARLY_PRICE='price_1TZPrSQaq3EwNY4QKHNKuXv3';
-        var mPlanLabel=miniSubData&&miniSubData.plan==='mini'?'miniプラン':'standardプラン';
-        var mPlanStatus=miniSubData&&miniSubData.status==='active'?'有効':'解約済み';
-        var mIsCancelScheduled=miniSubData&&miniSubData.cancelAtPeriodEnd;
-        var mCancelAtStr=mIsCancelScheduled&&miniSubData.cancelAt?new Date(miniSubData.cancelAt).toLocaleDateString('ja-JP'):'';
-        var isMiniPlan=miniSubData&&miniSubData.plan==='mini'&&miniSubData.status==='active'&&!mIsCancelScheduled;
+        var activeSubData=(roomSubData&&roomSubData.status==='active')?roomSubData:miniSubData;
+        var mPlanLabel=activeSubData&&activeSubData.plan==='mini'?'miniプラン':'standardプラン';
+        var mPlanStatus=activeSubData&&activeSubData.status==='active'?'有効':'解約済み';
+        var mIsCancelScheduled=activeSubData&&activeSubData.cancelAtPeriodEnd;
+        var mCancelAtStr=mIsCancelScheduled&&activeSubData.cancelAt?new Date(activeSubData.cancelAt).toLocaleDateString('ja-JP'):'';
+        var isMiniPlan=miniSubData&&miniSubData.plan==='mini'&&miniSubData.status==='active'&&!(roomSubData&&roomSubData.status==='active');
         function handleMiniCancelSub(){
           if(!user)return;
           if(!confirm('サブスクリプションを解約しますか？\n現在の契約期間が終了するまでは引き続きご利用いただけます。'))return;
@@ -2634,12 +2648,12 @@ function MiniApp(){
             e('div',{style:{width:'40px'}})
           ),
           e('div',{style:Object.assign({},SETTINGS_PANEL,{padding:'24px 18px'})},
-            miniSubData
+            activeSubData
               ?e('div',null,
                 e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'20px',marginBottom:'16px'}},
                   e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'6px'}},'現在のプラン'),
                   e('div',{style:{fontSize:'18px',fontWeight:700,color:'#e8b86d',marginBottom:'4px'}},mPlanLabel),
-                  e('div',{style:{fontSize:'12px',color:miniSubData.status==='active'?'#34d399':'#f87171'}},mPlanStatus),
+                  e('div',{style:{fontSize:'12px',color:activeSubData.status==='active'?'#34d399':'#f87171'}},mPlanStatus),
                   mIsCancelScheduled&&e('div',{style:{marginTop:'12px',padding:'10px',background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'8px',fontSize:'12px',color:'#f87171'}},
                     '解約予約済み：'+mCancelAtStr+'に終了します'
                   )
@@ -2690,11 +2704,11 @@ function MiniApp(){
                     )
                   )
                 ),
-                mIsCancelScheduled&&miniSubData.status==='active'&&e('button',{
+                miniSubData&&mIsCancelScheduled&&miniSubData.status==='active'&&e('button',{
                   style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'12px',padding:'14px',color:'#e8b86d',fontSize:'14px',cursor:miniCancelLoading?'not-allowed':'pointer',opacity:miniCancelLoading?0.6:1},
                   onClick:handleMiniResumeSub,disabled:miniCancelLoading
                 },miniCancelLoading?'処理中...':'解約をキャンセルする'),
-                !mIsCancelScheduled&&miniSubData.status==='active'&&e('button',{
+                miniSubData&&!mIsCancelScheduled&&miniSubData.status==='active'&&e('button',{
                   style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:miniCancelLoading?'not-allowed':'pointer',opacity:miniCancelLoading?0.6:1,marginTop:isMiniPlan?'8px':'0'},
                   onClick:handleMiniCancelSub,disabled:miniCancelLoading
                 },miniCancelLoading?'処理中...':'解約する')
