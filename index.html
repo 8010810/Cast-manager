@@ -4574,7 +4574,7 @@ function App(){
                             e('span',{style:{fontSize:'13px',color:'#9ca3af'}},'•••• '+paymentMethodData.last4),
                             e('span',{style:{fontSize:'12px',color:'#6b7280'}},String(paymentMethodData.exp_month).padStart(2,'0')+'/'+String(paymentMethodData.exp_year).slice(-2))
                           ),
-                          (!roomId||roomRole==='admin')&&e('button',{
+                          (!roomId||roomRole==='admin')&&subscriptionData.plan!=='mini'&&e('button',{
                             style:{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',padding:'4px 10px',color:'#9ca3af',fontSize:'11px',cursor:portalLoading?'default':'pointer',opacity:portalLoading?0.5:1},
                             onClick:handleOpenPortal,disabled:portalLoading
                           },portalLoading?'..':'変更')
