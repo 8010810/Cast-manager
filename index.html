@@ -3693,7 +3693,7 @@ function App(){
     if(!user)return;
     if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}
     var subPath;
-    if(roomId&&(roomRole==='admin'||roomRole==='sub-admin')){
+    if(roomId){
       subPath=db.collection('rooms').doc(roomId).collection('subscription').doc('main');
     }else{
       subPath=db.collection('users').doc(user.uid).collection('subscription').doc('main');
@@ -4518,12 +4518,12 @@ function App(){
                   '解約予約済み：'+cancelAtStr+'に終了します'
                 )
               ),
-              isCancelScheduled&&subscriptionData.status==='active'&&e('button',{
+              (roomRole==='admin'||roomRole==='sub-admin'||!roomId)&&isCancelScheduled&&subscriptionData.status==='active'&&e('button',{
                 style:{width:'100%',background:'transparent',border:'1px solid #374151',borderRadius:'12px',padding:'14px',color:'#e8b86d',fontSize:'14px',cursor:cancelLoading?'not-allowed':'pointer',opacity:cancelLoading?0.6:1},
                 onClick:handleResumeSubscription,
                 disabled:cancelLoading
               },cancelLoading?'処理中...':'解約をキャンセルする'),
-              !isCancelScheduled&&subscriptionData.status==='active'&&e('button',{
+              (roomRole==='admin'||roomRole==='sub-admin'||!roomId)&&!isCancelScheduled&&subscriptionData.status==='active'&&e('button',{
                 style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'12px',padding:'14px',color:'#f87171',fontSize:'14px',cursor:cancelLoading?'not-allowed':'pointer',opacity:cancelLoading?0.6:1},
                 onClick:handleCancelSubscription,
                 disabled:cancelLoading
