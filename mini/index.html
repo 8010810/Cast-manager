@@ -2525,7 +2525,7 @@ function MiniApp(){
                     if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='standard'){
                       window.location.href='/?from=mini';
                     }else{
-                      notify('ルームに参加するとstd.アプリを利用できます','error');
+                      notify('std.プランにアップグレードしてください','error');
                     }
                   }).catch(function(_e){notify('std.プランの機能です','error');});
                 }
