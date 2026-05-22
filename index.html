@@ -3233,6 +3233,7 @@ function App(){
   var s_tow=useState(false);var transferOwnerPage=s_tow[0];var setTransferOwnerPage=s_tow[1];
   var s_sub=useState(null);var subscriptionData=s_sub[0];var setSubscriptionData=s_sub[1]; // {plan,status,cancelAtPeriodEnd,cancelAt,...}
   var s_cld=useState(false);var cancelLoading=s_cld[0];var setCancelLoading=s_cld[1];
+  var s_mrl=useState(false);var miniResumeLoading=s_mrl[0];var setMiniResumeLoading=s_mrl[1];
   var s_crn=useState('');var createRoomName=s_crn[0];var setCreateRoomName=s_crn[1];
   var s_crl2=useState(false);var createRoomStdLoading=s_crl2[0];var setCreateRoomStdLoading=s_crl2[1];
   var s_crsp=useState('monthly');var createRoomStdPeriod=s_crsp[0];var setCreateRoomStdPeriod=s_crsp[1];
@@ -3323,8 +3324,7 @@ function App(){
       db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
         if(subDoc.exists&&subDoc.data().plan==='mini'){
           if(subDoc.data().status==='paused'){
-            fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
-              .finally(function(){window.location.href='/mini';});
+            setConsentState('mini-resume-confirm');setLoading(false);
           }else{
             window.location.href='/mini';
           }
@@ -4144,6 +4144,39 @@ function App(){
     );
   }
 
+  if(consentState==='mini-resume-confirm'){
+    return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      e('div',{style:{maxWidth:'420px',width:'100%'}},
+        e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'24px'}},'CAST MANAGER'),
+        e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.25)',borderRadius:'16px',padding:'28px 24px',textAlign:'center'}},
+          e('div',{style:{fontSize:'13px',color:'#9ca3af',marginBottom:'8px'}},'miniプランのサブスクリプションが一時停止中です'),
+          e('div',{style:{fontSize:'16px',fontWeight:700,color:'#f3f4f6',marginBottom:'8px'}},'miniプランを再開しますか？'),
+          e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'24px'}},'再開しない場合はサブスクリプションを解約します'),
+          e('button',{
+            style:{width:'100%',background:'linear-gradient(135deg,#7c3aed,#a78bfa)',border:'none',borderRadius:'10px',padding:'13px',color:'#fff',fontWeight:700,fontSize:'14px',cursor:miniResumeLoading?'default':'pointer',opacity:miniResumeLoading?0.6:1,marginBottom:'10px'},
+            disabled:miniResumeLoading,
+            onClick:function(){
+              if(miniResumeLoading)return;
+              setMiniResumeLoading(true);
+              fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
+                .finally(function(){window.location.href='/mini';});
+            }
+          },miniResumeLoading?'処理中...':'miniプランを再開する'),
+          e('button',{
+            style:{width:'100%',background:'transparent',border:'1px solid #7f1d1d',borderRadius:'10px',padding:'12px',color:'#f87171',fontSize:'13px',cursor:miniResumeLoading?'default':'pointer',opacity:miniResumeLoading?0.6:1},
+            disabled:miniResumeLoading,
+            onClick:function(){
+              if(miniResumeLoading)return;
+              setMiniResumeLoading(true);
+              fetch('/api/stripe-cancel-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
+                .finally(function(){setMiniResumeLoading(false);setConsentState('planselect');});
+            }
+          },miniResumeLoading?'処理中...':'解約する')
+        )
+      )
+    );
+  }
+
   if(consentState==='create-room-for-std'){
     return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
       e('div',{style:{maxWidth:'420px',width:'100%'}},
@@ -4665,8 +4698,7 @@ function App(){
                 setSettingsPage(null);
                 db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
                   if(subDoc.exists&&subDoc.data().plan==='mini'&&subDoc.data().status==='paused'){
-                    fetch('/api/stripe-resume-mini',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:user.uid})})
-                      .finally(function(){window.location.href='/mini';});
+                    setConsentState('mini-resume-confirm');setLoading(false);
                   }else if(subDoc.exists&&(subDoc.data().status==='active'||subDoc.data().status==='trialing')){
                     window.location.href='/mini';
                   }else{
