@@ -1891,7 +1891,7 @@ function MiniApp(){
       if(pendingUid){
         localStorage.removeItem('pending_reauth_delete');
         var u=auth.currentUser;
-        if(u&&u.uid===pendingUid){u.delete().then(function(){window.location.href='/';}).catch(function(){auth.signOut().catch(function(){});window.location.href='/';});}
+        if(u&&u.uid===pendingUid){u.delete().then(function(){auth.signOut().catch(function(){}).finally(function(){window.location.href='/';});}).catch(function(){auth.signOut().catch(function(){}).finally(function(){window.location.href='/';});});}
       }
     }).catch(function(){localStorage.removeItem('pending_reauth_delete');});
     // bfcacheで復元された場合はloadingをリセット
@@ -2266,10 +2266,9 @@ function MiniApp(){
         return auth.signOut();
       });
     }).then(function(){
-      window.location.href='/';
+      auth.signOut().catch(function(){}).finally(function(){window.location.href='/';});
     }).catch(function(){
-      auth.signOut().catch(function(){});
-      window.location.href='/';
+      auth.signOut().catch(function(){}).finally(function(){window.location.href='/';});
     });
   }
   function goBack(){
