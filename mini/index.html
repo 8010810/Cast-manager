@@ -2249,9 +2249,12 @@ function MiniApp(){
     }).then(function(){
       return Promise.all([
         userRef.collection('data').doc('main').delete().catch(function(){}),
+        userRef.collection('subscription').doc('main').delete().catch(function(){}),
         userRef.collection('meta').doc('consent').delete().catch(function(){}),
         userRef.collection('meta').doc('pendingJoins').delete().catch(function(){})
       ]);
+    }).then(function(){
+      return userRef.delete().catch(function(){});
     }).then(function(){
       if(!auth.currentUser)return auth.signOut().catch(function(){});
       return auth.currentUser.delete().catch(function(e){
