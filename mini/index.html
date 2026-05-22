@@ -97,7 +97,7 @@ var typeColor=function(t){
   if(t==='同伴')return{bg:'#34d39918',fg:'#34d399',border:'#34d39944'};
   return{bg:'#a78bfa18',fg:'#a78bfa',border:'#a78bfa44'};
 };
-var blankGuest=function(){return{_id:uid(),type:'指名',name:'',sales:'',bottleNeck:'',orderBottle:'',receipt:'',note:''};};
+var blankGuest=function(){return{_id:uid(),type:'指名',name:'',sales:'',hour:'',tableNo:'',count:'',partnerCast:'',bottleNeck:'',orderBottle:'',receipt:'',note:''};};
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 var S={
@@ -1273,7 +1273,7 @@ function CastTabBar(p){
 // ─── InputPage ────────────────────────────────────────────────────────────────
 var initForm=function(date){return{date:date||todayStr(),sales:'',companions:'',nominations:'',floorCount:''};};
 var initGuests=function(){return[blankGuest()];};
-var custToGuest=function(c){return{_id:c.id,type:c.type,name:c.name,sales:c.sales||'',bottleNeck:c.bottleNeck||'',orderBottle:c.orderBottle||'',receipt:c.receipt||'',note:c.note||''};};
+var custToGuest=function(c){return{_id:c.id,type:c.type,name:c.name,sales:c.sales||'',hour:c.hour||'',tableNo:c.tableNo||'',count:c.count||'',partnerCast:c.partnerCast||'',bottleNeck:c.bottleNeck||'',orderBottle:c.orderBottle||'',receipt:c.receipt||'',note:c.note||''};};
 
 function InputPage(p){
   var t1=useState('daily');var tab=t1[0];var setTab=t1[1];
@@ -1287,7 +1287,7 @@ function InputPage(p){
   function saveData(){
     var record={date:form.date,sales:Number(form.sales||0),companions:Number(form.companions||0),nominations:Number(form.nominations||0),floorCount:Number(form.floorCount||0)};
     var rows=(p.data.records[p.castId]||[]).filter(function(r){return r.date!==form.date;});
-    var newEntries=guests.filter(function(g){return g.name.trim();}).map(function(g){return{id:g._id,date:form.date,type:g.type,name:g.name.trim(),sales:Number(g.sales||0),bottleNeck:g.bottleNeck.trim(),orderBottle:g.orderBottle.trim(),receipt:g.receipt.trim(),note:g.note.trim()};});
+    var newEntries=guests.filter(function(g){return g.name.trim();}).map(function(g){return{id:g._id,date:form.date,type:g.type,name:g.name.trim(),sales:Number(g.sales||0),hour:g.hour.trim(),tableNo:g.tableNo.trim(),count:g.count.trim(),partnerCast:g.partnerCast.trim(),bottleNeck:g.bottleNeck.trim(),orderBottle:g.orderBottle.trim(),receipt:g.receipt.trim(),note:g.note.trim()};});
     var prevCust=(p.data.customers[p.castId]||[]).filter(function(c){return c.date!==form.date;});
     p.persist(Object.assign({},p.data,{records:Object.assign({},p.data.records,{[p.castId]:[...rows,record].sort(function(a,b){return a.date.localeCompare(b.date);})}),customers:Object.assign({},p.data.customers,{[p.castId]:[...prevCust,...newEntries].sort(function(a,b){return b.date.localeCompare(a.date);})})}));
     p.notify('保存しました');
@@ -1329,7 +1329,12 @@ function GuestCard(p){
     open&&e('div',{style:{padding:'14px 14px 10px'}},
       e('label',{style:S.label},'種別'),
       e('div',{style:{display:'flex',gap:'8px',marginBottom:'12px'}},['指名','場内','同伴'].map(function(t){var c=typeColor(t);return e('button',{key:t,onClick:function(){p.onChange('type',t);},style:{flex:1,padding:'9px 0',borderRadius:'8px',border:'1px solid',fontSize:'13px',fontWeight:700,cursor:'pointer',borderColor:p.g.type===t?c.border:'#2d2d4e',background:p.g.type===t?c.bg:'transparent',color:p.g.type===t?c.fg:'#6b7280'}},t);})),
-      [{key:'name',label:'客の名前',ph:'',type:'text'},{key:'sales',label:'売上金額 (円)',ph:'',type:'number'},{key:'bottleNeck',label:'ボトルネック名',ph:'',type:'text'},{key:'orderBottle',label:'オーダーボトル',ph:'',type:'text'},{key:'receipt',label:'領収書',ph:'',type:'text'}].map(function(f){return e('div',{key:f.key},e('label',{style:S.label},f.label),e('input',{type:f.type,style:S.input,placeholder:f.ph,value:p.g[f.key],onChange:function(ev){p.onChange(f.key,ev.target.value);}}));}),
+      e('div',{style:{display:'flex',gap:'8px',marginBottom:'12px'}},
+        e('div',{style:{flex:1}},e('label',{style:S.label},'時間'),e('input',{type:'text',style:Object.assign({},S.input,{marginBottom:0}),placeholder:'',value:p.g.hour,onChange:function(ev){p.onChange('hour',ev.target.value);}})),
+        e('div',{style:{flex:1}},e('label',{style:S.label},'卓番'),e('input',{type:'text',style:Object.assign({},S.input,{marginBottom:0}),placeholder:'',value:p.g.tableNo,onChange:function(ev){p.onChange('tableNo',ev.target.value);}})),
+        e('div',{style:{flex:1}},e('label',{style:S.label},'人数'),e('input',{type:'number',style:Object.assign({},S.input,{marginBottom:0}),placeholder:'',value:p.g.count,onChange:function(ev){p.onChange('count',ev.target.value);}}))
+      ),
+      [{key:'name',label:'お客様名',ph:'',type:'text'},{key:'sales',label:'売上 (円)',ph:'',type:'number'},{key:'partnerCast',label:'相判キャスト',ph:'',type:'text'},{key:'bottleNeck',label:'ボトルネック名',ph:'',type:'text'},{key:'orderBottle',label:'オーダーボトル',ph:'',type:'text'},{key:'receipt',label:'領収書',ph:'',type:'text'}].map(function(f){return e('div',{key:f.key},e('label',{style:S.label},f.label),e('input',{type:f.type,style:S.input,placeholder:f.ph,value:p.g[f.key],onChange:function(ev){p.onChange(f.key,ev.target.value);}}));}),
       e('label',{style:S.label},'備考'),e('textarea',{style:Object.assign({},S.input,{resize:'vertical',minHeight:'58px',fontFamily:'inherit',marginBottom:'4px'}),placeholder:'メモ・特記事項など',value:p.g.note,onChange:function(ev){p.onChange('note',ev.target.value);}})
     )
   );
@@ -1540,12 +1545,15 @@ function CustomerPage(p){
           e('span',{style:{color:'#4b5563',fontSize:'11px',flexShrink:0}},open?'▲':'▼')
         ),
         open&&!editing&&e('div',{style:{padding:'12px 14px',borderTop:'1px solid #1e2035'}},
-          [['種別',c.type],['売上金額',c.sales>0?yen(c.sales):'--'],['ボトルネック名',c.bottleNeck||'--'],['オーダーボトル',c.orderBottle||'--'],['領収書',c.receipt||'--'],['備考',c.note||'--']].map(function(row){return e('div',{key:row[0],style:{display:'flex',gap:'8px',marginBottom:'6px',fontSize:'13px'}},e('span',{style:{color:'#6b7280',minWidth:'112px',flexShrink:0}},row[0]),e('span',{style:{color:'#e5e7eb',wordBreak:'break-word'}},row[1]));  }),
+          [['種別',c.type],['時間',c.hour||'--'],['卓番',c.tableNo||'--'],['人数',c.count||'--'],['お客様名',c.name||'--'],['売上',c.sales>0?yen(c.sales):'--'],['相判キャスト',c.partnerCast||'--'],['ボトルネック名',c.bottleNeck||'--'],['オーダーボトル',c.orderBottle||'--'],['領収書',c.receipt||'--'],['備考',c.note||'--']].map(function(row){return e('div',{key:row[0],style:{display:'flex',gap:'8px',marginBottom:'6px',fontSize:'13px'}},e('span',{style:{color:'#6b7280',minWidth:'112px',flexShrink:0}},row[0]),e('span',{style:{color:'#e5e7eb',wordBreak:'break-word'}},row[1]));  }),
           e('div',{style:{display:'flex',gap:'8px',marginTop:'12px',justifyContent:'flex-end'}},e('button',{style:S.btnEdit,onClick:function(ev){startEdit(ev,c);}}, '編集'),e('button',{style:S.btnDanger,onClick:function(ev){del(ev,c.id);}}, '削除'))
         ),
         open&&editing&&e('div',{style:{padding:'12px 14px',borderTop:'1px solid #1e2035'},onClick:function(ev){ev.stopPropagation();}},
           e('label',{style:S.label},'種別'),e('div',{style:{display:'flex',gap:'8px',marginBottom:'12px'}},['指名','場内','同伴'].map(function(t){var c2=typeColor(t);return e('button',{key:t,onClick:function(){setEditForm(function(f){return Object.assign({},f,{type:t});});},style:{flex:1,padding:'8px 0',borderRadius:'8px',border:'1px solid',fontSize:'13px',fontWeight:700,cursor:'pointer',borderColor:editForm.type===t?c2.border:'#2d2d4e',background:editForm.type===t?c2.bg:'transparent',color:editForm.type===t?c2.fg:'#6b7280'}},t);})),
-          [{key:'name',label:'客の名前',type:'text'},{key:'sales',label:'売上金額 (円)',type:'number'},{key:'bottleNeck',label:'ボトルネック名',type:'text'},{key:'orderBottle',label:'オーダーボトル',type:'text'},{key:'receipt',label:'領収書',type:'text'}].map(function(f){return e('div',{key:f.key,style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}},e('label',{style:Object.assign({},S.label,{marginBottom:0,minWidth:'112px',flexShrink:0})},f.label),e('input',{type:f.type,style:Object.assign({},S.input,{marginBottom:0,flex:1}),value:editForm[f.key]||'',onChange:function(ev){setEditForm(function(ef){return Object.assign({},ef,{[f.key]:ev.target.value});});}}));}),
+          e('div',{style:{display:'flex',gap:'8px',marginBottom:'10px'}},
+            [{key:'hour',label:'時間'},{key:'tableNo',label:'卓番'},{key:'count',label:'人数'}].map(function(f){return e('div',{key:f.key,style:{flex:1}},e('label',{style:S.label},f.label),e('input',{type:f.key==='count'?'number':'text',style:Object.assign({},S.input,{marginBottom:0}),value:editForm[f.key]||'',onChange:function(ev){setEditForm(function(ef){return Object.assign({},ef,{[f.key]:ev.target.value});});}}));})
+          ),
+          [{key:'name',label:'お客様名',type:'text'},{key:'sales',label:'売上 (円)',type:'number'},{key:'partnerCast',label:'相判キャスト',type:'text'},{key:'bottleNeck',label:'ボトルネック名',type:'text'},{key:'orderBottle',label:'オーダーボトル',type:'text'},{key:'receipt',label:'領収書',type:'text'}].map(function(f){return e('div',{key:f.key,style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:'10px'}},e('label',{style:Object.assign({},S.label,{marginBottom:0,minWidth:'112px',flexShrink:0})},f.label),e('input',{type:f.type,style:Object.assign({},S.input,{marginBottom:0,flex:1}),value:editForm[f.key]||'',onChange:function(ev){setEditForm(function(ef){return Object.assign({},ef,{[f.key]:ev.target.value});});}}));}),
           e('div',{style:{marginBottom:'10px'}},e('label',{style:S.label},'備考'),e('textarea',{style:Object.assign({},S.input,{resize:'vertical',minHeight:'50px',fontFamily:'inherit',marginBottom:0}),value:editForm.note||'',onChange:function(ev){setEditForm(function(ef){return Object.assign({},ef,{note:ev.target.value});});}})),
           e('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end'}},e('button',{style:S.btnGhost,onClick:function(ev){ev.stopPropagation();setEditId(null);}}, 'キャンセル'),e('button',{style:S.btnPrimary,onClick:function(ev){saveEdit(ev,c.id);}}, '保存'))
         )
