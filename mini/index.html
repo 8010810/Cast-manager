@@ -2585,8 +2585,12 @@ function MiniApp(){
         var isMiniPlan=miniSubData&&miniSubData.plan==='mini'&&miniSubData.status==='active'&&!(roomSubData&&roomSubData.status==='active');
         function handleOpenMiniPortal(){
           if(miniPortalLoading)return;
-          setMiniPortalLoading(true);
           var primaryRid=roomSubData&&roomSubData.status==='active'?primaryRoomRef.current:null;
+          if(primaryRid){
+            var myRoom=roomsList.find(function(r){return r.roomId===primaryRid;});
+            if(!myRoom||myRoom.role!=='admin'){notify('管理者のみカードを変更できます','error');return;}
+          }
+          setMiniPortalLoading(true);
           var body=primaryRid?{roomId:primaryRid,returnUrl:window.location.href}:{uid:user.uid,returnUrl:window.location.href};
           fetch('/api/stripe-portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
             .then(function(r){return r.json();})
@@ -2696,10 +2700,7 @@ function MiniApp(){
                               e('span',{style:{fontSize:'13px',color:'#9ca3af'}},'•••• '+miniPaymentMethodData.last4),
                               e('span',{style:{fontSize:'12px',color:'#6b7280'}},String(miniPaymentMethodData.exp_month).padStart(2,'0')+'/'+String(miniPaymentMethodData.exp_year).slice(-2))
                             ),
-                            e('button',{
-                              style:{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',padding:'4px 10px',color:'#9ca3af',fontSize:'11px',cursor:miniPortalLoading?'default':'pointer',opacity:miniPortalLoading?0.5:1},
-                              onClick:handleOpenMiniPortal,disabled:miniPortalLoading
-                            },miniPortalLoading?'..':'変更')
+                            (function(){var _prid=roomSubData&&roomSubData.status==='active'?primaryRoomRef.current:null;var _room=_prid&&roomsList.find(function(r){return r.roomId===_prid;});var _canChange=!_prid||(_room&&_room.role==='admin');return _canChange&&e('button',{style:{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',padding:'4px 10px',color:'#9ca3af',fontSize:'11px',cursor:miniPortalLoading?'default':'pointer',opacity:miniPortalLoading?0.5:1},onClick:handleOpenMiniPortal,disabled:miniPortalLoading},miniPortalLoading?'..':'変更');})()
                           )
                         :miniPaymentMethodData===null
                           ?e('div',{style:{fontSize:'12px',color:'#6b7280'}},'登録なし')
