@@ -1845,6 +1845,9 @@ function MiniApp(){
   var s_subm=useState(null);var miniSubData=s_subm[0];var setMiniSubData=s_subm[1];
   var s_rsd=useState(null);var roomSubData=s_rsd[0];var setRoomSubData=s_rsd[1];
   var s_mcld=useState(false);var miniCancelLoading=s_mcld[0];var setMiniCancelLoading=s_mcld[1];
+  var s_mpm=useState(undefined);var miniPaymentMethodData=s_mpm[0];var setMiniPaymentMethodData=s_mpm[1];
+  var s_mpml=useState(false);var miniPaymentMethodLoading=s_mpml[0];var setMiniPaymentMethodLoading=s_mpml[1];
+  var s_mptl=useState(false);var miniPortalLoading=s_mptl[0];var setMiniPortalLoading=s_mptl[1];
   var s_upgc=useState(false);var upgradeConfirm=s_upgc[0];var setUpgradeConfirm=s_upgc[1];
   var s_upgn=useState('');var upgradeRoomName=s_upgn[0];var setUpgradeRoomName=s_upgn[1];
   React.useEffect(function(){
@@ -1866,6 +1869,19 @@ function MiniApp(){
     },function(){});
     return function(){unsub();};
   },[user&&user.uid]);
+
+  useEffect(function(){
+    if(settingsPage!=='plan'||!user)return;
+    var activeSubD=(roomSubData&&roomSubData.status==='active')?roomSubData:miniSubData;
+    if(!activeSubD||activeSubD.status!=='active')return;
+    var primaryRid=roomSubData&&roomSubData.status==='active'?primaryRoomRef.current:null;
+    var body=primaryRid?{roomId:primaryRid}:{uid:user.uid};
+    setMiniPaymentMethodLoading(true);
+    fetch('/api/stripe-get-payment-method',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.json();})
+      .then(function(d){setMiniPaymentMethodLoading(false);setMiniPaymentMethodData(d.error?null:d.paymentMethod);})
+      .catch(function(){setMiniPaymentMethodLoading(false);setMiniPaymentMethodData(null);});
+  },[settingsPage,miniSubData&&miniSubData.status,roomSubData&&roomSubData.status]);
 
   var roomDataMapRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
@@ -2567,6 +2583,16 @@ function MiniApp(){
         var mIsCancelScheduled=activeSubData&&activeSubData.cancelAtPeriodEnd;
         var mCancelAtStr=mIsCancelScheduled&&activeSubData.cancelAt?new Date(activeSubData.cancelAt).toLocaleDateString('ja-JP'):'';
         var isMiniPlan=miniSubData&&miniSubData.plan==='mini'&&miniSubData.status==='active'&&!(roomSubData&&roomSubData.status==='active');
+        function handleOpenMiniPortal(){
+          if(miniPortalLoading)return;
+          setMiniPortalLoading(true);
+          var primaryRid=roomSubData&&roomSubData.status==='active'?primaryRoomRef.current:null;
+          var body=primaryRid?{roomId:primaryRid,returnUrl:window.location.href}:{uid:user.uid,returnUrl:window.location.href};
+          fetch('/api/stripe-portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+            .then(function(r){return r.json();})
+            .then(function(d){setMiniPortalLoading(false);if(d.url)window.location.href=d.url;else notify('エラーが発生しました','error');})
+            .catch(function(){setMiniPortalLoading(false);notify('エラーが発生しました','error');});
+        }
         function handleMiniCancelSub(){
           if(!user)return;
           if(!confirm('サブスクリプションを解約しますか？\n現在の契約期間が終了するまでは引き続きご利用いただけます。'))return;
@@ -2658,6 +2684,26 @@ function MiniApp(){
                   e('div',{style:{fontSize:'12px',color:activeSubData.status==='active'?'#34d399':'#f87171'}},mPlanStatus),
                   mIsCancelScheduled&&e('div',{style:{marginTop:'12px',padding:'10px',background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'8px',fontSize:'12px',color:'#f87171'}},
                     '解約予約済み：'+mCancelAtStr+'に終了します'
+                  ),
+                  activeSubData.status==='active'&&e('div',{style:{marginTop:'16px',paddingTop:'14px',borderTop:'1px solid rgba(255,255,255,0.06)'}},
+                    e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'8px'}},'お支払いカード'),
+                    miniPaymentMethodLoading
+                      ?e('div',{style:{fontSize:'12px',color:'#6b7280'}},'読み込み中...')
+                      :miniPaymentMethodData
+                        ?e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+                            e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+                              e('span',{style:{fontSize:'13px',fontWeight:600,color:'#d1d5db',textTransform:'uppercase'}},miniPaymentMethodData.brand),
+                              e('span',{style:{fontSize:'13px',color:'#9ca3af'}},'•••• '+miniPaymentMethodData.last4),
+                              e('span',{style:{fontSize:'12px',color:'#6b7280'}},String(miniPaymentMethodData.exp_month).padStart(2,'0')+'/'+String(miniPaymentMethodData.exp_year).slice(-2))
+                            ),
+                            e('button',{
+                              style:{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',padding:'4px 10px',color:'#9ca3af',fontSize:'11px',cursor:miniPortalLoading?'default':'pointer',opacity:miniPortalLoading?0.5:1},
+                              onClick:handleOpenMiniPortal,disabled:miniPortalLoading
+                            },miniPortalLoading?'..':'変更')
+                          )
+                        :miniPaymentMethodData===null
+                          ?e('div',{style:{fontSize:'12px',color:'#6b7280'}},'登録なし')
+                          :null
                   )
                 ),
                 isMiniPlan&&e('div',null,

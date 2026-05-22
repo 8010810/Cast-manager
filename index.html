@@ -3233,6 +3233,9 @@ function App(){
   var s_tow=useState(false);var transferOwnerPage=s_tow[0];var setTransferOwnerPage=s_tow[1];
   var s_sub=useState(null);var subscriptionData=s_sub[0];var setSubscriptionData=s_sub[1]; // {plan,status,cancelAtPeriodEnd,cancelAt,...}
   var s_cld=useState(false);var cancelLoading=s_cld[0];var setCancelLoading=s_cld[1];
+  var s_pm=useState(undefined);var paymentMethodData=s_pm[0];var setPaymentMethodData=s_pm[1];
+  var s_pml=useState(false);var paymentMethodLoading=s_pml[0];var setPaymentMethodLoading=s_pml[1];
+  var s_ptl=useState(false);var portalLoading=s_ptl[0];var setPortalLoading=s_ptl[1];
   var s_mrl=useState(false);var miniResumeLoading=s_mrl[0];var setMiniResumeLoading=s_mrl[1];
   var s_crn=useState('');var createRoomName=s_crn[0];var setCreateRoomName=s_crn[1];
   var s_crl2=useState(false);var createRoomStdLoading=s_crl2[0];var setCreateRoomStdLoading=s_crl2[1];
@@ -3718,6 +3721,17 @@ function App(){
     },function(){});
     return function(){if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}};
   },[user,roomId,roomRole]);
+
+  // プラン画面を開いたときにカード情報を取得
+  useEffect(function(){
+    if(settingsPage!=='plan'||!user||!subscriptionData||subscriptionData.status!=='active')return;
+    var body=roomId?{roomId:roomId}:{uid:user.uid};
+    setPaymentMethodLoading(true);
+    fetch('/api/stripe-get-payment-method',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){return r.json();})
+      .then(function(d){setPaymentMethodLoading(false);setPaymentMethodData(d.error?null:d.paymentMethod);})
+      .catch(function(){setPaymentMethodLoading(false);setPaymentMethodData(null);});
+  },[settingsPage,subscriptionData&&subscriptionData.status]);
 
   // checkout=success: postCheckout=trueにしてURLをクリア。subscriptionがactiveになったら解除
   useEffect(function(){
@@ -4512,6 +4526,15 @@ function App(){
       var isCancelScheduled=subscriptionData&&subscriptionData.cancelAtPeriodEnd;
       var cancelAtStr=isCancelScheduled&&subscriptionData.cancelAt?new Date(subscriptionData.cancelAt).toLocaleDateString('ja-JP'):'';
       var cancelBody=(roomId&&roomRole==='admin')?{roomId:roomId}:{uid:user.uid};
+      function handleOpenPortal(){
+        if(portalLoading)return;
+        setPortalLoading(true);
+        var body=roomId?{roomId:roomId,returnUrl:window.location.href}:{uid:user.uid,returnUrl:window.location.href};
+        fetch('/api/stripe-portal',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+          .then(function(r){return r.json();})
+          .then(function(d){setPortalLoading(false);if(d.url)window.location.href=d.url;else notify('エラーが発生しました','error');})
+          .catch(function(){setPortalLoading(false);notify('エラーが発生しました','error');});
+      }
       function handleCancelSubscription(){
         if(!user)return;
         if(!confirm('サブスクリプションを解約しますか？\n現在の契約期間が終了するまでは引き続きご利用いただけます。'))return;
@@ -4554,6 +4577,26 @@ function App(){
                 e('div',{style:{fontSize:'12px',color:subscriptionData.status==='active'?'#34d399':'#f87171'}},planStatus),
                 isCancelScheduled&&e('div',{style:{marginTop:'12px',padding:'10px',background:'rgba(248,113,113,0.08)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'8px',fontSize:'12px',color:'#f87171'}},
                   '解約予約済み：'+cancelAtStr+'に終了します'
+                ),
+                subscriptionData.status==='active'&&e('div',{style:{marginTop:'16px',paddingTop:'14px',borderTop:'1px solid rgba(255,255,255,0.06)'}},
+                  e('div',{style:{fontSize:'12px',color:'#6b7280',marginBottom:'8px'}},'お支払いカード'),
+                  paymentMethodLoading
+                    ?e('div',{style:{fontSize:'12px',color:'#6b7280'}},'読み込み中...')
+                    :paymentMethodData
+                      ?e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
+                          e('div',{style:{display:'flex',alignItems:'center',gap:'8px'}},
+                            e('span',{style:{fontSize:'13px',fontWeight:600,color:'#d1d5db',textTransform:'uppercase'}},paymentMethodData.brand),
+                            e('span',{style:{fontSize:'13px',color:'#9ca3af'}},'•••• '+paymentMethodData.last4),
+                            e('span',{style:{fontSize:'12px',color:'#6b7280'}},String(paymentMethodData.exp_month).padStart(2,'0')+'/'+String(paymentMethodData.exp_year).slice(-2))
+                          ),
+                          e('button',{
+                            style:{background:'transparent',border:'1px solid rgba(255,255,255,0.15)',borderRadius:'6px',padding:'4px 10px',color:'#9ca3af',fontSize:'11px',cursor:portalLoading?'default':'pointer',opacity:portalLoading?0.5:1},
+                            onClick:handleOpenPortal,disabled:portalLoading
+                          },portalLoading?'..':'変更')
+                        )
+                      :paymentMethodData===null
+                        ?e('div',{style:{fontSize:'12px',color:'#6b7280'}},'登録なし')
+                        :null
                 )
               ),
               (roomRole==='admin'||roomRole==='sub-admin'||!roomId)&&isCancelScheduled&&subscriptionData.status==='active'&&e('button',{
