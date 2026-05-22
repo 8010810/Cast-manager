@@ -1974,8 +1974,20 @@ function MiniApp(){
               if(!cd.userName){setConsentState('username');setLoading(false);}
               else{
                 var isCheckoutSuccess=new URLSearchParams(window.location.search).get('checkout')==='success';
-                if(isCheckoutSuccess){window.history.replaceState({},'','/mini');}
-                setConsentState('done');setLoading(false);
+                if(isCheckoutSuccess){window.history.replaceState({},'','/mini');setConsentState('done');setLoading(false);}
+                else{
+                  db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'})
+                  .then(function(subDoc){
+                    var hasSub=subDoc.exists&&subDoc.data().status==='active';
+                    if(hasSub){setConsentState('done');setLoading(false);}
+                    else{
+                      db.collection('users').doc(u.uid).collection('rooms').limit(1).get({source:'server'}).then(function(rs){
+                        if(!rs.empty){setConsentState('done');setLoading(false);}
+                        else{window.location.href='/';}
+                      }).catch(function(){setConsentState('done');setLoading(false);});
+                    }
+                  }).catch(function(){setConsentState('done');setLoading(false);});
+                }
               }
             }
           }
