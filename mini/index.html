@@ -1545,7 +1545,7 @@ function CustomerPage(p){
           e('span',{style:{color:'#4b5563',fontSize:'11px',flexShrink:0}},open?'▲':'▼')
         ),
         open&&!editing&&e('div',{style:{padding:'12px 14px',borderTop:'1px solid #1e2035'}},
-          [['種別',c.type],['時間',c.hour||'--'],['卓番',c.tableNo||'--'],['人数',c.count||'--'],['お客様名',c.name||'--'],['売上',c.sales>0?yen(c.sales):'--'],['相判キャスト',c.partnerCast||'--'],['ボトルネック名',c.bottleNeck||'--'],['オーダーボトル',c.orderBottle||'--'],['領収書',c.receipt||'--'],['備考',c.note||'--']].map(function(row){return e('div',{key:row[0],style:{display:'flex',gap:'8px',marginBottom:'6px',fontSize:'13px'}},e('span',{style:{color:'#6b7280',minWidth:'112px',flexShrink:0}},row[0]),e('span',{style:{color:'#e5e7eb',wordBreak:'break-word'}},row[1]));  }),
+          [['種別',c.type],['時間',c.hour||'--'],['卓番',c.tableNo||'--'],['人数',c.count?(c.count+'名'):'--'],['お客様名',c.name||'--'],['売上',c.sales>0?yen(c.sales):'--'],['相判キャスト',c.partnerCast||'--'],['ボトルネック名',c.bottleNeck||'--'],['オーダーボトル',c.orderBottle||'--'],['領収書',c.receipt||'--'],['備考',c.note||'--']].map(function(row){return e('div',{key:row[0],style:{display:'flex',gap:'8px',marginBottom:'6px',fontSize:'13px'}},e('span',{style:{color:'#6b7280',minWidth:'112px',flexShrink:0}},row[0]),e('span',{style:{color:'#e5e7eb',wordBreak:'break-word'}},row[1]));  }),
           e('div',{style:{display:'flex',gap:'8px',marginTop:'12px',justifyContent:'flex-end'}},e('button',{style:S.btnEdit,onClick:function(ev){startEdit(ev,c);}}, '編集'),e('button',{style:S.btnDanger,onClick:function(ev){del(ev,c.id);}}, '削除'))
         ),
         open&&editing&&e('div',{style:{padding:'12px 14px',borderTop:'1px solid #1e2035'},onClick:function(ev){ev.stopPropagation();}},
