@@ -944,7 +944,7 @@ function ShiftPage(p){
     var myIds=new Set();
     (p.data.folders||[]).filter(function(f){return !f._archived&&f.ownerUid&&f.ownerUid===p.uid;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myIds.add(id);});});
     var q=query.trim().toLowerCase();
-    var base=p.data.casts.filter(function(c){return myIds.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
+    var base=p.data.casts.filter(function(c){return !c._archived&&myIds.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
     if(q)base=base.filter(function(c){return c.name.toLowerCase().includes(q);});
     if(selShiftFolder==='all')return base;
     var roomFolders=(p.data.folders||[]).filter(function(f){return(f._roomId||'__none__')===selShiftFolder;});
