@@ -1685,11 +1685,11 @@ function VisitPage(p){
       ),
 
     // ルームフィルタータブ
-    (p.roomsList&&p.roomsList.length>0)&&e('div',{style:{display:'flex',alignItems:'stretch',background:'rgba(10,10,22,0.92)',backdropFilter:'blur(20px)',WebkitBackdropFilter:'blur(20px)',borderBottom:'1px solid rgba(232,184,109,0.12)',overflowX:'auto',margin:'0 -16px 12px',scrollbarWidth:'none'}},
-      ['全て'].concat((p.roomsList||[]).map(function(r){return r.name;})).map(function(label,i){
-        var rid=i===0?null:(p.roomsList[i-1].roomId);
-        var active=visitRoomFilter===rid;
-        return e('button',{key:i,style:{flexShrink:0,padding:'10px 16px',fontSize:'13px',fontWeight:600,border:'none',background:active?'#e8b86d08':'transparent',cursor:'pointer',color:active?'#e8b86d':'#6b7280',borderBottom:active?'2px solid #e8b86d':'2px solid transparent',marginBottom:'-1px',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter(rid);}},label);
+    (p.roomsList&&p.roomsList.length>0)&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',paddingBottom:'2px'}},
+      e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(visitRoomFilter===null?'#e8b86d':'#374151'),background:visitRoomFilter===null?'#e8b86d22':'transparent',color:visitRoomFilter===null?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:visitRoomFilter===null?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter(null);}},'全て'),
+      (p.roomsList||[]).map(function(r){
+        var active=visitRoomFilter===r.roomId;
+        return e('button',{key:r.roomId,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter(r.roomId);}},r.name);
       })
     ),
 
