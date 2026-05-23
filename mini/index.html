@@ -2860,18 +2860,17 @@ function MiniApp(){
   // 月別目標売上設定ページ
   if(layer==='target'){
     var nowYear=new Date().getFullYear();
-    var targetYears=[String(nowYear),String(nowYear-1)];
+    var targetYears=[String(nowYear)];
     var myUid2=user?user.uid:'';
     var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&(f.ownerUid===myUid2||f._personal);});
     var myFolderCastIds=new Set();allTargetFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){myFolderCastIds.add(cid);});});
     var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived&&myFolderCastIds.has(c.id);});
-    allTargetFolders=allTargetFolders.filter(function(f){return (f.castIds||[]).some(function(cid){return activeCastsT.some(function(c){return c.id===cid;});});});
     var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
     var curTFObj=allTargetFolders.find(function(f){return f.id===curTF;})||null;
     var castsInTF=curTFObj?activeCastsT.filter(function(c){return (curTFObj.castIds||[]).includes(c.id);}):activeCastsT;
     var targetCastObj=castsInTF.find(function(c){return c.id===targetCast;})||null;
     function getTFLabel(f){
-      if(f._personal&&f.ownerUid===myUid2)return userName||f.name;
+      if(f.ownerUid===myUid2||f._personal)return userName||f.name;
       if(f._roomId){var rm=(roomsList||[]).find(function(r){return r.roomId===f._roomId;});return rm?rm.name:f.name;}
       return f.name;
     }
