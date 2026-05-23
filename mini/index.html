@@ -1688,7 +1688,7 @@ function VisitPage(p){
     // ルームフィルタータブ
     e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',paddingBottom:'2px'}},
       e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(visitRoomFilter===null?'#e8b86d':'#374151'),background:visitRoomFilter===null?'#e8b86d22':'transparent',color:visitRoomFilter===null?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:visitRoomFilter===null?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter(null);}},'全て'),
-      e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(visitRoomFilter==='__personal__'?'#e8b86d':'#374151'),background:visitRoomFilter==='__personal__'?'#e8b86d22':'transparent',color:visitRoomFilter==='__personal__'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:visitRoomFilter==='__personal__'?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter('__personal__');}},'自分'),
+      e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(visitRoomFilter==='__personal__'?'#e8b86d':'#374151'),background:visitRoomFilter==='__personal__'?'#e8b86d22':'transparent',color:visitRoomFilter==='__personal__'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:visitRoomFilter==='__personal__'?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter('__personal__');}},p.userName||'自分'),
       (p.roomsList||[]).map(function(r){
         var active=visitRoomFilter===r.roomId;
         return e('button',{key:r.roomId,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter(r.roomId);}},r.name);
@@ -1760,7 +1760,7 @@ function VisitPage(p){
           e('div',{style:{fontWeight:700,color:'#e8b86d',fontSize:'16px'}},editVisit?'来店予定を編集':'来店予定を追加　'+fmtDayLabel(form.date)),
           e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'20px',cursor:'pointer'},onClick:function(){setShowForm(false);}}, '✗')
         ),
-        (form._roomId||form._personal)&&e('div',{style:{fontSize:'11px',color:'#7c3aed',marginBottom:'8px',padding:'4px 8px',background:'#7c3aed18',borderRadius:'6px',border:'1px solid #7c3aed33'}},'入力先: '+(form._personal?'自分':((p.roomsList||[]).find(function(r){return r.roomId===form._roomId;})||{name:'不明'}).name)),
+        (form._roomId||form._personal)&&e('div',{style:{fontSize:'11px',color:'#7c3aed',marginBottom:'8px',padding:'4px 8px',background:'#7c3aed18',borderRadius:'6px',border:'1px solid #7c3aed33'}},'入力先: '+(form._personal?(p.userName||'自分'):((p.roomsList||[]).find(function(r){return r.roomId===form._roomId;})||{name:'不明'}).name)),
         e('label',{style:S.label},'日付'),
         e('input',{type:'date',style:S.input,value:form.date,onChange:function(ev){setF('date',ev.target.value);}}),
         e('label',{style:S.label},'種別'),
@@ -3100,7 +3100,7 @@ function MiniApp(){
       })(),
       layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomsList:roomsList,userName:userName})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList,userName:userName,holidays:roomHolidays})),
-      layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList})),
+      layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList,userName:userName})),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
         castPage==='input'&&e(InputPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
         castPage==='chart'&&e(ChartPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
