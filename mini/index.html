@@ -769,8 +769,8 @@ function CastListPage(p){
             )
           )
           :e('div',null,
-            [['入店経路',cast.route||'未設定'],['誕生日',cast.birthday?fmtDate(cast.birthday)+(age!==null?' ('+age+'歳)':''):'未設定'],
-             ['本名',cast.realName||'未設定'],['出身地',cast.hometown||'未設定'],
+            [['入店経路',cast.route||'未設定'],['本名',cast.realName||'未設定'],['誕生日',cast.birthday?fmtDate(cast.birthday)+(age!==null?' ('+age+'歳)':''):'未設定'],
+             ['出身地',cast.hometown||'未設定'],
              ['身長',cast.height?cast.height+'cm':'未設定'],
              ['カップ数',cast.cup?cast.cup+'カップ':'未設定'],['系統',cast.castType||'未設定'],
              ['契約シフト',cast.contractShift||'未設定'],['所属フォルダ',castFolderName||'未設定'],['メモ',cast.memo||'なし']].map(function(row){
