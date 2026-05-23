@@ -1917,6 +1917,7 @@ function MiniApp(){
   var unsubRoomSubRef=React.useRef(null);
   var personalDataRef=React.useRef({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
   var pendingListenersRef=React.useRef({});
+  var rebuildDataRef=React.useRef(null);
 
   var layer=navStack[navStack.length-1]||'home';
   var isCastLayer=layer==='cast';
@@ -1963,6 +1964,7 @@ function MiniApp(){
     }
 
     function rebuildData(){
+      rebuildDataRef.current=rebuildData;
       var map=roomDataMapRef.current;
       var pd=personalDataRef.current;
       var casts=[],records={},customers={},folders=[],shifts={},visits=[],quota={};
@@ -2140,7 +2142,7 @@ function MiniApp(){
   },[]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
-  function refreshData(showToast){if(showToast)notify('更新しました','success');}
+  function refreshData(showToast){if(rebuildDataRef.current)rebuildDataRef.current();if(showToast)notify('更新しました','success');}
   function setupApprovalListener(uid,rid,roomName,inviteCode){
     if(pendingListenersRef.current[rid])return;
     var started=false;
