@@ -1719,7 +1719,7 @@ function VisitPage(p){
     selectedDate&&e('div',{key:selectedDate,style:{animation:'pageFadeIn 1.4s ease both'}},
       e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px',padding:'0 2px'}},
         e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'15px'}},fmtDayLabel(selectedDate)+' 来店予定'),
-        e('button',{style:S.btnPrimary,onClick:function(){openAdd(selectedDate);}}, '+ 追加')
+        visitRoomFilter&&e('button',{style:S.btnPrimary,onClick:function(){openAdd(selectedDate);}}, '+ 追加')
       ),
       selectedVisits.length===0
         ?e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',padding:'20px',textAlign:'center',color:'#4b5563',fontSize:'13px'}},'来店予定がありません')
