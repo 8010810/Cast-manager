@@ -2532,7 +2532,7 @@ function CastViewerPage(){
             e('span',{style:{color:'#4b5563',fontSize:'11px',marginLeft:'6px'}},isOpen?'▲':'▼')
           ),
           isOpen&&e('div',{style:{padding:'12px 14px',borderTop:'1px solid #1e2035'}},
-            [['種別',c.type],['売上',c.sales>0?yen2(c.sales):'--'],['ボトルネック',c.bottleNeck||'--'],['オーダーボトル',c.orderBottle||'--'],['領収書',c.receipt||'--'],['備考',c.note||'--']].map(function(r){
+            [['種別',c.type],['時間',c.hour||'--'],['卓番',c.tableNo||'--'],['人数',c.count?(c.count+'名'):'--'],['お客様名',c.name||'--'],['売上',c.sales>0?yen2(c.sales):'--'],['相判キャスト',c.partnerCast||'--'],['ボトルネック',c.bottleNeck||'--'],['オーダーボトル',c.orderBottle||'--'],['領収書',c.receipt||'--'],['備考',c.note||'--']].map(function(r){
               return e('div',{key:r[0],style:{display:'flex',gap:'8px',marginBottom:'6px',fontSize:'13px'}},
                 e('span',{style:{color:'#6b7280',minWidth:'100px',flexShrink:0}},r[0]),
                 e('span',{style:{color:'#e5e7eb',wordBreak:'break-word'}},r[1])
