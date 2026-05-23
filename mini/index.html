@@ -2862,11 +2862,10 @@ function MiniApp(){
     var nowYear=new Date().getFullYear();
     var targetYears=[String(nowYear),String(nowYear-1)];
     var myUid2=user?user.uid:'';
-    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived;});
-    // フォルダタブ: キャストが1人以上いるフォルダのみ
-    var allTargetFolders=(data&&data.folders||[]).filter(function(f){if(f._archived)return false;
-      return (f.castIds||[]).some(function(cid){return activeCastsT.some(function(c){return c.id===cid;});});
-    });
+    var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&f.ownerUid===myUid2;});
+    var myFolderCastIds=new Set();allTargetFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){myFolderCastIds.add(cid);});});
+    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived&&myFolderCastIds.has(c.id);});
+    allTargetFolders=allTargetFolders.filter(function(f){return (f.castIds||[]).some(function(cid){return activeCastsT.some(function(c){return c.id===cid;});});});
     var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
     var curTFObj=allTargetFolders.find(function(f){return f.id===curTF;})||null;
     var castsInTF=curTFObj?activeCastsT.filter(function(c){return (curTFObj.castIds||[]).includes(c.id);}):activeCastsT;
