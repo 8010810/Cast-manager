@@ -4092,7 +4092,7 @@ function App(){
       e('div',{style:{maxWidth:'480px',width:'100%'}},
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'}},'CAST MANAGER'),
         e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},adminNeedsSub?'決済方法を登録してください':'プランを選択してください'),
-        e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'28px'}},adminNeedsSub?'管理者としてルームを継続するには決済が必要です':'後から変更はできません'),
+        adminNeedsSub&&e('p',{style:{fontSize:'12px',color:'#6b7280',textAlign:'center',marginBottom:'28px'}},'管理者としてルームを継続するには決済が必要です'),
         e('div',{style:{display:'flex',flexDirection:'column',gap:'14px'}},
           !adminNeedsSub&&e('div',{style:{background:'#12122a',border:'1px solid rgba(167,139,250,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left'}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
