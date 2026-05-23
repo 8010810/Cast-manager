@@ -2870,7 +2870,7 @@ function MiniApp(){
     var castsInTF=curTFObj?activeCastsT.filter(function(c){return (curTFObj.castIds||[]).includes(c.id);}):activeCastsT;
     var targetCastObj=castsInTF.find(function(c){return c.id===targetCast;})||null;
     function getTFLabel(f){
-      if(f.ownerUid===myUid2||f._personal)return userName||f.name;
+      if(f._personal)return userName||f.name;
       if(f._roomId){var rm=(roomsList||[]).find(function(r){return r.roomId===f._roomId;});return rm?rm.name:f.name;}
       return f.name;
     }
