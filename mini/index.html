@@ -2393,7 +2393,8 @@ function MiniApp(){
       var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI));});
       var aiCastIdSet=new Set();
       aiFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){aiCastIdSet.add(cid);});});
-      var aiCasts=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&aiCastIdSet.has(c.id);});
+      var currentRoomIds=new Set((roomsList||[]).map(function(r){return r.roomId;}));
+      var aiCasts=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&aiCastIdSet.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
       var AI_OV={position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:200,display:'flex',flexDirection:'column',background:'#0d0d1a'};
       var AI_HDR={position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(167,139,250,0.15)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
       var AI_BODY={flex:1,overflowY:'auto',padding:'20px 16px 40px'};
