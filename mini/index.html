@@ -498,7 +498,7 @@ function MyCastPage(p){
     var folder=folders.find(function(f){return f.id===openFolder;});
     if(!folder){setOpenFolder(null);return null;}
     var folderCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
-    return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:p.data,onOpenCast:p.onOpenCast,notify:p.notify,uid:p.uid,onGoBack:p.onGoBack,onSetSubBack:p.onSetSubBack,onRestoreFolder:function(){setOpenFolder(openFolder);}});
+    return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:p.data,onOpenCast:p.onOpenCast,notify:p.notify,uid:p.uid,onGoBack:p.onGoBack,onSetSubBack:p.onSetSubBack,onRefresh:p.onRefresh,onRestoreFolder:function(){setOpenFolder(openFolder);}});
   }
 
   return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
@@ -3076,7 +3076,7 @@ function MiniApp(){
           e('div',{style:S.pageTitle},
             e('button',{style:{background:'transparent',border:'none',padding:'2px 4px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center',marginRight:'2px'},onClick:goBack},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'15 18 9 12 15 6'}))),
             e('h1',{style:{...S.h1,flex:1,textAlign:'center'}},'MG実績'),
-            e('div',{style:{width:'56px'}})
+            e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center',minWidth:'40px',justifyContent:'center'},onClick:function(){refreshData(true);}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})))
           ),
           multiRoom&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px',overflowX:'auto',paddingBottom:'2px'}},
             myRooms.map(function(r){
