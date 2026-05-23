@@ -1617,7 +1617,7 @@ function VisitPage(p){
 
   var s_vr=useState(null);var visitRoomFilter=s_vr[0];var setVisitRoomFilter=s_vr[1];
 
-  var blankVisit=function(date,roomId){return{id:uid(),type:'来店',time:'',guestName:'',castName:'',count:'',seat:'',bottleNeck:'',bottle:'',lastVisit:'',note:'',date:date||selectedDate||todayStr(),_roomId:roomId||undefined};};
+  var blankVisit=function(date,roomId){var isP=roomId==='__personal__';return{id:uid(),type:'来店',time:'',guestName:'',castName:'',count:'',seat:'',bottleNeck:'',bottle:'',lastVisit:'',note:'',date:date||selectedDate||todayStr(),_roomId:isP?undefined:(roomId||undefined),_personal:isP?true:undefined};};
   var s5=useState(blankVisit());var form=s5[0];var setForm=s5[1];
 
   var visits=p.data.visits||[];
@@ -1658,6 +1658,7 @@ function VisitPage(p){
   var dayVisits=function(date){return visits.filter(function(v){
     if(v.date!==date)return false;
     if(!visitRoomFilter)return true;
+    if(visitRoomFilter==='__personal__')return !!v._personal;
     return v._roomId===visitRoomFilter;
   });};
   var selectedVisits=selectedDate?dayVisits(selectedDate):[];
@@ -1685,8 +1686,9 @@ function VisitPage(p){
       ),
 
     // ルームフィルタータブ
-    (p.roomsList&&p.roomsList.length>0)&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',paddingBottom:'2px'}},
+    e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',paddingBottom:'2px'}},
       e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(visitRoomFilter===null?'#e8b86d':'#374151'),background:visitRoomFilter===null?'#e8b86d22':'transparent',color:visitRoomFilter===null?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:visitRoomFilter===null?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter(null);}},'全て'),
+      e('button',{style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(visitRoomFilter==='__personal__'?'#e8b86d':'#374151'),background:visitRoomFilter==='__personal__'?'#e8b86d22':'transparent',color:visitRoomFilter==='__personal__'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:visitRoomFilter==='__personal__'?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter('__personal__');}},'自分'),
       (p.roomsList||[]).map(function(r){
         var active=visitRoomFilter===r.roomId;
         return e('button',{key:r.roomId,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap'},onClick:function(){setVisitRoomFilter(r.roomId);}},r.name);
@@ -1758,7 +1760,7 @@ function VisitPage(p){
           e('div',{style:{fontWeight:700,color:'#e8b86d',fontSize:'16px'}},editVisit?'来店予定を編集':'来店予定を追加　'+fmtDayLabel(form.date)),
           e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'20px',cursor:'pointer'},onClick:function(){setShowForm(false);}}, '✗')
         ),
-        form._roomId&&e('div',{style:{fontSize:'11px',color:'#7c3aed',marginBottom:'8px',padding:'4px 8px',background:'#7c3aed18',borderRadius:'6px',border:'1px solid #7c3aed33'}},'入力先: '+((p.roomsList||[]).find(function(r){return r.roomId===form._roomId;})||{name:'不明'}).name),
+        (form._roomId||form._personal)&&e('div',{style:{fontSize:'11px',color:'#7c3aed',marginBottom:'8px',padding:'4px 8px',background:'#7c3aed18',borderRadius:'6px',border:'1px solid #7c3aed33'}},'入力先: '+(form._personal?'自分':((p.roomsList||[]).find(function(r){return r.roomId===form._roomId;})||{name:'不明'}).name)),
         e('label',{style:S.label},'日付'),
         e('input',{type:'date',style:S.input,value:form.date,onChange:function(ev){setF('date',ev.target.value);}}),
         e('label',{style:S.label},'種別'),
@@ -1992,6 +1994,7 @@ function MiniApp(){
         }
       });
       Object.keys(pd.shifts||{}).forEach(function(k){if(!roomCastIds.has(k))shifts[k]=pd.shifts[k];});
+      (pd.visits||[]).forEach(function(v){visits.push(Object.assign({},v,{_personal:true}));});
       setData({casts:casts,records:records,customers:customers,folders:folders,shifts:shifts,visits:visits,quota:quota});
     }
 
@@ -2210,13 +2213,15 @@ function MiniApp(){
     var personalCasts=(next.casts||[]).filter(function(c){return c._personal;});
     var personalCastIds=new Set(personalCasts.map(function(c){return c.id;}));
     var personalFolders=(next.folders||[]).filter(function(f){return f._personal;});
-    if(personalCasts.length>0||personalFolders.length>0){
+    var personalVisits=(next.visits||[]).filter(function(v){return v._personal;});
+    if(personalCasts.length>0||personalFolders.length>0||personalVisits.length>0){
       var cleanPC=personalCasts.map(function(c){var cc=Object.assign({},c);delete cc._personal;return cc;});
       var cleanPF=personalFolders.map(function(f){var ff=Object.assign({},f);delete ff._personal;return ff;});
+      var cleanPV=personalVisits.map(function(v){var vv=Object.assign({},v);delete vv._personal;return vv;});
       var pRec={};Object.keys(next.records||{}).forEach(function(k){if(personalCastIds.has(k))pRec[k]=next.records[k];});
       var pCus={};Object.keys(next.customers||{}).forEach(function(k){if(personalCastIds.has(k))pCus[k]=next.customers[k];});
       var pShift={};Object.keys(next.shifts||{}).forEach(function(k){if(personalCastIds.has(k))pShift[k]=next.shifts[k];});
-      db.collection('users').doc(user.uid).collection('data').doc('main').set({casts:cleanPC,records:pRec,customers:pCus,folders:cleanPF,shifts:pShift,visits:[],quota:{}}).catch(function(e){console.error('Personal save error:',e);});
+      db.collection('users').doc(user.uid).collection('data').doc('main').set({casts:cleanPC,records:pRec,customers:pCus,folders:cleanPF,shifts:pShift,visits:cleanPV,quota:{}}).catch(function(e){console.error('Personal save error:',e);});
     }
     var map=roomDataMapRef.current;
     var rids=Object.keys(map);
