@@ -651,7 +651,7 @@ function MyCastPage(p){
     var folder=folders.find(function(f){return f.id===openFolder;});
     if(!folder){setOpenFolder(null);return null;}
     var folderCasts=p.data.casts.filter(function(c){return(folder.castIds||[]).includes(c.id);});
-    return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:p.data,onOpenCast:p.onOpenCast,notify:p.notify,uid:p.uid,onGoBack:p.onGoBack,onSetSubBack:p.onSetSubBack,onRestoreFolder:function(){setOpenFolder(openFolder);}});
+    return e(FolderDetail,{folder:folder,folderCasts:folderCasts,data:p.data,onOpenCast:p.onOpenCast,notify:p.notify,uid:p.uid,onGoBack:p.onGoBack,onSetSubBack:p.onSetSubBack,onRefresh:p.onRefresh,onRestoreFolder:function(){setOpenFolder(openFolder);}});
   }
 
   return e('div',{style:{animation:'pageFadeIn 1.4s ease both'}},
@@ -3753,6 +3753,7 @@ function App(){
       .then(function(d){setPaymentMethodLoading(false);setPaymentMethodData(d.error?null:d.paymentMethod);})
       .catch(function(){setPaymentMethodLoading(false);setPaymentMethodData(null);});
   },[settingsPage,subscriptionData&&subscriptionData.status]);
+
 
   // checkout=success: postCheckout=trueにしてURLをクリア。subscriptionがactiveになったら解除
   useEffect(function(){
