@@ -795,8 +795,18 @@ function SalesPage(p){
   },[p.data,rankMode,tm]);
 
   // ランキング用（年月日選択）
-  var selMonth=targetPanel||pad(now.getMonth()+1);
-  var selDay=editTargetMK||pad(now.getDate());
+  var availableMonths=useMemo(function(){
+    var ms=new Set();
+    p.data.casts.forEach(function(c){(p.data.records[c.id]||[]).forEach(function(r){if(r.date.slice(0,4)===selYearS)ms.add(r.date.slice(5,7));});});
+    return Array.from(ms).sort();
+  },[p.data,selYearS]);
+  var selMonth=targetPanel&&targetPanel.length===2?targetPanel:(availableMonths.length>0?availableMonths[availableMonths.length-1]:pad(now.getMonth()+1));
+  var availableDays=useMemo(function(){
+    var ds=new Set();
+    p.data.casts.forEach(function(c){(p.data.records[c.id]||[]).forEach(function(r){if(r.date.slice(0,7)===selYearS+'-'+selMonth)ds.add(r.date.slice(8,10));});});
+    return Array.from(ds).sort();
+  },[p.data,selYearS,selMonth]);
+  var selDay=editTargetMK||(availableDays.length>0?availableDays[availableDays.length-1]:pad(now.getDate()));
   var rkData=useMemo(function(){
     return p.data.casts.map(function(c){
       var rows=(p.data.records[c.id]||[]).filter(function(r){
@@ -969,7 +979,7 @@ function SalesPage(p){
     var rkMax=rkSorted.length>0?rkSorted[0][rkMetric]:1;
 
     function rkBtn(active,label,onClick){
-      return e('button',{style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,0.4)':'#2d2d4e'),borderRadius:'8px',color:active?'#e8b86d':'#9ca3af',fontSize:'11px',padding:'5px 10px',cursor:'pointer',fontWeight:active?700:400},onClick:onClick},label);
+      return e('button',{style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,0.4)':'#2d2d4e'),borderRadius:'20px',color:active?'#e8b86d':'#9ca3af',fontSize:'13px',padding:'7px 14px',cursor:'pointer',fontWeight:active?700:400,flexShrink:0,whiteSpace:'nowrap'},onClick:onClick},label);
     }
 
     return e('div',null,
@@ -988,14 +998,11 @@ function SalesPage(p){
         e('div',{style:{display:'flex',gap:'4px',marginBottom:'8px',flexWrap:'wrap'}},
           allYearsS.map(function(y){return rkBtn(selYearS===y,y+'年',function(){setSelYearS(y);});})
         ),
-        e('div',{style:{display:'flex',gap:'4px',marginBottom:'8px',flexWrap:'wrap'}},
-          Array.from({length:12},function(_,i){var m=pad(i+1);return rkBtn(selMonth===m,(i+1)+'月',function(){setTargetPanel(m);});})
+        e('div',{style:{display:'flex',gap:'6px',marginBottom:'8px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}},
+          availableMonths.map(function(m){return rkBtn(selMonth===m,Number(m)+'月',function(){setTargetPanel(m);setEditTargetMK(null);});})
         ),
-        rankMode==='daily'&&e('div',{style:{display:'flex',gap:'4px',marginBottom:'10px',flexWrap:'wrap'}},
-          Array.from({length:new Date(Number(selYearS),Number(selMonth),0).getDate()},function(_,i){
-            var d=pad(i+1);
-            return rkBtn(selDay===d,(i+1)+'日',function(){setEditTargetMK(d);});
-          })
+        rankMode==='daily'&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',overflowX:'auto',scrollbarWidth:'none',WebkitOverflowScrolling:'touch'}},
+          availableDays.map(function(d){return rkBtn(selDay===d,Number(d)+'日',function(){setEditTargetMK(d);});})
         ),
         e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px',marginBottom:'10px'}},
           selYearS+'年'+Number(selMonth)+'月'+(rankMode==='daily'?Number(selDay)+'日':'')
