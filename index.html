@@ -3957,7 +3957,10 @@ function App(){
           var isAdmin=(rd.data().role==='admin');
           if(!isAdmin){
             return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){})
-              .then(function(){return rd.ref.delete().catch(function(){});});
+              .then(function(){
+                fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:rid})}).catch(function(){});
+                return rd.ref.delete().catch(function(){});
+              });
           }
           return db.collection('rooms').doc(rid).collection('members').get().catch(function(){return{docs:[]};}).then(function(membersSnap){
             var others=membersSnap.docs.filter(function(m){return m.id!==uid2;});
@@ -3974,7 +3977,10 @@ function App(){
             if(otherAdmins.length>0){
               // 他に管理者がいる → 自分だけ抜ける
               return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){})
-                .then(function(){return rd.ref.delete().catch(function(){});});
+                .then(function(){
+                  fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:rid})}).catch(function(){});
+                  return rd.ref.delete().catch(function(){});
+                });
             }
             // 管理者1人・他メンバーあり → サブ管理者を優先、次に最古参を管理者に昇格
             others.sort(function(a,b){
@@ -3986,7 +3992,10 @@ function App(){
             return db.collection('rooms').doc(rid).collection('members').doc(newAdmin.id).update({role:'admin'}).catch(function(){})
               .then(function(){return db.collection('users').doc(newAdmin.id).collection('rooms').doc(rid).update({role:'admin'}).catch(function(){});})
               .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(uid2).delete().catch(function(){});})
-              .then(function(){return rd.ref.delete().catch(function(){});});
+              .then(function(){
+                fetch('/api/stripe-remove-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({roomId:rid})}).catch(function(){});
+                return rd.ref.delete().catch(function(){});
+              });
           });
         });
         return Promise.all(roomHandles);
