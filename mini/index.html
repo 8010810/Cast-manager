@@ -2898,9 +2898,10 @@ function MiniApp(){
         e('div',{style:{display:'flex',gap:'6px',marginBottom:'14px'}},
           targetYears.map(function(y){return e('button',{key:y,style:Object.assign({},y===targetYear?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 12px'}),onClick:function(){setTargetYear(y);setEditTargetMK(null);}},y+'年');})
         ),
-        allTargetFolders.length>1&&e('div',{style:{display:'flex',gap:'6px',overflowX:'auto',marginBottom:'12px',paddingBottom:'2px',WebkitOverflowScrolling:'touch'}},
+        allTargetFolders.length>0&&e('div',{style:{display:'flex',gap:'6px',overflowX:'auto',marginBottom:'12px',paddingBottom:'2px',WebkitOverflowScrolling:'touch'}},
           allTargetFolders.map(function(f){
-            return e('button',{key:f.id,style:Object.assign({},f.id===curTF?S.modeActive:S.modeBtn,{fontSize:'12px',padding:'5px 14px',flexShrink:0,whiteSpace:'nowrap'}),onClick:function(){
+            var active=f.id===curTF;
+            return e('button',{key:f.id,style:{padding:'5px 12px',borderRadius:'20px',border:'1px solid '+(active?'#e8b86d':'#374151'),background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:active?700:400,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0},onClick:function(){
               setTargetFolder(f.id);setTargetCast(null);setEditTargetMK(null);setTargetInput('');
             }},getTFLabel(f));
           })
