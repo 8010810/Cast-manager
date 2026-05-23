@@ -56,9 +56,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, message: 'No ACCOUNT_ADD item to decrease' });
     }
 
-    // 管理者含む全メンバー数を正とする（Stripeの数字に依存しない）
+    // 管理者を除く招待済みメンバー数（isInvited===true）のみカウント
     var membersSnap = await db.collection('rooms').doc(roomId).collection('members').get();
-    var newQuantity = membersSnap.size;
+    var newQuantity = membersSnap.docs.filter(function(doc) { return doc.data().isInvited === true; }).length;
 
     await stripe.subscriptionItems.update(item.id, {
       quantity: newQuantity,

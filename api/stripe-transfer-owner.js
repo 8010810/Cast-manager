@@ -1,5 +1,8 @@
+import Stripe from 'stripe';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+
+const ACCOUNT_ADD_PRICE = 'price_1TXgqSQaq3EwNY4QdQVc6rNT';
 
 function getDb() {
   try {
@@ -60,6 +63,34 @@ export default async function handler(req, res) {
     await db.collection('rooms').doc(roomId).collection('subscription').doc('main').update({
       ownerUid: newOwnerUid,
     }).catch(function(){});
+
+    // Firestore更新後に isInvited===true のメンバー数で Stripe を同期
+    try {
+      var stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+      var subDoc = await db.collection('rooms').doc(roomId).collection('subscription').doc('main').get();
+      if (subDoc.exists) {
+        var subData = subDoc.data();
+        var subscriptionId = subData.subscriptionId;
+        if (subscriptionId) {
+          var membersSnap = await db.collection('rooms').doc(roomId).collection('members').get();
+          var newQuantity = membersSnap.docs.filter(function(doc) { return doc.data().isInvited === true; }).length;
+          var subscription = await stripe.subscriptions.retrieve(subscriptionId);
+          var item = subscription.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
+          if (item) {
+            await stripe.subscriptionItems.update(item.id, {
+              quantity: newQuantity,
+              proration_behavior: 'none',
+            });
+            await db.collection('rooms').doc(roomId).collection('subscription').doc('main').update({
+              memberCount: newQuantity,
+            });
+            console.log('[stripe-transfer-owner] Updated Stripe quantity to', newQuantity);
+          }
+        }
+      }
+    } catch (_stripeErr) {
+      console.error('[stripe-transfer-owner] Stripe sync error:', _stripeErr.message);
+    }
 
     console.log('[stripe-transfer-owner] Transferred from', oldOwnerUid, 'to', newOwnerUid);
     return res.status(200).json({ success: true });
