@@ -58,12 +58,40 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No subscription item found' });
     }
 
-    // 既存のカード情報でプライスを差し替え（即時プロレーション課金）
+    // プロレーションなしでプライスを差し替え
     await stripe.subscriptions.update(subscriptionId, {
       items: [{ id: item.id, price: newPriceId }],
-      proration_behavior: 'create_prorations',
+      proration_behavior: 'none',
       cancel_at_period_end: false,
     });
+
+    // std.料金をその場で即時請求
+    var price = await stripe.prices.retrieve(newPriceId);
+    var invoiceItem = await stripe.invoiceItems.create({
+      customer: subscription.customer,
+      subscription: subscriptionId,
+      amount: price.unit_amount,
+      currency: price.currency,
+      description: 'standardプランアップグレード',
+    });
+    var invoice = null;
+    try {
+      invoice = await stripe.invoices.create({
+        customer: subscription.customer,
+        subscription: subscriptionId,
+        auto_advance: false,
+      });
+      await stripe.invoices.finalizeInvoice(invoice.id);
+      await stripe.invoices.pay(invoice.id, { off_session: true });
+    } catch (_payErr) {
+      console.error('[stripe-upgrade-subscription] Invoice pay failed:', _payErr.message);
+      if (invoice) {
+        await stripe.invoices.voidInvoice(invoice.id).catch(function() {});
+      } else {
+        await stripe.invoiceItems.del(invoiceItem.id).catch(function() {});
+      }
+      throw _payErr;
+    }
 
     await db.collection('users').doc(uid).collection('subscription').doc('main').update({
       plan: 'standard',
