@@ -935,6 +935,7 @@ function ShiftPage(p){
       var rid=f._roomId||'__none__';
       if(!seen.has(rid)){seen.add(rid);result.push({rid:rid,label:f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:p.userName||f.name});}
     });
+    result.sort(function(a,b){return a.rid==='__none__'?-1:b.rid==='__none__'?1:0;});
     return result;
   },[p.data.folders,p.roomsList]);
   var filteredCasts=useMemo(function(){
@@ -3070,6 +3071,7 @@ function MiniApp(){
               result.push({rid:rid,label:rName});
             }
           });
+          result.sort(function(a,b){return a.rid==='__none__'?-1:b.rid==='__none__'?1:0;});
           return result;
         })();
         var multiRoom=myRooms.length>1;
