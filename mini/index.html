@@ -2142,7 +2142,7 @@ function MiniApp(){
   },[]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
-  function refreshData(showToast){if(rebuildDataRef.current)rebuildDataRef.current();if(showToast)notify('更新しました','success');}
+  function refreshData(showToast){if(showToast)notify('更新しました','success');try{if(rebuildDataRef.current)rebuildDataRef.current();}catch(_e){console.error('refreshData error',_e);}}
   function setupApprovalListener(uid,rid,roomName,inviteCode){
     if(pendingListenersRef.current[rid])return;
     var started=false;
