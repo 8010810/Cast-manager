@@ -594,9 +594,10 @@ function CastListPage(p){
   },[detail]);
 
   var sorted=useMemo(function(){
+    var currentRoomIds=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));
     var pCastIds=new Set();
     (p.data.folders||[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===p.uid));}).forEach(function(f){(f.castIds||[]).forEach(function(cid){pCastIds.add(cid);});});
-    var list=(p.data.casts||[]).filter(function(c){return !c._archived&&(c._personal===true||pCastIds.has(c.id));});
+    var list=(p.data.casts||[]).filter(function(c){return !c._archived&&(c._personal===true||pCastIds.has(c.id))&&(!c._roomId||currentRoomIds.has(c._roomId));});
     var CUP_ORDER_M={A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,I:9,J:10,K:11};
     if(sortBy==='name')list.sort(function(a,b){return a.name.localeCompare(b.name,'ja');});
     else if(sortBy==='age')list.sort(function(a,b){var aa=calcAge(a.birthday)||999;var bb=calcAge(b.birthday)||999;return aa-bb;});
@@ -939,10 +940,11 @@ function ShiftPage(p){
     return result;
   },[p.data.folders,p.roomsList]);
   var filteredCasts=useMemo(function(){
+    var currentRoomIds=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));
     var myIds=new Set();
     (p.data.folders||[]).filter(function(f){return !f._archived&&f.ownerUid&&f.ownerUid===p.uid;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myIds.add(id);});});
     var q=query.trim().toLowerCase();
-    var base=p.data.casts.filter(function(c){return myIds.has(c.id);});
+    var base=p.data.casts.filter(function(c){return myIds.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
     if(q)base=base.filter(function(c){return c.name.toLowerCase().includes(q);});
     if(selShiftFolder==='all')return base;
     var roomFolders=(p.data.folders||[]).filter(function(f){return(f._roomId||'__none__')===selShiftFolder;});
