@@ -1615,7 +1615,9 @@ function VisitPage(p){
   var s3=useState(false);var showForm=s3[0];var setShowForm=s3[1];
   var s4=useState(null);var editVisit=s4[0];var setEditVisit=s4[1];
 
-  var blankVisit=function(date){return{id:uid(),type:'来店',time:'',guestName:'',castName:'',count:'',seat:'',bottleNeck:'',bottle:'',lastVisit:'',note:'',date:date||selectedDate||todayStr()};};
+  var s_vr=useState(null);var visitRoomFilter=s_vr[0];var setVisitRoomFilter=s_vr[1];
+
+  var blankVisit=function(date,roomId){return{id:uid(),type:'来店',time:'',guestName:'',castName:'',count:'',seat:'',bottleNeck:'',bottle:'',lastVisit:'',note:'',date:date||selectedDate||todayStr(),_roomId:roomId||undefined};};
   var s5=useState(blankVisit());var form=s5[0];var setForm=s5[1];
 
   var visits=p.data.visits||[];
@@ -1642,7 +1644,7 @@ function VisitPage(p){
   }
   function openAdd(date){
     setSelectedDate(date);
-    setForm(blankVisit(date));
+    setForm(blankVisit(date,visitRoomFilter||undefined));
     setEditVisit(null);setShowForm(true);
   }
   function openEdit(v){
@@ -1653,7 +1655,11 @@ function VisitPage(p){
     setShowForm(false);
   }
 
-  var dayVisits=function(date){return visits.filter(function(v){return v.date===date;});};
+  var dayVisits=function(date){return visits.filter(function(v){
+    if(v.date!==date)return false;
+    if(!visitRoomFilter)return true;
+    return v._roomId===visitRoomFilter;
+  });};
   var selectedVisits=selectedDate?dayVisits(selectedDate):[];
   var typeColor2=function(t){return t==='同伴'?'#a78bfa':'#34d399';};
   var fmtDayLabel=function(date){
@@ -1677,6 +1683,15 @@ function VisitPage(p){
         e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px',display:'flex',alignItems:'center'}},yr+'年'+mo+'月'),
         e('button',{style:{...S.btnGhost,padding:'6px 10px'},onClick:nextMonth},'→')
       ),
+
+    // ルームフィルタータブ
+    (p.roomsList&&p.roomsList.length>0)&&e('div',{style:{display:'flex',gap:'6px',overflowX:'auto',padding:'0 0 10px',scrollbarWidth:'none'}},
+      e('button',{style:{flexShrink:0,padding:'4px 12px',borderRadius:'999px',fontSize:'12px',background:!visitRoomFilter?'#7c3aed':'transparent',border:'1px solid '+(visitRoomFilter?'rgba(255,255,255,0.15)':'#7c3aed'),color:!visitRoomFilter?'#fff':'#9ca3af',cursor:'pointer'},onClick:function(){setVisitRoomFilter(null);}},'全て'),
+      (p.roomsList||[]).map(function(r){
+        var active=visitRoomFilter===r.roomId;
+        return e('button',{key:r.roomId,style:{flexShrink:0,padding:'4px 12px',borderRadius:'999px',fontSize:'12px',background:active?'#7c3aed':'transparent',border:'1px solid '+(active?'#7c3aed':'rgba(255,255,255,0.15)'),color:active?'#fff':'#9ca3af',cursor:'pointer'},onClick:function(){setVisitRoomFilter(r.roomId);}},r.name);
+      })
+    ),
 
     // カレンダー
     e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'10px',marginBottom:'16px'}},
@@ -1743,6 +1758,7 @@ function VisitPage(p){
           e('div',{style:{fontWeight:700,color:'#e8b86d',fontSize:'16px'}},editVisit?'来店予定を編集':'来店予定を追加　'+fmtDayLabel(form.date)),
           e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'20px',cursor:'pointer'},onClick:function(){setShowForm(false);}}, '✗')
         ),
+        form._roomId&&e('div',{style:{fontSize:'11px',color:'#7c3aed',marginBottom:'8px',padding:'4px 8px',background:'#7c3aed18',borderRadius:'6px',border:'1px solid #7c3aed33'}},'入力先: '+((p.roomsList||[]).find(function(r){return r.roomId===form._roomId;})||{name:'不明'}).name),
         e('label',{style:S.label},'日付'),
         e('input',{type:'date',style:S.input,value:form.date,onChange:function(ev){setF('date',ev.target.value);}}),
         e('label',{style:S.label},'種別'),
@@ -3079,7 +3095,7 @@ function MiniApp(){
       })(),
       layer==='castlist'&&e(CastListPage,Object.assign({},commonProps,{onRefresh:function(){refreshData(true);},onGoBack:goBack,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomsList:roomsList,userName:userName})),
       layer==='shift'&&e(ShiftPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList,userName:userName,holidays:roomHolidays})),
-      layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack})),
+      layer==='visit'&&e(VisitPage,Object.assign({},commonProps,{onGoBack:goBack,roomsList:roomsList})),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
         castPage==='input'&&e(InputPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
         castPage==='chart'&&e(ChartPage,Object.assign({},commonProps,{castId:selectedCast,onChangePage:function(pg){setCastPage(pg);}})),
