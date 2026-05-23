@@ -3093,7 +3093,7 @@ function MiniApp(){
               visibleFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){if(!seenCids.has(cid)){seenCids.add(cid);mergedIds.push(cid);}});});
               var displayFolder=Object.assign({},visibleFolders.find(function(f){return f._personal;})||visibleFolders[0]||{},{castIds:mergedIds});
               var folderCasts=(data.casts||[]).filter(function(c){return seenCids.has(c.id);});
-              return e(FolderDetail,Object.assign({},commonProps2,{folder:displayFolder,folderCasts:folderCasts,onRefresh:onRefreshMycast,onGoBack:goBack}));
+              return e(FolderDetail,Object.assign({},commonProps2,{folder:displayFolder,folderCasts:folderCasts,onRefresh:onRefreshMycast,onGoBack:goBack,hideHeader:true}));
             })()
         );
       })(),
