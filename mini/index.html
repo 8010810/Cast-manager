@@ -1870,6 +1870,7 @@ function MiniApp(){
   var primaryRoomRef=React.useRef(null);
   var personalDataRef=React.useRef({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
   var pendingListenersRef=React.useRef({});
+  var rebuildDataRef=React.useRef(null);
 
   var layer=navStack[navStack.length-1]||'home';
   var isCastLayer=layer==='cast';
@@ -1944,6 +1945,7 @@ function MiniApp(){
       Object.keys(pd.shifts||{}).forEach(function(k){if(!roomCastIds.has(k))shifts[k]=pd.shifts[k];});
       setData({casts:casts,records:records,customers:customers,folders:folders,shifts:shifts,visits:visits,quota:quota});
     }
+    rebuildDataRef.current=rebuildData;
 
     var unsubAuth=auth.onAuthStateChanged(function(u){
       setUser(u);cleanupRooms();
@@ -2071,7 +2073,7 @@ function MiniApp(){
   },[]);
 
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
-  function refreshData(showToast){if(showToast)notify('更新しました','success');}
+  function refreshData(showToast){if(rebuildDataRef.current)rebuildDataRef.current();if(showToast)notify('更新しました','success');}
   function setupApprovalListener(uid,rid,roomName,inviteCode){
     if(pendingListenersRef.current[rid])return;
     var started=false;
@@ -2963,7 +2965,7 @@ function MiniApp(){
           e('div',{style:S.pageTitle},
             e('button',{style:{background:'transparent',border:'none',padding:'2px 4px',cursor:'pointer',color:'#e8b86d',display:'flex',alignItems:'center',marginRight:'2px'},onClick:goBack},e('svg',{width:20,height:20,viewBox:'0 0 24 24',fill:'none',stroke:'#e8b86d',strokeWidth:2.5,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'15 18 9 12 15 6'}))),
             e('h1',{style:{...S.h1,flex:1,textAlign:'center'}},'MG実績'),
-            e('div',{style:{width:'56px'}})
+            e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center',minWidth:'40px',justifyContent:'center'},onClick:function(){refreshData(true);}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})))
           ),
           multiRoom&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px',overflowX:'auto',paddingBottom:'2px'}},
             myRooms.map(function(r){
