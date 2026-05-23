@@ -410,8 +410,8 @@ function FolderDetail(p){
         var target=getMonthlyTarget(c,tm);
         var cpct=target>0?Math.round(sales/target*100):null;
         return e('div',{key:c.id,style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'14px 16px',marginBottom:'8px',display:'flex',alignItems:'center',gap:'12px'}},
-          e('div',{style:{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:700,color:'#0d0d1a',flexShrink:0,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();});}},c.name[0]),
-          e('div',{style:{flex:1,cursor:'pointer'},onClick:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();})}},
+          e('div',{style:{width:'40px',height:'40px',borderRadius:'50%',background:'linear-gradient(135deg,#e8b86d,#a78bfa)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'16px',fontWeight:700,color:'#0d0d1a',flexShrink:0,cursor:p.readOnly?'default':'pointer'},onClick:p.readOnly?undefined:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();});}},c.name[0]),
+          e('div',{style:{flex:1,cursor:p.readOnly?'default':'pointer'},onClick:p.readOnly?undefined:function(){p.onOpenCast(c.id,function(){p.onRestoreFolder&&p.onRestoreFolder();})}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'6px'}},e('div',{style:{fontWeight:700,color:c.isDispatch?'#a78bfa':'#f3f4f6',fontSize:'14px'}},c.name),c.isDispatch&&e('span',{style:{background:'#a78bfa22',color:'#a78bfa',border:'1px solid #a78bfa44',borderRadius:'4px',padding:'1px 5px',fontSize:'10px',fontWeight:700}},'派遣')),
             e('div',{style:{display:'flex',gap:'12px',marginTop:'4px'}},
               e('span',{style:{color:'#e8b86d',fontSize:'13px',fontWeight:700}},yen(sales)),
@@ -931,8 +931,9 @@ function ShiftPage(p){
   function nextMonth(){var d=new Date(yr,mo,1);setCurrentYM(d.getFullYear()+'-'+pad(d.getMonth()+1));}
 
   var shiftRooms=useMemo(function(){
+    var currentRoomIds=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));
     var seen=new Set();var result=[];
-    (p.data.folders||[]).forEach(function(f){
+    (p.data.folders||[]).filter(function(f){return !(f._roomId&&!currentRoomIds.has(f._roomId));}).forEach(function(f){
       var rid=f._roomId||'__none__';
       if(!seen.has(rid)){seen.add(rid);result.push({rid:rid,label:f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:p.userName||f.name});}
     });
@@ -942,7 +943,7 @@ function ShiftPage(p){
   var filteredCasts=useMemo(function(){
     var currentRoomIds=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));
     var myIds=new Set();
-    (p.data.folders||[]).filter(function(f){return !f._archived&&f.ownerUid&&f.ownerUid===p.uid;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myIds.add(id);});});
+    (p.data.folders||[]).filter(function(f){return !f._archived&&f.ownerUid&&f.ownerUid===p.uid&&!(f._roomId&&!currentRoomIds.has(f._roomId));}).forEach(function(f){(f.castIds||[]).forEach(function(id){myIds.add(id);});});
     var q=query.trim().toLowerCase();
     var base=p.data.casts.filter(function(c){return !c._archived&&!c._leftRoom&&myIds.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
     if(q)base=base.filter(function(c){return c.name.toLowerCase().includes(q);});
@@ -1987,7 +1988,6 @@ function MiniApp(){
         if(!roomCastIds.has(c.id)){
           var extra={_personal:true};
           if(c._archived)extra._archived=true;
-          if(c._leftRoom)extra._leftRoom=true;
           casts.push(Object.assign({},c,extra));
         }
       });
@@ -2080,22 +2080,6 @@ function MiniApp(){
           Object.keys(unsubDataMapRef.current).forEach(function(rid){
             if(!currentRids.has(rid)){
               unsubDataMapRef.current[rid]();delete unsubDataMapRef.current[rid];
-              var prevLeave=roomDataMapRef.current[rid];
-              if(prevLeave&&(prevLeave.casts||[]).length>0){
-                db.collection('users').doc(u.uid).collection('data').doc('main').get().then(function(pDoc){
-                  var pd2=pDoc.exists?pDoc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
-                  var pCids2=new Set((pd2.casts||[]).map(function(c){return c.id;}));
-                  var lvCids=new Set((prevLeave.casts||[]).map(function(c){return c.id;}));
-                  // キャスト+レコードを_leftRoom:trueで個人データに移す。フォルダは移さない
-                  db.collection('users').doc(u.uid).collection('data').doc('main').set({
-                    casts:(pd2.casts||[]).map(function(c){return lvCids.has(c.id)?Object.assign({},c,{_leftRoom:true}):c;}).concat((prevLeave.casts||[]).filter(function(c){return !pCids2.has(c.id);}).map(function(c){return Object.assign({},c,{_leftRoom:true});})),
-                    records:Object.assign({},prevLeave.records||{},pd2.records||{}),
-                    customers:pd2.customers||{},
-                    folders:pd2.folders||[],
-                    shifts:pd2.shifts||{},visits:pd2.visits||[],quota:pd2.quota||{}
-                  }).catch(function(){});
-                }).catch(function(){});
-              }
               delete roomDataMapRef.current[rid];rebuildData();
             }
           });
@@ -2104,25 +2088,7 @@ function MiniApp(){
             if(unsubDataMapRef.current[rid])return;
             unsubDataMapRef.current[rid]=db.collection('rooms').doc(rid).collection('data').doc('main').onSnapshot(function(doc){
               if(!doc.exists){
-                var prev=roomDataMapRef.current[rid];
-                if(prev&&(prev.casts||[]).length>0){
-                  // ルームが削除された → キャスト+レコードを_leftRoom:trueで個人データに移す
-                  var pRef2=db.collection('users').doc(u.uid).collection('data').doc('main');
-                  pRef2.get().then(function(pDoc){
-                    var pd=pDoc.exists?pDoc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
-                    var pCids=new Set((pd.casts||[]).map(function(c){return c.id;}));
-                    var prevCids=new Set((prev.casts||[]).map(function(c){return c.id;}));
-                    pRef2.set({
-                      casts:(pd.casts||[]).map(function(c){return prevCids.has(c.id)?Object.assign({},c,{_leftRoom:true}):c;}).concat((prev.casts||[]).filter(function(c){return !pCids.has(c.id);}).map(function(c){return Object.assign({},c,{_leftRoom:true});})),
-                      records:Object.assign({},prev.records||{},pd.records||{}),
-                      customers:pd.customers||{},
-                      folders:pd.folders||[],
-                      shifts:pd.shifts||{},visits:pd.visits||[],quota:pd.quota||{}
-                    }).catch(function(){});
-                    db.collection('users').doc(u.uid).collection('rooms').doc(rid).delete().catch(function(){});
-                  }).catch(function(){});
-                }
-                roomDataMapRef.current[rid]=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
+                delete roomDataMapRef.current[rid];
                 loadedRids.add(rid);
                 if(firstRoomsSnap&&loadedRids.size>=rooms.length){firstRoomsSnap=false;roomsReady=true;checkAllDone();}
                 rebuildData();
@@ -2390,10 +2356,10 @@ function MiniApp(){
 
     if(aiPage){
       var myUidAI=user?user.uid:'';
-      var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI));});
+      var currentRoomIds=new Set((roomsList||[]).map(function(r){return r.roomId;}));
+      var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI))&&!(f._roomId&&!currentRoomIds.has(f._roomId));});
       var aiCastIdSet=new Set();
       aiFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){aiCastIdSet.add(cid);});});
-      var currentRoomIds=new Set((roomsList||[]).map(function(r){return r.roomId;}));
       var aiCasts=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&!c._leftRoom&&aiCastIdSet.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
       var AI_OV={position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:200,display:'flex',flexDirection:'column',background:'#0d0d1a'};
       var AI_HDR={position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(167,139,250,0.15)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
@@ -2860,7 +2826,8 @@ function MiniApp(){
     var nowYear=new Date().getFullYear();
     var targetYears=[String(nowYear)];
     var myUid2=user?user.uid:'';
-    var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&(f.ownerUid===myUid2||f._personal);});
+    var currentRoomIds=new Set((roomsList||[]).map(function(r){return r.roomId;}));
+    var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&(f.ownerUid===myUid2||f._personal)&&!(f._roomId&&!currentRoomIds.has(f._roomId));});
     var myFolderCastIds=new Set();allTargetFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){myFolderCastIds.add(cid);});});
     var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived&&myFolderCastIds.has(c.id);});
     var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
@@ -3092,12 +3059,12 @@ function MiniApp(){
             :(function(){
               var mergedIds=[];var seenCids=new Set();
               visibleFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){if(!seenCids.has(cid)){seenCids.add(cid);mergedIds.push(cid);}});});
-              // グラフ用: _leftRoomキャストも含める（カード表示は除外）
-              var graphIds=mergedIds.slice();var graphCids=new Set(seenCids);
-              (data.casts||[]).forEach(function(c){if(c._leftRoom&&c._personal&&!c._archived&&!graphCids.has(c.id)){graphCids.add(c.id);graphIds.push(c.id);}});
-              var displayFolder=Object.assign({},visibleFolders.find(function(f){return f._personal;})||visibleFolders[0]||{},{castIds:graphIds});
+              var displayFolder=Object.assign({},visibleFolders.find(function(f){return f._personal;})||visibleFolders[0]||{},{castIds:mergedIds});
               var folderCasts=(data.casts||[]).filter(function(c){return seenCids.has(c.id);});
-              return e(FolderDetail,Object.assign({},commonProps2,{folder:displayFolder,folderCasts:folderCasts,onRefresh:onRefreshMycast,onGoBack:goBack,hideHeader:true}));
+              var currentRoomIds2=new Set((roomsList||[]).map(function(r){return r.roomId;}));
+              var activeFolder2=visibleFolders[0]||null;
+              var isLeftRoom=activeFolder2&&activeFolder2._roomId&&!currentRoomIds2.has(activeFolder2._roomId);
+              return e(FolderDetail,Object.assign({},commonProps2,{folder:displayFolder,folderCasts:folderCasts,onRefresh:onRefreshMycast,onGoBack:goBack,hideHeader:true,readOnly:!!isLeftRoom}));
             })()
         );
       })(),
