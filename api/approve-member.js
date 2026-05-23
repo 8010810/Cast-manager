@@ -113,9 +113,9 @@ export default async function handler(req, res) {
     var subscriptionId = subData.subscriptionId;
     var customerId = subData.customerId;
 
-    // 管理者含む全メンバー数を正として数量更新
+    // 管理者を除く招待済みメンバー数（isInvited===true）のみカウント
     var membersSnap = await db.collection('rooms').doc(roomId).collection('members').get();
-    var newQuantity = membersSnap.size;
+    var newQuantity = membersSnap.docs.filter(function(doc) { return doc.data().isInvited === true; }).length;
 
     var subscription = await stripe.subscriptions.retrieve(subscriptionId);
     var item = subscription.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
