@@ -2422,12 +2422,12 @@ function MiniApp(){
       if(aiPage==='hub'){
         return e('div',{style:AI_OV},
           e('div',{style:AI_HDR},
-            e('div',{style:{width:'36px'}}),
+            e('button',{style:{background:'transparent',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'22px',lineHeight:'1',padding:'4px 8px'},onClick:function(){setAiPage(null);}},'×'),
             e('div',{style:{position:'absolute',left:'50%',transform:'translateX(-50%)',display:'flex',alignItems:'center',gap:'8px'}},
               AI_SPARKLE_ICON,
               e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'AI分析')
             ),
-            e('button',{style:{background:'transparent',border:'none',color:'#9ca3af',cursor:'pointer',fontSize:'22px',lineHeight:'1',padding:'4px 8px'},onClick:function(){setAiPage(null);}},'×')
+            e('div',{style:{width:'36px'}})
           ),
           e('div',{style:AI_BODY},
             aiCasts.length===0
