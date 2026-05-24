@@ -816,9 +816,10 @@ function SalesPage(p){
       return{id:c.id,name:c.name,
         sales:rows.reduce(function(s,r){return s+Number(r.sales||0);},0),
         nominations:rows.reduce(function(s,r){return s+Number(r.nominations||0);},0),
+        companions:rows.reduce(function(s,r){return s+Number(r.companions||0);},0),
         floorCount:rows.reduce(function(s,r){return s+Number(r.floorCount||0);},0)
       };
-    }).filter(function(x){return x.sales>0||x.nominations>0||x.floorCount>0;});
+    }).filter(function(x){return x.sales>0||x.nominations>0||x.companions>0||x.floorCount>0;});
   },[p.data,rankMode,selYearS,selMonth,selDay]);
 
   var folders=p.data.folders||[];
@@ -989,6 +990,7 @@ function SalesPage(p){
         e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}},
           rkBtn(rkMetric==='sales','売上',function(){setTargetInput2('sales');}),
           rkBtn(rkMetric==='nominations','指名組数',function(){setTargetInput2('nominations');}),
+          rkBtn(rkMetric==='companions','同伴数',function(){setTargetInput2('companions');}),
           rkBtn(rkMetric==='floorCount','場内組数',function(){setTargetInput2('floorCount');})
         ),
         e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px'}},
@@ -1006,7 +1008,7 @@ function SalesPage(p){
         ),
         e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px',marginBottom:'10px'}},
           selYearS+'年'+Number(selMonth)+'月'+(rankMode==='daily'?Number(selDay)+'日':'')
-          +' '+(rkMetric==='sales'?'売上':rkMetric==='nominations'?'指名組数':'場内組数')+'ランキング'
+          +' '+(rkMetric==='sales'?'売上':rkMetric==='nominations'?'指名組数':rkMetric==='companions'?'同伴数':'場内組数')+'ランキング'
         ),
         rkSorted.length===0
           ?e('div',{style:{color:'#4b5563',fontSize:'13px',textAlign:'center',padding:'20px'}},'データがありません')
@@ -1014,7 +1016,7 @@ function SalesPage(p){
             var val=item[rkMetric];
             var bw=Math.round(val/rkMax*100);
             var medal=idx===0?'1':idx===1?'2':idx===2?'3':'';var medalColor=idx===0?'#f59e0b':idx===1?'#9ca3af':idx===2?'#b45309':'#6b7280';
-            var dispVal=rkMetric==='sales'?yen(val):val+'組';
+            var dispVal=rkMetric==='sales'?yen(val):rkMetric==='companions'?val+'回':val+'組';
             return e('div',{key:item.id,style:{marginBottom:'12px'}},
               e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'4px'}},
                 e('div',{style:{width:'22px',textAlign:'center',fontSize:'14px'}},medal||e('span',{style:{color:'#6b7280',fontSize:'12px'}},String(idx+1))),
