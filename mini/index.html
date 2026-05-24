@@ -2014,6 +2014,20 @@ function MiniApp(){
       if(u){
         unsubPersonalData=db.collection('users').doc(u.uid).collection('data').doc('main').onSnapshot(function(doc){
           var d=doc.exists?doc.data():{};
+          // 同じownerUidの個人フォルダ重複をマージ
+          var rawFolders=d.folders||[];
+          var myFolders=rawFolders.filter(function(f){return f.ownerUid&&f.ownerUid===u.uid;});
+          if(myFolders.length>1){
+            var canonical=myFolders.find(function(f){return f.id==='personal_'+u.uid;})||myFolders[0];
+            var mergedIds=[];
+            myFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){if(!mergedIds.includes(cid))mergedIds.push(cid);});});
+            canonical=Object.assign({},canonical,{castIds:mergedIds});
+            var dupIds=new Set(myFolders.map(function(f){return f.id;}));
+            dupIds.delete(canonical.id);
+            var cleanFolders=rawFolders.filter(function(f){return !dupIds.has(f.id);}).map(function(f){return f.id===canonical.id?canonical:f;});
+            d=Object.assign({},d,{folders:cleanFolders});
+            db.collection('users').doc(u.uid).collection('data').doc('main').update({folders:cleanFolders}).catch(function(){});
+          }
           personalDataRef.current=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
           rebuildData();
         },function(){});
