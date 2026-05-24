@@ -1930,12 +1930,20 @@ function ChartPage(p){
       ),
       e('div',{style:S.summaryTable},
         e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'10px'}},summaryLabel),
-        e('div',{style:S.summaryRow},METRICS.map(function(m){
-          return e('div',{key:m.key,style:S.summaryCell},
+        e('div',{style:S.summaryRow},METRICS.reduce(function(acc,m){
+          if(m.key==='workDays'){
+            var avgS=summaryTotals.workDays>0?Math.round(summaryTotals.sales/summaryTotals.workDays):0;
+            acc.push(e('div',{key:'avgSales',style:S.summaryCell},
+              e('div',{style:{color:'#f59e0b',fontSize:'11px',marginBottom:'4px'}},'平均売上'),
+              e('div',{style:{color:'#e5e7eb',fontSize:'15px',fontWeight:700}},yen(avgS))
+            ));
+          }
+          acc.push(e('div',{key:m.key,style:S.summaryCell},
             e('div',{style:{color:m.color,fontSize:'11px',marginBottom:'4px'}},m.label),
             e('div',{style:{color:'#e5e7eb',fontSize:'15px',fontWeight:700}},m.key==='sales'?yen(summaryTotals[m.key]):summaryTotals[m.key]+m.unit)
-          );
-        }))
+          ));
+          return acc;
+        },[]))
       )
     )
   );
