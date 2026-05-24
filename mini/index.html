@@ -1865,6 +1865,8 @@ function MiniApp(){
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
   var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|castId
   var s_acd=useState({castId:null,text:'',status:'idle'});var aiCastData=s_acd[0];var setAiCastData=s_acd[1];
+  var s_airpts=useState({});var aiReports=s_airpts[0];var setAiReports=s_airpts[1];
+  var s_airp=useState(null);var aiReportPage=s_airp[0];var setAiReportPage=s_airp[1];
   var s_pdata=useState({experienceYears:'',castRelationStyle:'',riskTolerance:'',trainingPolicy:'',specialtyArea:'',decisionStyle:''});var miniProfileData=s_pdata[0];var setMiniProfileData=s_pdata[1];
   var s_pef=useState(null);var miniProfEditField=s_pef[0];var setMiniProfEditField=s_pef[1];
   var s_pev=useState('');var miniProfEditVal=s_pev[0];var setMiniProfEditVal=s_pev[1];
@@ -1948,14 +1950,16 @@ function MiniApp(){
     var unsubConsent=null;
     var unsubPersonalData=null;
     var unsubRoomDoc=null;
+    var unsubAiReports=null;
     var loadingTimeoutId=null;
 
     function cleanupRooms(){
       if(unsubConsent){unsubConsent();unsubConsent=null;}
       if(unsubRooms){unsubRooms();unsubRooms=null;}
       if(unsubPersonalData){unsubPersonalData();unsubPersonalData=null;}
+      if(unsubAiReports){unsubAiReports();unsubAiReports=null;}
       if(unsubRoomDoc){unsubRoomDoc();unsubRoomDoc=null;}
-      setRoomHolidays([]);
+      setRoomHolidays([]);setAiReports({});
       Object.values(unsubDataMapRef.current).forEach(function(fn){fn();});
       unsubDataMapRef.current={};roomDataMapRef.current={};leftRoomDataRef.current={};primaryRoomRef.current=null;
       if(unsubRoomSubRef.current){unsubRoomSubRef.current();unsubRoomSubRef.current=null;}
@@ -2012,6 +2016,9 @@ function MiniApp(){
           var d=doc.exists?doc.data():{};
           personalDataRef.current=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
           rebuildData();
+        },function(){});
+        unsubAiReports=db.collection('users').doc(u.uid).collection('meta').doc('aiReports').onSnapshot(function(doc){
+          setAiReports(doc.exists?doc.data():{});
         },function(){});
         setLoading(true);
         var consentDone=false,roomsReady=false;
@@ -2363,6 +2370,7 @@ function MiniApp(){
     function runCastAI(castId){
       var cast=(data.casts||[]).find(function(c){return c.id===castId;});
       if(!cast)return;
+      if((aiReports[castId]||[]).length>=4)return;
       setAiCastData({castId:castId,text:'',status:'loading'});
       var now2=new Date();var months=[];
       for(var i=5;i>=0;i--){
@@ -2389,7 +2397,14 @@ function MiniApp(){
       fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})})
       .then(function(r){return r.json();})
-      .then(function(d){setAiCastData({castId:castId,text:d.content&&d.content[0]?d.content[0].text:'分析に失敗しました',status:'done'});})
+      .then(function(d){
+        var txt=d.content&&d.content[0]?d.content[0].text:'分析に失敗しました';
+        var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
+        var newRpts=(aiReports[castId]||[]).concat([rpt]);
+        var upd={};upd[castId]=newRpts;
+        if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiReports').set(upd,{merge:true}).catch(function(){});}
+        setAiCastData({castId:castId,text:'',status:'idle'});
+      })
       .catch(function(){setAiCastData({castId:castId,text:'ネットワークエラーが発生しました',status:'error'});});
     }
 
@@ -2430,34 +2445,54 @@ function MiniApp(){
         );
       }
       var aiCast=(data?data.casts||[]:[]).find(function(c){return c.id===aiPage;})||null;
-      var acd=aiCastData.castId===aiPage?aiCastData:{castId:aiPage,text:'',status:'idle'};
-      var aiBodyContent;
-      if(acd.status==='loading'){
-        aiBodyContent=e('div',{style:{textAlign:'center',padding:'80px 24px'}},
-          e('div',{style:{fontSize:'13px',color:'#a78bfa'}},'分析中...')
-        );
-      } else if(acd.status==='done'){
-        aiBodyContent=e('div',null,
-          e('div',{style:{whiteSpace:'pre-wrap',fontSize:'13px',color:'#d1d5db',lineHeight:'1.7',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'14px',padding:'18px 16px',marginBottom:'16px'}},acd.text),
-          e('button',{style:{display:'block',width:'100%',padding:'12px',background:'linear-gradient(135deg,#7c3aed,#4f46e5)',border:'none',borderRadius:'12px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:'pointer'},onClick:function(){runCastAI(aiPage);}},'再分析')
-        );
-      } else if(acd.status==='error'){
-        aiBodyContent=e('div',{style:{textAlign:'center',padding:'40px 24px'}},
-          e('div',{style:{fontSize:'13px',color:'#ef4444',marginBottom:'16px'}},acd.text),
-          e('button',{style:{padding:'10px 24px',background:'linear-gradient(135deg,#7c3aed,#4f46e5)',border:'none',borderRadius:'12px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:'pointer'},onClick:function(){runCastAI(aiPage);}},'再試行')
-        );
-      } else {
-        aiBodyContent=e('div',{style:{textAlign:'center',padding:'60px 24px'}},
-          e('button',{style:{padding:'14px 32px',background:'linear-gradient(135deg,#7c3aed,#4f46e5)',border:'none',borderRadius:'14px',color:'#fff',fontSize:'14px',fontWeight:600,cursor:'pointer',boxShadow:'0 4px 20px rgba(124,58,237,0.4)'},onClick:function(){runCastAI(aiPage);}},'✨ AI分析を開始')
+      if(aiReportPage){
+        var rptDetail=(aiReports[aiPage]||[]).find(function(r){return r.id===aiReportPage;})||null;
+        return e('div',{style:AI_OV},
+          e('div',{style:AI_HDR},
+            e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiReportPage(null);}},'‹ 戻る'),
+            e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},rptDetail?rptDetail.date:''),
+            e('div',{style:{width:'40px'}})
+          ),
+          e('div',{style:AI_BODY},
+            rptDetail
+              ?e('div',{style:{whiteSpace:'pre-wrap',fontSize:'13px',color:'#d1d5db',lineHeight:'1.7'}},rptDetail.text)
+              :e('div',{style:{color:'#6b7280',fontSize:'13px',textAlign:'center',paddingTop:'60px'}},'レポートが見つかりません')
+          )
         );
       }
+      var castRpts=(aiReports[aiPage]||[]).slice().sort(function(a,b){return Number(b.id)-Number(a.id);});
+      var remainCount=4-castRpts.length;
+      var acd=aiCastData.castId===aiPage?aiCastData:{castId:aiPage,text:'',status:'idle'};
+      var isAnalyzing=acd.status==='loading';
       return e('div',{style:AI_OV},
         e('div',{style:AI_HDR},
-          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');}},'‹ 戻る'),
+          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');setAiReportPage(null);}},'‹ 戻る'),
           e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},aiCast?aiCast.name:''),
           e('div',{style:{width:'40px'}})
         ),
-        e('div',{style:AI_BODY},aiBodyContent)
+        e('div',{style:AI_BODY},
+          e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}},
+            e('button',{
+              style:{padding:'8px 18px',background:remainCount>0&&!isAnalyzing?'linear-gradient(135deg,#7c3aed,#4f46e5)':'#374151',border:'none',borderRadius:'10px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:remainCount>0&&!isAnalyzing?'pointer':'default',opacity:remainCount>0&&!isAnalyzing?1:0.5},
+              disabled:remainCount<=0||isAnalyzing,
+              onClick:function(){if(remainCount>0&&!isAnalyzing)runCastAI(aiPage);}
+            },isAnalyzing?'分析中...':'分析を開始'),
+            e('span',{style:{fontSize:'12px',color:'#6b7280'}},'残り '+remainCount+'/4')
+          ),
+          acd.status==='error'&&e('div',{style:{fontSize:'12px',color:'#ef4444',marginBottom:'12px'}},acd.text),
+          castRpts.length===0
+            ?e('div',{style:{textAlign:'center',padding:'40px 24px',color:'#4b5563',fontSize:'13px'}},'まだレポートがありません')
+            :castRpts.map(function(rpt){
+              return e('button',{key:rpt.id,style:{display:'flex',alignItems:'center',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'0',color:'#e5e7eb',cursor:'pointer',textAlign:'left',marginBottom:'10px',overflow:'hidden'},
+                onClick:function(){setAiReportPage(rpt.id);}},
+                e('div',{style:{width:'4px',alignSelf:'stretch',background:'#a78bfa',flexShrink:0}}),
+                e('div',{style:{flex:1,padding:'14px 14px'}},
+                  e('div',{style:{fontSize:'13px',fontWeight:600}},rpt.date)
+                ),
+                e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
+              );
+            })
+        )
       );
     }
     // 設定画面
