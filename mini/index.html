@@ -2070,19 +2070,6 @@ function MiniApp(){
           Object.keys(unsubDataMapRef.current).forEach(function(rid){
             if(!currentRids.has(rid)){
               unsubDataMapRef.current[rid]();delete unsubDataMapRef.current[rid];
-              // 退室ルームのフォルダ・キャスト・レコードを個人Firestoreに永続化
-              var prevData=roomDataMapRef.current[rid];
-              if(prevData&&((prevData.casts||[]).length>0||(prevData.folders||[]).length>0)){
-                db.collection('users').doc(u.uid).collection('data').doc('main').get().then(function(pDoc){
-                  var pd=pDoc.exists?pDoc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
-                  var pCastIds=new Set((pd.casts||[]).map(function(c){return c.id;}));
-                  var pFolderIds=new Set((pd.folders||[]).map(function(f){return f.id;}));
-                  var newCasts=(pd.casts||[]).concat((prevData.casts||[]).filter(function(c){return !pCastIds.has(c.id);}).map(function(c){return Object.assign({},c,{_leftRoomId:rid});}));
-                  var newFolders=(pd.folders||[]).concat((prevData.folders||[]).filter(function(f){return !pFolderIds.has(f.id);}).map(function(f){return Object.assign({},f,{_leftRoomId:rid});}));
-                  var newRecords=Object.assign({},pd.records||{},prevData.records||{});
-                  return db.collection('users').doc(u.uid).collection('data').doc('main').set(Object.assign({},pd,{casts:newCasts,folders:newFolders,records:newRecords}));
-                }).catch(function(){});
-              }
               delete roomDataMapRef.current[rid];
               rebuildData();
             }
