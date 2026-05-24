@@ -2348,8 +2348,8 @@ function MiniApp(){
             if(!canSubmit)return;
             var uName=userName.trim();
             var newData=Object.assign({},data);
-            var alreadyExists=(newData.folders||[]).some(function(f){return f.ownerUid&&f.ownerUid===user.uid;});
-            if(!alreadyExists){newData.folders=[{id:uid(),name:uName,castIds:[],ownerUid:user.uid}].concat(newData.folders||[]);}
+            var alreadyExists=(newData.folders||[]).some(function(f){return f.ownerUid&&f.ownerUid===user.uid&&(f._personal||!f._roomId);});
+            if(!alreadyExists){newData.folders=[{id:'personal_'+user.uid,name:uName,castIds:[],ownerUid:user.uid,_personal:true}].concat(newData.folders||[]);}
             db.collection('users').doc(user.uid).collection('meta').doc('consent').update({userName:uName});
             persist(newData);
             // サブスクまたはルーム所属がなければ / でプラン選択（server直読み）
