@@ -594,10 +594,9 @@ function CastListPage(p){
   },[detail]);
 
   var sorted=useMemo(function(){
-    var currentRoomIds=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));
     var pCastIds=new Set();
-    (p.data.folders||[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===p.uid));}).forEach(function(f){(f.castIds||[]).forEach(function(cid){pCastIds.add(cid);});});
-    var list=(p.data.casts||[]).filter(function(c){return !c._archived&&(c._personal===true||pCastIds.has(c.id))&&(!c._roomId||currentRoomIds.has(c._roomId));});
+    (p.data.folders||[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f._personal===true||(f.ownerUid&&f.ownerUid===p.uid));}).forEach(function(f){(f.castIds||[]).forEach(function(cid){pCastIds.add(cid);});});
+    var list=(p.data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom&&(c._personal===true||pCastIds.has(c.id));});
     var CUP_ORDER_M={A:1,B:2,C:3,D:4,E:5,F:6,G:7,H:8,I:9,J:10,K:11};
     if(sortBy==='name')list.sort(function(a,b){return a.name.localeCompare(b.name,'ja');});
     else if(sortBy==='age')list.sort(function(a,b){var aa=calcAge(a.birthday)||999;var bb=calcAge(b.birthday)||999;return aa-bb;});
@@ -931,9 +930,8 @@ function ShiftPage(p){
   function nextMonth(){var d=new Date(yr,mo,1);setCurrentYM(d.getFullYear()+'-'+pad(d.getMonth()+1));}
 
   var shiftRooms=useMemo(function(){
-    var currentRoomIds=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));
     var seen=new Set();var result=[];
-    (p.data.folders||[]).filter(function(f){return !(f._roomId&&!currentRoomIds.has(f._roomId));}).forEach(function(f){
+    (p.data.folders||[]).filter(function(f){return !f._leftRoom;}).forEach(function(f){
       var rid=f._roomId||'__none__';
       if(!seen.has(rid)){seen.add(rid);result.push({rid:rid,label:f._roomId?((p.roomsList||[]).find(function(r){return r.roomId===f._roomId;})||{}).name||f.name:p.userName||f.name});}
     });
@@ -941,11 +939,10 @@ function ShiftPage(p){
     return result;
   },[p.data.folders,p.roomsList]);
   var filteredCasts=useMemo(function(){
-    var currentRoomIds=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));
     var myIds=new Set();
-    (p.data.folders||[]).filter(function(f){return !f._archived&&f.ownerUid&&f.ownerUid===p.uid&&!(f._roomId&&!currentRoomIds.has(f._roomId));}).forEach(function(f){(f.castIds||[]).forEach(function(id){myIds.add(id);});});
+    (p.data.folders||[]).filter(function(f){return !f._archived&&!f._leftRoom&&f.ownerUid&&f.ownerUid===p.uid;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myIds.add(id);});});
     var q=query.trim().toLowerCase();
-    var base=p.data.casts.filter(function(c){return !c._archived&&myIds.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
+    var base=p.data.casts.filter(function(c){return !c._archived&&!c._leftRoom&&myIds.has(c.id);});
     if(q)base=base.filter(function(c){return c.name.toLowerCase().includes(q);});
     if(selShiftFolder==='all')return base;
     var roomFolders=(p.data.folders||[]).filter(function(f){return(f._roomId||'__none__')===selShiftFolder;});
@@ -1624,7 +1621,7 @@ function VisitPage(p){
   var blankVisit=function(date,roomId){var isP=roomId==='__personal__';return{id:uid(),type:'来店',time:'',guestName:'',castName:'',count:'',seat:'',bottleNeck:'',bottle:'',lastVisit:'',note:'',date:date||selectedDate||todayStr(),_roomId:isP?undefined:(roomId||undefined),_personal:isP?true:undefined};};
   var s5=useState(blankVisit());var form=s5[0];var setForm=s5[1];
 
-  var visits=(p.data.visits||[]).filter(function(v){var cur=new Set((p.roomsList||[]).map(function(r){return r.roomId;}));return!v._roomId||cur.has(v._roomId);});
+  var visits=(p.data.visits||[]).filter(function(v){return !v._leftRoom;});
   var ymParts=currentYM.split('-');var yr=Number(ymParts[0]);var mo=Number(ymParts[1]);
   var daysInMonth=new Date(yr,mo,0).getDate();
   var firstDay=new Date(yr,mo-1,1).getDay();
@@ -1915,6 +1912,7 @@ function MiniApp(){
   },[settingsPage,miniSubData&&miniSubData.status,roomSubData&&roomSubData.status]);
 
   var roomDataMapRef=React.useRef({});
+  var leftRoomDataRef=React.useRef({});
   var unsubDataMapRef=React.useRef({});
   var primaryRoomRef=React.useRef(null);
   var unsubRoomSubRef=React.useRef(null);
@@ -1958,7 +1956,7 @@ function MiniApp(){
       if(unsubRoomDoc){unsubRoomDoc();unsubRoomDoc=null;}
       setRoomHolidays([]);
       Object.values(unsubDataMapRef.current).forEach(function(fn){fn();});
-      unsubDataMapRef.current={};roomDataMapRef.current={};primaryRoomRef.current=null;
+      unsubDataMapRef.current={};roomDataMapRef.current={};leftRoomDataRef.current={};primaryRoomRef.current=null;
       if(unsubRoomSubRef.current){unsubRoomSubRef.current();unsubRoomSubRef.current=null;}
       setRoomSubData(null);
       personalDataRef.current={casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
@@ -1980,6 +1978,13 @@ function MiniApp(){
         Object.keys(d.shifts||{}).forEach(function(k){shifts[k]=d.shifts[k];});
         visits=visits.concat((d.visits||[]).map(function(v){return Object.assign({},v,{_roomId:rid});}));
         Object.assign(quota,d.quota||{});
+      });
+      // 退室ルームデータをマージ（_leftRoom:true フラグ付き、visits除外）
+      Object.keys(leftRoomDataRef.current).forEach(function(rid){
+        var d=leftRoomDataRef.current[rid]||{};
+        (d.casts||[]).forEach(function(c){casts.push(Object.assign({},c,{_roomId:rid,_leftRoom:true}));});
+        Object.keys(d.records||{}).forEach(function(k){if(!records[k])records[k]=d.records[k];});
+        (d.folders||[]).forEach(function(f){folders.push(Object.assign({},f,{_roomId:rid,_leftRoom:true}));});
       });
       // ルームデータと重複しないようにIDで除外してからpersonalデータをマージ
       var roomCastIds=new Set(casts.map(function(c){return c.id;}));
@@ -2066,7 +2071,10 @@ function MiniApp(){
           Object.keys(unsubDataMapRef.current).forEach(function(rid){
             if(!currentRids.has(rid)){
               unsubDataMapRef.current[rid]();delete unsubDataMapRef.current[rid];
-              // roomDataMapRef のデータは残す（退室後もMG実績でreadOnly表示するため）
+              // 退室ルームデータを専用refに移動（roomDataMapRefとリスナーから切り離す）
+              var prev=roomDataMapRef.current[rid];
+              if(prev)leftRoomDataRef.current[rid]=prev;
+              delete roomDataMapRef.current[rid];
               rebuildData();
             }
           });
@@ -2361,11 +2369,10 @@ function MiniApp(){
 
     if(aiPage){
       var myUidAI=user?user.uid:'';
-      var currentRoomIds=new Set((roomsList||[]).map(function(r){return r.roomId;}));
-      var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI))&&!(f._roomId&&!currentRoomIds.has(f._roomId));});
+      var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI));});
       var aiCastIdSet=new Set();
       aiFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){aiCastIdSet.add(cid);});});
-      var aiCasts=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&aiCastIdSet.has(c.id)&&(!c._roomId||currentRoomIds.has(c._roomId));});
+      var aiCasts=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&!c._leftRoom&&aiCastIdSet.has(c.id);});
       var AI_OV={position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:200,display:'flex',flexDirection:'column',background:'#0d0d1a'};
       var AI_HDR={position:'relative',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'16px 18px',borderBottom:'1px solid rgba(167,139,250,0.15)',background:'rgba(10,10,22,0.95)',backdropFilter:'blur(20px)',paddingTop:'calc(16px + env(safe-area-inset-top))'};
       var AI_BODY={flex:1,overflowY:'auto',padding:'20px 16px 40px'};
@@ -2831,8 +2838,7 @@ function MiniApp(){
     var nowYear=new Date().getFullYear();
     var targetYears=[String(nowYear)];
     var myUid2=user?user.uid:'';
-    var currentRoomIds=new Set((roomsList||[]).map(function(r){return r.roomId;}));
-    var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&(f.ownerUid===myUid2||f._personal)&&!(f._roomId&&!currentRoomIds.has(f._roomId));});
+    var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f.ownerUid===myUid2||f._personal);});
     var myFolderCastIds=new Set();allTargetFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){myFolderCastIds.add(cid);});});
     var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived&&myFolderCastIds.has(c.id);});
     var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
@@ -3066,9 +3072,7 @@ function MiniApp(){
               visibleFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){if(!seenCids.has(cid)){seenCids.add(cid);mergedIds.push(cid);}});});
               var displayFolder=Object.assign({},visibleFolders.find(function(f){return f._personal;})||visibleFolders[0]||{},{castIds:mergedIds});
               var folderCasts=(data.casts||[]).filter(function(c){return seenCids.has(c.id);});
-              var currentRoomIds2=new Set((roomsList||[]).map(function(r){return r.roomId;}));
-              var activeFolder2=visibleFolders[0]||null;
-              var isLeftRoom=activeFolder2&&activeFolder2._roomId&&!currentRoomIds2.has(activeFolder2._roomId);
+              var isLeftRoom=visibleFolders.length>0&&visibleFolders[0]._leftRoom;
               return e(FolderDetail,Object.assign({},commonProps2,{folder:displayFolder,folderCasts:folderCasts,onRefresh:onRefreshMycast,onGoBack:goBack,hideHeader:true,readOnly:!!isLeftRoom}));
             })()
         );
