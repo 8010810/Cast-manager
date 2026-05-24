@@ -1864,6 +1864,7 @@ function MiniApp(){
   var s_tf=useState(null);var targetFolder=s_tf[0];var setTargetFolder=s_tf[1];
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
   var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|castId
+  var s_acd=useState({castId:null,text:'',status:'idle'});var aiCastData=s_acd[0];var setAiCastData=s_acd[1];
   var s_pdata=useState({experienceYears:'',castRelationStyle:'',riskTolerance:'',trainingPolicy:'',specialtyArea:'',decisionStyle:''});var miniProfileData=s_pdata[0];var setMiniProfileData=s_pdata[1];
   var s_pef=useState(null);var miniProfEditField=s_pef[0];var setMiniProfEditField=s_pef[1];
   var s_pev=useState('');var miniProfEditVal=s_pev[0];var setMiniProfEditVal=s_pev[1];
@@ -2359,6 +2360,39 @@ function MiniApp(){
     }
 
 
+    function runCastAI(castId){
+      var cast=(data.casts||[]).find(function(c){return c.id===castId;});
+      if(!cast)return;
+      setAiCastData({castId:castId,text:'',status:'loading'});
+      var now2=new Date();var months=[];
+      for(var i=5;i>=0;i--){
+        var d2=new Date(now2.getFullYear(),now2.getMonth()-i,1);
+        var mk=d2.getFullYear()+'-'+pad(d2.getMonth()+1);
+        var rows=(data.records[castId]||[]).filter(function(r){return r.date.slice(0,7)===mk;});
+        months.push({mk:mk,
+          sales:rows.reduce(function(s,r){return s+Number(r.sales||0);},0),
+          companions:rows.reduce(function(s,r){return s+Number(r.companions||0);},0),
+          nominations:rows.reduce(function(s,r){return s+Number(r.nominations||0);},0),
+          workDays:rows.length,target:getMonthlyTarget(cast,mk)});
+      }
+      var yen=function(n){return Number(n).toLocaleString('ja-JP');};
+      var monthsText=months.map(function(m){
+        return m.mk+': 売上¥'+yen(m.sales)+(m.target?' (目標¥'+yen(m.target)+')':'')
+          +' 出勤'+m.workDays+'日 指名'+m.nominations+'組 同伴'+m.companions+'回';
+      }).join('\n');
+      var prompt='キャスト名: '+cast.name+'\n'
+        +(cast.contractShift?'契約シフト: '+cast.contractShift+'\n':'')
+        +'\n【直近6ヶ月】\n'+monthsText
+        +'\n\n以下を日本語で分析してください:\n'
+        +'1. 売上トレンドと目標達成状況\n2. 指名・同伴のバランス評価\n'
+        +'3. 売上向上の具体的アドバイス3点\n4. 今月の重点取り組み提案';
+      fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})})
+      .then(function(r){return r.json();})
+      .then(function(d){setAiCastData({castId:castId,text:d.content&&d.content[0]?d.content[0].text:'分析に失敗しました',status:'done'});})
+      .catch(function(){setAiCastData({castId:castId,text:'ネットワークエラーが発生しました',status:'error'});});
+    }
+
     if(aiPage){
       var myUidAI=user?user.uid:'';
       var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI));});
@@ -2396,18 +2430,34 @@ function MiniApp(){
         );
       }
       var aiCast=(data?data.casts||[]:[]).find(function(c){return c.id===aiPage;})||null;
+      var acd=aiCastData.castId===aiPage?aiCastData:{castId:aiPage,text:'',status:'idle'};
+      var aiBodyContent;
+      if(acd.status==='loading'){
+        aiBodyContent=e('div',{style:{textAlign:'center',padding:'80px 24px'}},
+          e('div',{style:{fontSize:'13px',color:'#a78bfa'}},'分析中...')
+        );
+      } else if(acd.status==='done'){
+        aiBodyContent=e('div',null,
+          e('div',{style:{whiteSpace:'pre-wrap',fontSize:'13px',color:'#d1d5db',lineHeight:'1.7',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(167,139,250,0.15)',borderRadius:'14px',padding:'18px 16px',marginBottom:'16px'}},acd.text),
+          e('button',{style:{display:'block',width:'100%',padding:'12px',background:'linear-gradient(135deg,#7c3aed,#4f46e5)',border:'none',borderRadius:'12px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:'pointer'},onClick:function(){runCastAI(aiPage);}},'再分析')
+        );
+      } else if(acd.status==='error'){
+        aiBodyContent=e('div',{style:{textAlign:'center',padding:'40px 24px'}},
+          e('div',{style:{fontSize:'13px',color:'#ef4444',marginBottom:'16px'}},acd.text),
+          e('button',{style:{padding:'10px 24px',background:'linear-gradient(135deg,#7c3aed,#4f46e5)',border:'none',borderRadius:'12px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:'pointer'},onClick:function(){runCastAI(aiPage);}},'再試行')
+        );
+      } else {
+        aiBodyContent=e('div',{style:{textAlign:'center',padding:'60px 24px'}},
+          e('button',{style:{padding:'14px 32px',background:'linear-gradient(135deg,#7c3aed,#4f46e5)',border:'none',borderRadius:'14px',color:'#fff',fontSize:'14px',fontWeight:600,cursor:'pointer',boxShadow:'0 4px 20px rgba(124,58,237,0.4)'},onClick:function(){runCastAI(aiPage);}},'✨ AI分析を開始')
+        );
+      }
       return e('div',{style:AI_OV},
         e('div',{style:AI_HDR},
           e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');}},'‹ 戻る'),
           e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},aiCast?aiCast.name:''),
           e('div',{style:{width:'40px'}})
         ),
-        e('div',{style:AI_BODY},
-          e('div',{style:{textAlign:'center',padding:'80px 24px',color:'#4b5563'}},
-            e('div',{style:{width:'40px',height:'4px',background:'#a78bfa',borderRadius:'2px',margin:'0 auto 20px'}}),
-            e('div',{style:{fontSize:'14px',color:'#6b7280'}},'準備中')
-          )
-        )
+        e('div',{style:AI_BODY},aiBodyContent)
       );
     }
     // 設定画面
