@@ -1088,10 +1088,11 @@ function CastListPage(p){
     var now3=new Date();var initMK=now3.getFullYear()+'-'+pad(now3.getMonth()+1);
     // 派遣の場合は「派遣」フォルダ、なければ作成
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
-    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(p.data.folders[0]||{}).id||'';
+    var defaultFid=((p.data.folders||[]).find(function(f){return f.name==='新入店';})||(p.data.folders[0]||{})).id||'';
+    var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(newFolder||defaultFid);
     var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',cup:addForm.cup||'',castType:addForm.castType||'',route:addForm.route||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
     var newFolders=(p.data.folders||[]).map(function(f){
-      var shouldAdd=isDispatch?f.id===initFid:newFolder?f.id===newFolder:f.name==='新入店';
+      var shouldAdd=f.id===initFid;
       if(shouldAdd)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});
       return f;
     });
