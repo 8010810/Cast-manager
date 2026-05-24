@@ -1988,6 +1988,7 @@ function MiniApp(){
         if(!roomCastIds.has(c.id)){
           var extra={_personal:true};
           if(c._archived)extra._archived=true;
+          if(c._leftRoomId)extra._roomId=c._leftRoomId;
           casts.push(Object.assign({},c,extra));
         }
       });
@@ -1997,7 +1998,10 @@ function MiniApp(){
         if(!roomFolderIds.has(f.id)){
           var filteredCids=(f.castIds||[]).filter(function(cid){return !roomCastIds.has(cid);});
           var arch=!!f._archived;
-          folders.push(Object.assign({},f,{castIds:filteredCids,_personal:true},arch?{_archived:true}:{}));
+          var extra={castIds:filteredCids,_personal:true};
+          if(f._leftRoomId)extra._roomId=f._leftRoomId;
+          if(arch)extra._archived=true;
+          folders.push(Object.assign({},f,extra));
         }
       });
       Object.keys(pd.shifts||{}).forEach(function(k){if(!roomCastIds.has(k))shifts[k]=pd.shifts[k];});
@@ -2061,6 +2065,28 @@ function MiniApp(){
         unsubRooms=db.collection('users').doc(u.uid).collection('rooms').onSnapshot(function(snap){
           var rooms=snap.docs.map(function(d){return Object.assign({roomId:d.id},d.data());});
           setRoomsList(rooms);
+          // 退室ルーム検出: rooms.length===0の場合も含めて早期returnの前に実行
+          var currentRids=new Set(rooms.map(function(r){return r.roomId;}));
+          Object.keys(unsubDataMapRef.current).forEach(function(rid){
+            if(!currentRids.has(rid)){
+              unsubDataMapRef.current[rid]();delete unsubDataMapRef.current[rid];
+              // 退室ルームのフォルダ・キャスト・レコードを個人Firestoreに永続化
+              var prevData=roomDataMapRef.current[rid];
+              if(prevData&&((prevData.casts||[]).length>0||(prevData.folders||[]).length>0)){
+                db.collection('users').doc(u.uid).collection('data').doc('main').get().then(function(pDoc){
+                  var pd=pDoc.exists?pDoc.data():{casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}};
+                  var pCastIds=new Set((pd.casts||[]).map(function(c){return c.id;}));
+                  var pFolderIds=new Set((pd.folders||[]).map(function(f){return f.id;}));
+                  var newCasts=(pd.casts||[]).concat((prevData.casts||[]).filter(function(c){return !pCastIds.has(c.id);}).map(function(c){return Object.assign({},c,{_leftRoomId:rid});}));
+                  var newFolders=(pd.folders||[]).concat((prevData.folders||[]).filter(function(f){return !pFolderIds.has(f.id);}).map(function(f){return Object.assign({},f,{_leftRoomId:rid});}));
+                  var newRecords=Object.assign({},pd.records||{},prevData.records||{});
+                  return db.collection('users').doc(u.uid).collection('data').doc('main').set(Object.assign({},pd,{casts:newCasts,folders:newFolders,records:newRecords}));
+                }).catch(function(){});
+              }
+              delete roomDataMapRef.current[rid];
+              rebuildData();
+            }
+          });
           if(rooms.length===0){
             if(unsubRoomSubRef.current){unsubRoomSubRef.current();unsubRoomSubRef.current=null;}
             setRoomSubData(null);
@@ -2076,14 +2102,6 @@ function MiniApp(){
               setRoomSubData(doc.exists?doc.data():null);
             },function(){setRoomSubData(null);});
           }
-          var currentRids=new Set(rooms.map(function(r){return r.roomId;}));
-          Object.keys(unsubDataMapRef.current).forEach(function(rid){
-            if(!currentRids.has(rid)){
-              unsubDataMapRef.current[rid]();delete unsubDataMapRef.current[rid];
-              // roomDataMapRef のデータは残す（MG実績でreadOnly表示するため）
-              rebuildData();
-            }
-          });
           rooms.forEach(function(r){
             var rid=r.roomId;
             if(unsubDataMapRef.current[rid])return;
