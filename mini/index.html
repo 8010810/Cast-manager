@@ -2089,7 +2089,10 @@ function MiniApp(){
             if(unsubDataMapRef.current[rid])return;
             unsubDataMapRef.current[rid]=db.collection('rooms').doc(rid).collection('data').doc('main').onSnapshot(function(doc){
               if(!doc.exists){
-                roomDataMapRef.current[rid]=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
+                // データが未作成の新規ルームのみ空データをセット（既存データは保持）
+                if(!roomDataMapRef.current[rid]){
+                  roomDataMapRef.current[rid]=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}});
+                }
                 loadedRids.add(rid);
                 if(firstRoomsSnap&&loadedRids.size>=rooms.length){firstRoomsSnap=false;roomsReady=true;checkAllDone();}
                 rebuildData();
