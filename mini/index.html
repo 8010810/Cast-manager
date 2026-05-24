@@ -2088,6 +2088,7 @@ function MiniApp(){
             var rid=r.roomId;
             if(unsubDataMapRef.current[rid])return;
             unsubDataMapRef.current[rid]=db.collection('rooms').doc(rid).collection('data').doc('main').onSnapshot(function(doc){
+              if(!unsubDataMapRef.current[rid])return;
               if(!doc.exists){
                 // データが未作成の新規ルームのみ空データをセット（既存データは保持）
                 if(!roomDataMapRef.current[rid]){
