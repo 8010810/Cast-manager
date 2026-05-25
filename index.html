@@ -2287,6 +2287,126 @@ function buildAttendanceData(data,absenceData,yearMonth){
   }).filter(Boolean).sort(function(a,b){return b.totalSales-a.totalSales;});
   return{yearMonth:yearMonth,castProfiles:castProfiles};
 }
+function buildVisitsData(data,yearMonth,openDate){
+  var today=new Date();
+  var todayStr=today.toISOString().split('T')[0];
+  var casts=data.casts||[];
+  var allVisits=data.visits||[];
+  var lastYM=(function(){var d=new Date(yearMonth+'-01');d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);})();
+
+  // ① 来店サイクル予測
+  var customerPredictions=[];
+  casts.forEach(function(cast){
+    var castVisits=data.customers[cast.id]||[];
+    var grouped={};
+    castVisits.forEach(function(v){
+      if(!v.name)return;
+      if(!grouped[v.name])grouped[v.name]={name:v.name,dates:[]};
+      grouped[v.name].dates.push(v.date);
+    });
+    Object.keys(grouped).forEach(function(guestName){
+      var customer=grouped[guestName];
+      if(customer.dates.length<2)return;
+      var sortedDates=customer.dates.map(function(d){return new Date(d);}).sort(function(a,b){return b-a;});
+      var intervals=[];
+      for(var i=0;i<sortedDates.length-1;i++)intervals.push(Math.floor((sortedDates[i]-sortedDates[i+1])/86400000));
+      var avgInterval=Math.round(intervals.reduce(function(a,b){return a+b;},0)/intervals.length);
+      if(avgInterval<=0)return;
+      var lastVisit=sortedDates[0];
+      var daysSinceLast=Math.floor((today-lastVisit)/86400000);
+      var predictedNext=new Date(lastVisit.getTime()+avgInterval*86400000);
+      var daysUntilNext=Math.floor((predictedNext-today)/86400000);
+      var riskLevel=daysSinceLast>=avgInterval*2?'高リスク':daysSinceLast>=avgInterval*1.5?'要注意':'良好';
+      customerPredictions.push({customerName:guestName,castName:cast.name,castId:cast.id,
+        visitCount:customer.dates.length,daysSinceLast:daysSinceLast,avgInterval:avgInterval,
+        predictedNextDate:predictedNext.toISOString().split('T')[0],
+        daysUntilNext:daysUntilNext,riskLevel:riskLevel});
+    });
+  });
+  var upcomingSoon=customerPredictions
+    .filter(function(c){return c.daysUntilNext>=-3&&c.daysUntilNext<=14;})
+    .sort(function(a,b){return a.daysUntilNext-b.daysUntilNext;})
+    .slice(0,20);
+
+  // 曜日別来店量（直近2ヶ月）
+  var twoMonthsAgo=new Date(today);twoMonthsAgo.setMonth(twoMonthsAgo.getMonth()-2);
+  var twoMonthsAgoStr=twoMonthsAgo.toISOString().split('T')[0];
+  var recentVisits=allVisits.filter(function(v){return v.date&&v.date>=twoMonthsAgoStr&&v.date<=todayStr;});
+  var dowVisitSum={0:0,1:0,2:0,3:0,4:0,5:0,6:0};
+  var dowDayCount={0:0,1:0,2:0,3:0,4:0,5:0,6:0};
+  var uniqueDates=[];
+  recentVisits.forEach(function(v){if(uniqueDates.indexOf(v.date)===-1)uniqueDates.push(v.date);});
+  uniqueDates.forEach(function(dt){
+    var di=new Date(dt).getDay();dowDayCount[di]++;
+    var g=recentVisits.filter(function(v){return v.date===dt;}).reduce(function(s,v){return s+Number(v.count||0);},0);
+    dowVisitSum[di]+=g;
+  });
+  var dowAnalysis=[0,1,2,3,4,5,6].map(function(di){
+    var days=dowDayCount[di];
+    return{day:di,avgGuests:days>0?Math.round(dowVisitSum[di]/days*10)/10:0,sampleDays:days};
+  });
+
+  // ② バースデーキャスト（30日以内）
+  var birthdayPickups=[];
+  casts.forEach(function(cast){
+    if(!cast.birthday)return;
+    var parts=cast.birthday.split('-');
+    var bdThisYear=new Date(today.getFullYear(),Number(parts[1])-1,Number(parts[2]));
+    if(bdThisYear<today)bdThisYear=new Date(today.getFullYear()+1,Number(parts[1])-1,Number(parts[2]));
+    var daysUntilBd=Math.floor((bdThisYear-today)/86400000);
+    if(daysUntilBd>30)return;
+    var custCount=(data.customers[cast.id]||[]).length;
+    var totalNoms=(data.records[cast.id]||[]).filter(function(r){return r.date&&r.date.startsWith(yearMonth);}).reduce(function(s,r){return s+Number(r.nominations||0);},0);
+    birthdayPickups.push({castName:cast.name,birthdayDate:bdThisYear.toISOString().split('T')[0],daysUntilBd:daysUntilBd,custCount:custCount,totalNoms:totalNoms});
+  });
+  birthdayPickups.sort(function(a,b){return a.daysUntilBd-b.daysUntilBd;});
+
+  // ③ 指名上位キャスト（2ヶ月平均 上位5名）
+  var nomRanking=[];
+  casts.filter(function(c){return !c.isDispatch;}).forEach(function(cast){
+    var recs=data.records[cast.id]||[];
+    var thisNoms=recs.filter(function(r){return r.date&&r.date.startsWith(yearMonth);}).reduce(function(s,r){return s+Number(r.nominations||0);},0);
+    var lastNoms=recs.filter(function(r){return r.date&&r.date.startsWith(lastYM);}).reduce(function(s,r){return s+Number(r.nominations||0);},0);
+    var avg=Math.round((thisNoms+lastNoms)/2);
+    if(avg===0)return;
+    nomRanking.push({castName:cast.name,thisMonthNoms:thisNoms,lastMonthNoms:lastNoms,avgNoms:avg});
+  });
+  nomRanking.sort(function(a,b){return b.avgNoms-a.avgNoms;});
+  var topNomCasts=nomRanking.slice(0,5);
+
+  // ④ 直近30日以内のイベント・記念日
+  var ANNUAL_EVENTS=[
+    {month:1,day:1,name:'元旦・新年'},{month:2,day:3,name:'節分'},
+    {month:2,day:14,name:'バレンタインデー'},{month:3,day:14,name:'ホワイトデー'},
+    {month:5,day:3,name:'ゴールデンウィーク'},{month:7,day:7,name:'七夕'},
+    {month:8,day:15,name:'お盆'},{month:10,day:31,name:'ハロウィン'},
+    {month:12,day:24,name:'クリスマスイブ'},{month:12,day:25,name:'クリスマス'},
+    {month:12,day:31,name:'大晦日'}
+  ];
+  var upcomingEvents=[];
+  ANNUAL_EVENTS.forEach(function(ev){
+    var evDate=new Date(today.getFullYear(),ev.month-1,ev.day);
+    if(evDate<today)evDate=new Date(today.getFullYear()+1,ev.month-1,ev.day);
+    var daysUntil=Math.floor((evDate-today)/86400000);
+    if(daysUntil>30)return;
+    upcomingEvents.push({name:ev.name,date:evDate.toISOString().split('T')[0],daysUntil:daysUntil,isAnniversary:false});
+  });
+  if(openDate){
+    var op=openDate.split('-');
+    var anniv=new Date(today.getFullYear(),Number(op[1])-1,Number(op[2]));
+    if(anniv<today)anniv=new Date(today.getFullYear()+1,Number(op[1])-1,Number(op[2]));
+    var daysUntilAnniv=Math.floor((anniv-today)/86400000);
+    if(daysUntilAnniv<=30){
+      var years=anniv.getFullYear()-Number(op[0]);
+      upcomingEvents.push({name:'店舗'+years+'周年',date:anniv.toISOString().split('T')[0],daysUntil:daysUntilAnniv,isAnniversary:true});
+    }
+  }
+  upcomingEvents.sort(function(a,b){return a.daysUntil-b.daysUntil;});
+
+  return{yearMonth:yearMonth,upcomingSoon:upcomingSoon,dowAnalysis:dowAnalysis,
+    castPickups:{birthdayPickups:birthdayPickups,topNomCasts:topNomCasts},
+    upcomingEvents:upcomingEvents};
+}
 function AIPage(p){
   var s1=useState('idle');var status=s1[0];var setStatus=s1[1];
   var s2=useState('');var result=s2[0];var setResult=s2[1];
@@ -4627,7 +4747,7 @@ function App(){
       setAiCatData({catKey:aiPage,status:'loading'});
       var now2=new Date();
       var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'ai-shift':aiPage==='ai-attendance'?'ai-attendance':'store-visits';
+      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'ai-shift':aiPage==='ai-attendance'?'ai-attendance':'ai-visits';
       var body={type:apiType,messages:[{role:'user',content:'分析してください'}]};
       if(apiType==='store-sales'){
         body.salesData=buildSalesData(data,yearMonth);
@@ -4657,12 +4777,26 @@ function App(){
           setAiCatData({catKey:aiPage,status:'idle'});
         }).catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
         return;
-      } else {
-        var today2=new Date();var todayStr2=today2.getFullYear()+'-'+pad(today2.getMonth()+1)+'-'+pad(today2.getDate());
-        var visits2=data.visits||[];
-        var upcoming=visits2.filter(function(v){return v.date>=todayStr2;}).sort(function(a,b){return a.date<b.date?-1:1;}).slice(0,20);
-        var recent=visits2.filter(function(v){return v.date<todayStr2;}).sort(function(a,b){return a.date<b.date?1:-1;}).slice(0,20);
-        body.storeData={yearMonth:yearMonth,upcoming:upcoming,recent:recent};
+      } else if(apiType==='ai-visits'){
+        body.messages=[{role:'user',content:'来店予測・直近イベントを踏まえて今週のアクションプランを提案してください'}];
+        var visRoomId=roomId||'';
+        (visRoomId
+          ?db.collection('rooms').doc(visRoomId).get()
+          :Promise.resolve(null)
+        ).then(function(doc){
+          var openDate=doc&&doc.exists&&doc.data().openDate?doc.data().openDate:null;
+          body.visitsData=buildVisitsData(data,yearMonth,openDate);
+          return fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        }).then(function(r){return r.json();})
+        .then(function(d){
+          var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
+          var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
+          var newRpts=(aiCatReports[aiPage]||[]).concat([rpt]);
+          var upd={};upd[aiPage]=newRpts;
+          if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiCatReports').set(upd,{merge:true}).catch(function(){});}
+          setAiCatData({catKey:aiPage,status:'idle'});
+        }).catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
+        return;
       }
       fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(function(r){return r.json();})

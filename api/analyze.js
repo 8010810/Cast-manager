@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, type, castData, customerData, salesData, storeData, trendsData, shiftData, attendanceData } = req.body;
+    const { messages, type, castData, customerData, salesData, storeData, trendsData, shiftData, attendanceData, visitsData } = req.body;
 
     let systemPrompt = '';
 
@@ -452,50 +452,129 @@ export default async function handler(req, res) {
         castBlock3
       ].join('\n');
 
-    } else if (type === 'store-visits') {
+    } else if (type === 'ai-visits') {
 
-      const vd = storeData || {};
-      const upcomingBlock = (vd.upcoming || []).length > 0
-        ? (vd.upcoming || []).map(v =>
-            '・' + v.date + ' ' + (v.time||'') + ' ' + v.type + '：' + (v.guestName||'') + ' → ' + (v.castName||'担当未定')
-            + (v.count ? '（' + v.count + '名）' : '')
-          ).join('\n')
-        : '　なし';
-      const recentBlock = (vd.recent || []).length > 0
-        ? (vd.recent || []).map(v =>
-            '・' + v.date + ' ' + v.type + '：' + (v.guestName||'') + ' → ' + (v.castName||'')
-          ).join('\n')
-        : '　なし';
+      const vd = visitsData || {};
+      const dow = ['日','月','火','水','木','金','土'];
+
+      const upcomingBlock = (vd.upcomingSoon || []).map(c => {
+        const timing = c.daysUntilNext <= 0
+          ? Math.abs(c.daysUntilNext) + '日超過（今すぐ連絡）'
+          : c.daysUntilNext + '日後';
+        return '・' + c.customerName + '（担当：' + c.castName + '）'
+          + ' 予測：' + c.predictedNextDate + '（' + timing + '）'
+          + ' 平均間隔：' + c.avgInterval + '日'
+          + ' リスク：' + c.riskLevel;
+      }).join('\n') || 'なし';
+
+      const dowBlock = (vd.dowAnalysis || [])
+        .filter(d => d.sampleDays > 0)
+        .map(d => '・' + dow[d.day] + '曜：平均' + d.avgGuests + '人/日（' + d.sampleDays + '日分）')
+        .join('\n') || 'なし';
+
+      const cp = vd.castPickups || {};
+      const bdBlock = (cp.birthdayPickups || []).map(c => {
+        const urgency = c.daysUntilBd <= 7 ? '【今すぐ動く】' : c.daysUntilBd <= 14 ? '【今週中】' : '【来週中】';
+        return urgency + ' ' + c.castName
+          + ' 誕生日：' + c.birthdayDate + '（' + c.daysUntilBd + '日後）'
+          + ' 顧客数：' + c.custCount + '名 / 今月指名：' + c.totalNoms + '組';
+      }).join('\n') || 'なし';
+
+      const nomBlock = (cp.topNomCasts || []).map((c, i) =>
+        (i+1) + '位 ' + c.castName
+          + '：今月' + c.thisMonthNoms + '組 / 先月' + c.lastMonthNoms + '組'
+          + '（2ヶ月平均 ' + c.avgNoms + '組）'
+      ).join('\n') || 'なし';
+
+      const evBlock = (vd.upcomingEvents || []).map(ev => {
+        const urgency = ev.daysUntil <= 7 ? '【今すぐ動く】' : ev.daysUntil <= 14 ? '【今週中に準備】' : '【来週中に準備】';
+        return urgency + ' ' + ev.name
+          + '：' + ev.date + '（' + ev.daysUntil + '日後）'
+          + (ev.isAnniversary ? ' ★周年イベント' : '');
+      }).join('\n') || 'なし';
+
+      const dataBlock = [
+        '【来店予測・来店予定ピックアップデータ】',
+        '',
+        '■ 近日来店が予測される顧客（次の14日以内・過去3日超過含む）',
+        upcomingBlock,
+        '',
+        '■ 曜日別 平均来店客数（直近2ヶ月）',
+        dowBlock,
+        '',
+        '■ バースデーキャスト（来店予定を今から取らせるべき）',
+        bdBlock,
+        '',
+        '■ 指名上位キャスト（人気を活かして来店予定を取らせるべき）',
+        nomBlock,
+        '',
+        '■ 直近30日以内のイベント・記念日',
+        evBlock
+      ].join('\n');
 
       systemPrompt = [
-        'あなたはキャバクラ店舗の来店管理を専門とするAIです。',
-        '週次レビューとして、今週の来店状況を振り返り、来週の来店に向けて今週中にすべきフォロー・準備を提案してください。',
+        'あなたはキャバクラの来店予測と来店予定獲得を専門とするAIです。',
+        '以下の4軸のデータを組み合わせて分析し、マネージャーが今週から動ける具体的なアクションを提案してください。',
+        '',
+        '【4つの分析軸】',
+        '① 来店サイクル予測：顧客の平均来店間隔から近日来そうな顧客を特定し担当キャストに連絡させる',
+        '② バースデーキャスト：誕生日が近いキャストに今から来店予定を取らせてイベント売上を最大化する',
+        '③ 指名上位キャスト：人気キャストの指名力を活かして来週・再来週の来店予定を積ませる',
+        '④ 直近イベント・記念日：バレンタイン・ハロウィン・クリスマス・店舗周年などに向けた来店予定の獲得',
+        '',
+        '【業界知識・前提】',
+        '・来店予定を事前に取ることで売上の予測と安定化ができる',
+        '・バースデーイベントは単価が上がりやすい（シャンパン・プレゼント・特別演出）',
+        '・バレンタイン・クリスマス・ハロウィンなど季節イベントは客が来やすいタイミング',
+        '・店舗周年は特別な演出ができる大きな集客チャンス',
+        '・イベントは2〜3週間前から告知・予約を始めると効果が高い',
+        '・指名が多いキャストほど来店予定が取りやすい',
+        '・来店サイクルを超えた顧客は担当キャストが連絡しないと離脱リスクが上がる',
         '',
         '【分析の視点】',
-        '・来週の来店予定を確認し、当日の準備・担当キャストへの指示を提案する',
-        '・同伴予定があるキャストに今週中にコンディション確認・打ち合わせを促す',
-        '・来店頻度が高い顧客へのVIP対応を来週に向けて準備する',
-        '・来店が途絶えている顧客への今週中のフォロー連絡（LINE等）を提案する',
-        '・今週の来店実績をもとに、来週の予測と対策を考える',
+        '',
+        '■ 直近イベントの活用',
+        '  イベント7日前以内 → 今すぐ全キャストが顧客に告知・予定取り',
+        '  イベント14日前以内 → 今週中に準備・連絡開始',
+        '  イベント30日前以内 → 来週中に準備',
+        '  周年イベント → 全キャストへの動員指示が最優先',
+        '  バレンタイン・クリスマス → カップル客・プレゼント需要を意識した声かけ',
+        '  ハロウィン → 仮装・テーマイベントとして盛り上げる演出を提案',
+        '',
+        '■ 来店サイクル予測の解釈',
+        '  daysUntilNext が0以下 → 今すぐ担当キャストに連絡させる',
+        '  daysUntilNext が1〜7 → 今週中にアプローチ',
+        '  daysUntilNext が8〜14 → 来週に向けて連絡開始',
+        '  高リスク・要注意の顧客は優先度を上げる',
+        '',
+        '■ バースデーキャストの活用',
+        '  誕生日が近いほど来店予定の獲得が売上に直結する',
+        '  顧客数・指名数が多いキャストほど予定を多く取れる可能性が高い',
+        '',
+        '■ 指名上位キャストの活用',
+        '  指名が多い = 来てくれる客がいる = 来店予定が取りやすい',
+        '  イベント前後の日程で積極的に予定を取らせる',
         '',
         '【判断の原則】',
-        '・断定しない。「〜の可能性があります」「〜を検討してください」で提示する',
-        '・今週中に動ける具体的なアドバイスを最優先にする',
+        '・名前を出して具体的に言及する（キャスト名・顧客名・イベント名）',
+        '・アクションの優先順位を「今すぐ・今週中・来週中」で明示する',
+        '・予測はあくまで傾向値。「〜が予測されます」「〜を検討してください」で提示する',
+        '・イベントと顧客予測を組み合わせた提案を心がける',
         '',
         '【回答フォーマット】',
-        '1. 今週の来店状況総評（2〜3行）',
-        '2. 来週の来店予定への具体的な準備アドバイス',
-        '3. 今週中にフォロー連絡すべき顧客・キャスト',
-        '4. 来週の来店準備と今週中にすべきフォロー連絡',
+        '1. 今週〜来週のサマリー（来店予測・直近イベントを含む2〜3行）',
+        '2. 直近イベント・記念日への対応（イベント名・推奨アクション・担当キャストへの指示）',
+        '3. 今すぐ連絡すべき顧客リスト（担当キャスト名・顧客名・理由）',
+        '4. 来店予定を取らせるべきキャストのピックアップ',
+        '   ・バースデーキャスト（誰に・いつまでに・何人分）',
+        '   ・指名上位キャスト（誰に・どの日程で）',
+        '5. 曜日別の来店予測と来店予定を入れるべき日',
+        '6. 今週のアクションプラン（優先順位順）',
         '',
         'iPadで読みやすい長さにする。',
         '最後に「最終判断はマネージャーが行ってください」を添える。',
         '',
-        '【来店予定（直近）】',
-        upcomingBlock,
-        '',
-        '【来店実績（直近）】',
-        recentBlock
+        dataBlock
       ].join('\n');
 
     } else {
