@@ -58,6 +58,43 @@ var calcAge=function(birthday){
 };
 var calcWorkDays=function(records,castId,scope){return(records[castId]||[]).filter(function(r){if(scope==='all')return true;if(scope.length===7)return r.date.slice(0,7)===scope;return r.date.slice(0,4)===scope;}).length;};
 var getMonthlyTarget=function(cast,monthKey){if(cast.monthlyTargets&&cast.monthlyTargets[monthKey]!=null)return Number(cast.monthlyTargets[monthKey]);return 0;};
+function getPrevMonth(ym){var d=new Date(ym+'-01');d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);}
+function calcMonthlyCastKPI(data,castId,yearMonth){
+  var records=(data.records||{})[castId]||[];
+  var monthly=records.filter(function(r){return r.date&&r.date.slice(0,7)===yearMonth;});
+  var lastYM=getPrevMonth(yearMonth);
+  var lastMonth=records.filter(function(r){return r.date&&r.date.slice(0,7)===lastYM;});
+  var lastSales=lastMonth.reduce(function(s,r){return s+Number(r.sales||0);},0);
+  return{
+    salesTotal:monthly.reduce(function(s,r){return s+Number(r.sales||0);},0),
+    workDays:monthly.length,
+    nominationCount:monthly.reduce(function(s,r){return s+Number(r.nominations||0);},0),
+    floorNominationCount:monthly.reduce(function(s,r){return s+Number(r.floorCount||0);},0),
+    companionCount:monthly.reduce(function(s,r){return s+Number(r.companions||0);},0),
+    lastMonthSales:lastSales||null
+  };
+}
+function buildCustomerData(data,castId){
+  var visits=(data.customers||{})[castId]||[];
+  var grouped={};
+  visits.forEach(function(v){
+    if(!v.name)return;
+    if(!grouped[v.name])grouped[v.name]={name:v.name,dates:[],types:[]};
+    grouped[v.name].dates.push(v.date);
+    grouped[v.name].types.push(v.type||'');
+  });
+  return Object.keys(grouped).map(function(k){
+    var c=grouped[k];
+    var sorted=c.dates.map(function(d){return new Date(d);}).sort(function(a,b){return b-a;});
+    var avgInterval=30;
+    if(sorted.length>=2){
+      var intervals=[];
+      for(var i=0;i<sorted.length-1;i++){intervals.push(Math.floor((sorted[i]-sorted[i+1])/86400000));}
+      avgInterval=Math.round(intervals.reduce(function(a,b){return a+b;},0)/intervals.length);
+    }
+    return{name:c.name,nominationType:c.types[0]||'不明',visitCount:sorted.length,lastVisitDate:sorted[0]?sorted[0].toISOString().split('T')[0]:null,averageVisitInterval:avgInterval};
+  }).filter(function(c){return c.lastVisitDate!==null;});
+}
 
 // キャストが指定月に所属していたフォルダIDを返す
 function getCastFolderAt(cast,mk){
@@ -2394,40 +2431,34 @@ function MiniApp(){
       if(!cast)return;
       if((aiReports[castId]||[]).length>=4)return;
       setAiCastData({castId:castId,text:'',status:'loading'});
-      var now2=new Date();var months=[];
-      for(var i=5;i>=0;i--){
-        var d2=new Date(now2.getFullYear(),now2.getMonth()-i,1);
-        var mk=d2.getFullYear()+'-'+pad(d2.getMonth()+1);
-        var rows=(data.records[castId]||[]).filter(function(r){return r.date.slice(0,7)===mk;});
-        months.push({mk:mk,
-          sales:rows.reduce(function(s,r){return s+Number(r.sales||0);},0),
-          companions:rows.reduce(function(s,r){return s+Number(r.companions||0);},0),
-          nominations:rows.reduce(function(s,r){return s+Number(r.nominations||0);},0),
-          workDays:rows.length,target:getMonthlyTarget(cast,mk)});
-      }
-      var yen=function(n){return Number(n).toLocaleString('ja-JP');};
-      var monthsText=months.map(function(m){
-        return m.mk+': 売上¥'+yen(m.sales)+(m.target?' (目標¥'+yen(m.target)+')':'')
-          +' 出勤'+m.workDays+'日 指名'+m.nominations+'組 同伴'+m.companions+'回';
-      }).join('\n');
-      var prompt='キャスト名: '+cast.name+'\n'
-        +(cast.contractShift?'契約シフト: '+cast.contractShift+'\n':'')
-        +'\n【直近6ヶ月】\n'+monthsText
-        +'\n\n以下を日本語で分析してください:\n'
-        +'1. 売上トレンドと目標達成状況\n2. 指名・同伴のバランス評価\n'
-        +'3. 売上向上の具体的アドバイス3点\n4. 今月の重点取り組み提案';
+      var now2=new Date();
+      var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+      var kpi=calcMonthlyCastKPI(data,castId,yearMonth);
+      var customerData=buildCustomerData(data,castId);
+      var castData={
+        name:cast.name,
+        isDispatch:cast.isDispatch||false,
+        period:yearMonth,
+        targetSales:(cast.monthlyTargets||{})[yearMonth]||0,
+        salesTotal:kpi.salesTotal,
+        workDays:kpi.workDays,
+        nominationCount:kpi.nominationCount,
+        floorNominationCount:kpi.floorNominationCount,
+        companionCount:kpi.companionCount,
+        lastMonthSales:kpi.lastMonthSales
+      };
       fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:prompt}]})})
+        body:JSON.stringify({messages:[{role:'user',content:'分析してください'}],castData:castData,customerData:customerData})})
       .then(function(r){return r.json();})
       .then(function(d){
-        var txt=d.content&&d.content[0]?d.content[0].text:'分析に失敗しました';
+        var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
         var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
         var newRpts=(aiReports[castId]||[]).concat([rpt]);
         var upd={};upd[castId]=newRpts;
         if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiReports').set(upd,{merge:true}).catch(function(){});}
         setAiCastData({castId:castId,text:'',status:'idle'});
       })
-      .catch(function(){setAiCastData({castId:castId,text:'ネットワークエラーが発生しました',status:'error'});});
+      .catch(function(e){console.error(e);setAiCastData({castId:castId,text:'ネットワークエラーが発生しました',status:'error'});});
     }
 
     if(aiPage){
