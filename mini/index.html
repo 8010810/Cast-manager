@@ -2524,7 +2524,7 @@ function MiniApp(){
           e('div',{style:{width:'40px'}})
         ),
         e('div',{style:AI_BODY},
-          e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'20px'}},
+          e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}},
             e('button',{
               style:{padding:'8px 18px',background:remainCount>0&&!isAnalyzing?'linear-gradient(135deg,#7c3aed,#4f46e5)':'#374151',border:'none',borderRadius:'10px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:remainCount>0&&!isAnalyzing?'pointer':'default',opacity:remainCount>0&&!isAnalyzing?1:0.5},
               disabled:remainCount<=0||isAnalyzing,
@@ -2532,6 +2532,7 @@ function MiniApp(){
             },isAnalyzing?'分析中...':'分析を開始'),
             e('span',{style:{fontSize:'12px',color:'#6b7280'}},'残り '+remainCount+'/4')
           ),
+          e('div',{style:{fontSize:'11px',color:'#4b5563',marginBottom:'16px'}},'＊分析には30秒ほどかかります'),
           acd.status==='error'&&e('div',{style:{fontSize:'12px',color:'#ef4444',marginBottom:'12px'}},acd.text),
           castRpts.length===0
             ?e('div',{style:{textAlign:'center',padding:'40px 24px',color:'#4b5563',fontSize:'13px'}},'まだレポートがありません')
