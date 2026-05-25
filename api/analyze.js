@@ -4,7 +4,67 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, type, castData, customerData, salesData, storeData, trendsData, shiftData, attendanceData, visitsData } = req.body;
+    const { messages, type, castData, customerData, salesData, storeData, trendsData, shiftData, attendanceData, visitsData, storeInfo } = req.body;
+
+    // ── 共有コンテキスト（全カテゴリ共通） ──────────────────────────────
+    const si = storeInfo || {};
+    const _today = new Date();
+    const _month = _today.getMonth() + 1;
+    const _day   = _today.getDate();
+
+    const MONTHLY_KB = {
+      1:  { season:'新年会シーズン',       chars:['年始ダッシュが売上を左右する','ボーナス残りで太客が動く時期','新年会需要が最高潮'] },
+      2:  { season:'バレンタイン前後',     chars:['バレンタイン（14日）前後が月最大の山場','月後半は閑散期入りに注意','カップル客・プレゼント需要が高まる'] },
+      3:  { season:'卒業・歓送迎会シーズン', chars:['新規客獲得の大チャンス','異動・退職する常連客のフォロー最重要','来店予定の積み増しを今月中に'] },
+      4:  { season:'新年度・歓迎会シーズン', chars:['新入社員による新規客の波','歓迎会需要で客数が増えやすい','年度始めの好調を次月以降につなげる仕込みの時期'] },
+      5:  { season:'GWシーズン',           chars:['GW前後の週末は集客チャンス','GW中は観光・帰省で動きが読みにくい','月後半は通常ペースに戻る'] },
+      6:  { season:'閑散期（梅雨）',       chars:['業界全体で来客が落ちやすい','梅雨で外出が減る','顧客維持と来店予定の積み上げが最重要','採用・育成に集中するタイミング'] },
+      7:  { season:'夏・ボーナスシーズン', chars:['夏ボーナスで太客が動く','暑気払い需要で来店が増えやすい','七夕・浴衣などの夏イベントが盛り上がる'] },
+      8:  { season:'お盆シーズン',         chars:['お盆前（前半）は来客増加傾向','お盆中は帰省の影響で閑散する地域もある','キャストのお盆休みによるシフト管理が重要'] },
+      9:  { season:'閑散期（秋入り）',     chars:['業界全体で来客が落ちやすい','年末に向けた仕込みの時期','採用強化・新キャスト育成の好機'] },
+      10: { season:'ハロウィンシーズン',   chars:['ハロウィン（31日）は最大の集客チャンス','衣装・仮装イベントで単価が上がりやすい','年末商戦への助走として重要'] },
+      11: { season:'年末準備シーズン',     chars:['忘年会の予約が入り始める','12月来店予定の獲得が最最重要','閑散からの回復期で仕掛けが大切'] },
+      12: { season:'忘年会・クリスマス（最繁忙期）', chars:['業界最大の繁忙期','忘年会需要で客数・単価ともに最高値になりやすい','クリスマスイブ（24日）は特別高単価','年間売上の20〜30%がこの月に集中することも'] },
+    };
+    const _mc = MONTHLY_KB[_month] || { season:'', chars:[] };
+
+    const ANNUAL_EV = [
+      {m:1,d:1,n:'元旦・新年'},{m:2,d:3,n:'節分'},{m:2,d:14,n:'バレンタインデー'},
+      {m:3,d:14,n:'ホワイトデー'},{m:5,d:3,n:'ゴールデンウィーク'},{m:7,d:7,n:'七夕'},
+      {m:8,d:15,n:'お盆'},{m:10,d:31,n:'ハロウィン'},{m:12,d:24,n:'クリスマスイブ'},
+      {m:12,d:25,n:'クリスマス'},{m:12,d:31,n:'大晦日'},
+    ];
+    const _evList = [];
+    ANNUAL_EV.forEach(ev => {
+      let evD = new Date(_today.getFullYear(), ev.m-1, ev.d);
+      if (evD < _today) evD = new Date(_today.getFullYear()+1, ev.m-1, ev.d);
+      const du = Math.floor((evD - _today) / 86400000);
+      if (du <= 30) _evList.push(ev.n + '（' + du + '日後）');
+    });
+    if (si.openDate) {
+      const op = si.openDate.split('-');
+      let an = new Date(_today.getFullYear(), Number(op[1])-1, Number(op[2]));
+      if (an < _today) an = new Date(_today.getFullYear()+1, Number(op[1])-1, Number(op[2]));
+      const du = Math.floor((an - _today) / 86400000);
+      if (du <= 30) _evList.push('店舗' + (an.getFullYear() - Number(op[0])) + '周年★（' + du + '日後）');
+    }
+
+    const _storeLines = [
+      si.area       ? 'エリア：' + si.area : null,
+      si.mainGuest  ? '主な客層：' + si.mainGuest : null,
+      si.freeRate   ? 'フリー率：' + si.freeRate : null,
+      si.policy     ? '店舗方針：' + si.policy : null,
+      si.openDate   ? '開店日：' + si.openDate : null,
+    ].filter(Boolean);
+
+    const sharedCtx = [
+      '【現在の時期・キャバクラ業界動向】',
+      _today.getFullYear() + '年' + _month + '月' + _day + '日 ／ 時期：' + _mc.season,
+      _mc.chars.map(c => '・' + c).join('\n'),
+      _evList.length ? '\n直近30日以内のイベント：\n' + _evList.map(e => '・' + e).join('\n') : '',
+      _storeLines.length ? '\n【店舗情報】\n' + _storeLines.join('\n') : '',
+    ].filter(Boolean).join('\n');
+    // ─────────────────────────────────────────────────────────────────────
 
     let systemPrompt = '';
 
@@ -63,6 +123,9 @@ export default async function handler(req, res) {
       systemPrompt = [
         'あなたはキャバクラ店舗の売上分析を専門とするAIです。',
         '週次レビューとして、今週の振り返りと来週に向けた具体的なアクションを提案してください。',
+        '現在の時期・店舗特性・業界動向も踏まえて分析してください。',
+        '',
+        sharedCtx,
         '',
         '【業界知識・前提】',
         '・客数が全ての根本。客が入らない店に売上は伸びない',
@@ -194,6 +257,9 @@ export default async function handler(req, res) {
         'あなたはキャバクラの採用戦略を専門とするAIです。',
         '提供された在籍キャストの特性データと実績を分析し、',
         '店舗が次にどんなキャストを採用すべきかを提案してください。',
+        '現在の時期・業界動向・店舗特性も踏まえて採用戦略を提案してください。',
+        '',
+        sharedCtx,
         '',
         '【分析の視点】',
         '',
@@ -288,6 +354,9 @@ export default async function handler(req, res) {
       systemPrompt = [
         'あなたはキャバクラのシフト最適化を専門とするAIです。',
         '今月の曜日別実績パターンとキャスト情報をもとに、来週のシフトを今週中に調整するための具体的な提案をしてください。',
+        '現在の時期・直近イベント・業界動向も踏まえてシフト戦略を提案してください。',
+        '',
+        sharedCtx,
         '',
         '【業界知識・前提】',
         '・シフト不足の日は機会損失（席が回らない）、過多の日は人件費の無駄',
@@ -364,6 +433,9 @@ export default async function handler(req, res) {
         'あなたはキャバクラのキャスト勤怠管理を専門とするAIです。',
         '提供された勤怠データをもとに、どのキャストにどんな改善が必要かを具体的に提案してください。',
         '※データは問題があるキャストのみ（当欠・遅刻・保留多数・達成率85%未満）を抽出しています。',
+        '現在の時期・業界動向も踏まえて勤怠管理の優先度を判断してください。',
+        '',
+        sharedCtx,
         '',
         '【業界知識・前提】',
         '・当欠（当日欠勤）は店舗運営に直接ダメージを与える。特に売上が高いキャストの当欠は損失が大きい',
@@ -515,6 +587,9 @@ export default async function handler(req, res) {
       systemPrompt = [
         'あなたはキャバクラの来店予測と来店予定獲得を専門とするAIです。',
         '以下の4軸のデータを組み合わせて分析し、マネージャーが今週から動ける具体的なアクションを提案してください。',
+        '現在の時期・直近イベント・業界動向も最大限活用してください。',
+        '',
+        sharedCtx,
         '',
         '【4つの分析軸】',
         '① 来店サイクル予測：顧客の平均来店間隔から近日来そうな顧客を特定し担当キャストに連絡させる',

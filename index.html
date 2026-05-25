@@ -4748,67 +4748,48 @@ function App(){
       var now2=new Date();
       var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
       var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'ai-shift':aiPage==='ai-attendance'?'ai-attendance':'ai-visits';
-      var body={type:apiType,messages:[{role:'user',content:'分析してください'}]};
-      if(apiType==='store-sales'){
-        body.salesData=buildSalesData(data,yearMonth);
-      } else if(apiType==='ai-trends'){
-        body.messages=[{role:'user',content:'現在のキャスト構成を分析して採用戦略を提案してください'}];
-        body.trendsData=buildTrendsData(data,yearMonth);
-      } else if(apiType==='ai-shift'){
-        body.messages=[{role:'user',content:'今月のシフト状況を分析して、キャストごとに具体的な最適化提案をしてください'}];
-        body.shiftData=buildShiftData(data,yearMonth);
-      } else if(apiType==='ai-attendance'){
-        body.messages=[{role:'user',content:'今月の勤怠状況を分析してキャストごとに改善案を提案してください'}];
-        var attRoomId=roomId||'';
-        (attRoomId
-          ?db.collection('rooms').doc(attRoomId).collection('attendance').doc('settings').get()
-          :Promise.resolve(null)
-        ).then(function(doc){
-          var absData=doc&&doc.exists&&doc.data().absenceData?doc.data().absenceData:{};
-          body.attendanceData=buildAttendanceData(data,absData,yearMonth);
-          return fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-        }).then(function(r){return r.json();})
-        .then(function(d){
-          var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
-          var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
-          var newRpts=(aiCatReports[aiPage]||[]).concat([rpt]);
-          var upd={};upd[aiPage]=newRpts;
-          if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiCatReports').set(upd,{merge:true}).catch(function(){});}
-          setAiCatData({catKey:aiPage,status:'idle'});
-        }).catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
-        return;
-      } else if(apiType==='ai-visits'){
-        body.messages=[{role:'user',content:'来店予測・直近イベントを踏まえて今週のアクションプランを提案してください'}];
-        var visRoomId=roomId||'';
-        (visRoomId
-          ?db.collection('rooms').doc(visRoomId).get()
-          :Promise.resolve(null)
-        ).then(function(doc){
-          var openDate=doc&&doc.exists&&doc.data().openDate?doc.data().openDate:null;
-          body.visitsData=buildVisitsData(data,yearMonth,openDate);
-          return fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-        }).then(function(r){return r.json();})
-        .then(function(d){
-          var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
-          var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
-          var newRpts=(aiCatReports[aiPage]||[]).concat([rpt]);
-          var upd={};upd[aiPage]=newRpts;
-          if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiCatReports').set(upd,{merge:true}).catch(function(){});}
-          setAiCatData({catKey:aiPage,status:'idle'});
-        }).catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
-        return;
-      }
-      fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      .then(function(r){return r.json();})
-      .then(function(d){
-        var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
+      var saveReport=function(txt){
         var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
         var newRpts=(aiCatReports[aiPage]||[]).concat([rpt]);
         var upd={};upd[aiPage]=newRpts;
         if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiCatReports').set(upd,{merge:true}).catch(function(){});}
         setAiCatData({catKey:aiPage,status:'idle'});
-      })
-      .catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
+      };
+      var doFetch=function(body){
+        return fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+          .then(function(r){return r.json();})
+          .then(function(d){saveReport((d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました');})
+          .catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
+      };
+      (roomId?db.collection('rooms').doc(roomId).get():Promise.resolve(null))
+      .then(function(roomDoc){
+        var rd=roomDoc&&roomDoc.exists?roomDoc.data():{};
+        var storeInfo={openDate:rd.openDate||'',area:rd.area||'',mainGuest:rd.mainGuest||'',freeRate:rd.freeRate||'',policy:rd.policy||''};
+        var body={type:apiType,messages:[{role:'user',content:'分析してください'}],storeInfo:storeInfo};
+        if(apiType==='store-sales'){
+          body.salesData=buildSalesData(data,yearMonth);
+          return doFetch(body);
+        } else if(apiType==='ai-trends'){
+          body.messages=[{role:'user',content:'現在のキャスト構成を分析して採用戦略を提案してください'}];
+          body.trendsData=buildTrendsData(data,yearMonth);
+          return doFetch(body);
+        } else if(apiType==='ai-shift'){
+          body.messages=[{role:'user',content:'今月のシフト状況を分析して、キャストごとに具体的な最適化提案をしてください'}];
+          body.shiftData=buildShiftData(data,yearMonth);
+          return doFetch(body);
+        } else if(apiType==='ai-attendance'){
+          body.messages=[{role:'user',content:'今月の勤怠状況を分析してキャストごとに改善案を提案してください'}];
+          return (roomId?db.collection('rooms').doc(roomId).collection('attendance').doc('settings').get():Promise.resolve(null))
+            .then(function(doc){
+              body.attendanceData=buildAttendanceData(data,doc&&doc.exists&&doc.data().absenceData?doc.data().absenceData:{},yearMonth);
+              return doFetch(body);
+            }).catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
+        } else {
+          body.messages=[{role:'user',content:'来店予測・直近イベントを踏まえて今週のアクションプランを提案してください'}];
+          body.visitsData=buildVisitsData(data,yearMonth,rd.openDate||null);
+          return doFetch(body);
+        }
+      }).catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
     }
 
     var canAnalyze=catRemain>0&&!catIsLoading;
