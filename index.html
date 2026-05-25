@@ -3334,7 +3334,6 @@ function App(){
   var roomRoleRef=React.useRef('member');
   var unsubConsentRef=React.useRef(null);
   var unsubSubRef=React.useRef(null);
-  var unsubAiReportsRef=React.useRef(null);
   var planSelectShownAtRef=React.useRef(0);
   var s2=useState(null);var data=s2[0];var setData=s2[1];
   var s3=useState(true);var loading=s3[0];var setLoading=s3[1];
@@ -3368,10 +3367,6 @@ function App(){
   var s_jrql=useState(false);var joinReqsLoading=s_jrql[0];var setJoinReqsLoading=s_jrql[1];
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
   var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|'ai-sales'|'ai-trends'|'ai-shift'|'ai-attendance'|'ai-visits'
-  var s_airpts=useState({});var aiReports=s_airpts[0];var setAiReports=s_airpts[1];
-  var s_airp=useState(null);var aiReportPage=s_airp[0];var setAiReportPage=s_airp[1];
-  var s_aicid=useState(null);var aiCastId=s_aicid[0];var setAiCastId=s_aicid[1];
-  var s_acd=useState({castId:null,status:'idle'});var aiCastData=s_acd[0];var setAiCastData=s_acd[1];
   var s_ssl=useState(false);var salesLoading=s_ssl[0];var setSalesLoading=s_ssl[1];
   var s_ssr=useState('');var salesResult=s_ssr[0];var setSalesResult=s_ssr[1];
   var s_ssi=useState('');var salesInput=s_ssi[0];var setSalesInput=s_ssi[1];
@@ -3875,15 +3870,6 @@ function App(){
     },function(){});
     return function(){if(unsubSubRef.current){unsubSubRef.current();unsubSubRef.current=null;}};
   },[user,roomId,roomRole]);
-
-  useEffect(function(){
-    if(unsubAiReportsRef.current){unsubAiReportsRef.current();unsubAiReportsRef.current=null;}
-    if(!user){setAiReports({});return;}
-    unsubAiReportsRef.current=db.collection('users').doc(user.uid).collection('meta').doc('aiReports').onSnapshot(function(doc){
-      setAiReports(doc.exists?doc.data():{});
-    },function(){});
-    return function(){if(unsubAiReportsRef.current){unsubAiReportsRef.current();unsubAiReportsRef.current=null;}};
-  },[user&&user.uid]);
 
   // プラン画面を開いたときにカード情報を取得
   useEffect(function(){
@@ -4531,115 +4517,6 @@ function App(){
                 e('button',{style:{background:salesLoading?'#4b5563':'#7c3aed',color:'#fff',border:'none',borderRadius:'10px',padding:'10px 14px',cursor:salesLoading?'not-allowed':'pointer',fontSize:'13px',flexShrink:0},onClick:sendSalesQuestion,disabled:salesLoading},'送信')
               )
             : null
-        )
-      );
-    }
-    if(aiPage==='ai-trends'){
-      function runCastAIStd(castId){
-        var cast=(data.casts||[]).find(function(c){return c.id===castId;});
-        if(!cast)return;
-        if((aiReports[castId]||[]).length>=4)return;
-        setAiCastData({castId:castId,status:'loading'});
-        var now2=new Date();
-        var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-        var kpi=calcMonthlyCastKPI(data,castId,yearMonth);
-        var customerData=buildCustomerData(data,castId);
-        var castData={
-          name:cast.name,isDispatch:cast.isDispatch||false,period:yearMonth,
-          targetSales:(cast.monthlyTargets||{})[yearMonth]||0,
-          salesTotal:kpi.salesTotal,workDays:kpi.workDays,
-          nominationCount:kpi.nominationCount,floorNominationCount:kpi.floorNominationCount,
-          companionCount:kpi.companionCount,lastMonthSales:kpi.lastMonthSales
-        };
-        fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({messages:[{role:'user',content:'分析してください'}],castData:castData,customerData:customerData})})
-        .then(function(r){return r.json();})
-        .then(function(d){
-          var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
-          var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
-          var newRpts=(aiReports[castId]||[]).concat([rpt]);
-          var upd={};upd[castId]=newRpts;
-          if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiReports').set(upd,{merge:true}).catch(function(){});}
-          setAiCastData({castId:castId,status:'idle'});
-        })
-        .catch(function(){setAiCastData({castId:castId,status:'error'});});
-      }
-      // レポート詳細ページ
-      if(aiCastId&&aiReportPage){
-        var rptDetail=(aiReports[aiCastId]||[]).find(function(r){return r.id===aiReportPage;})||null;
-        var rptCast=(data.casts||[]).find(function(c){return c.id===aiCastId;})||{};
-        return e('div',{style:AI_OV},
-          e('div',{style:AI_HDR},
-            e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiReportPage(null);}},'‹ 戻る'),
-            e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},rptDetail?rptDetail.date:''),
-            e('div',{style:{width:'40px'}})
-          ),
-          e('div',{style:AI_BODY},
-            rptDetail
-              ?e('div',{style:{whiteSpace:'pre-wrap',fontSize:'13px',color:'#d1d5db',lineHeight:'1.7'}},rptDetail.text)
-              :e('div',{style:{color:'#6b7280',fontSize:'13px',textAlign:'center',paddingTop:'60px'}},'レポートが見つかりません')
-          )
-        );
-      }
-      // キャスト個別ページ（分析開始＋レポート一覧）
-      if(aiCastId){
-        var selCast=(data.casts||[]).find(function(c){return c.id===aiCastId;})||{};
-        var castRpts=(aiReports[aiCastId]||[]).slice().sort(function(a,b){return Number(b.id)-Number(a.id);});
-        var remainCount=4-castRpts.length;
-        var acd=aiCastData.castId===aiCastId?aiCastData:{castId:aiCastId,status:'idle'};
-        var isAnalyzing=acd.status==='loading';
-        return e('div',{style:AI_OV},
-          e('div',{style:AI_HDR},
-            e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiCastId(null);setAiReportPage(null);}},'‹ 戻る'),
-            e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},selCast.name||''),
-            e('div',{style:{width:'40px'}})
-          ),
-          e('div',{style:AI_BODY},
-            e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'8px'}},
-              e('button',{
-                style:{padding:'8px 18px',background:remainCount>0&&!isAnalyzing?'linear-gradient(135deg,#7c3aed,#4f46e5)':'#374151',border:'none',borderRadius:'10px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:remainCount>0&&!isAnalyzing?'pointer':'default',opacity:remainCount>0&&!isAnalyzing?1:0.5},
-                disabled:remainCount<=0||isAnalyzing,
-                onClick:function(){if(remainCount>0&&!isAnalyzing)runCastAIStd(aiCastId);}
-              },isAnalyzing?'分析中...':'分析を開始'),
-              e('span',{style:{fontSize:'12px',color:'#6b7280'}},'残り '+remainCount+'/4')
-            ),
-            e('div',{style:{fontSize:'11px',color:'#4b5563',marginBottom:'16px'}},'＊分析には30秒ほどかかります'),
-            acd.status==='error'&&e('div',{style:{fontSize:'12px',color:'#ef4444',marginBottom:'12px'}},'エラーが発生しました'),
-            castRpts.length===0
-              ?e('div',{style:{textAlign:'center',padding:'40px 24px',color:'#4b5563',fontSize:'13px'}},'まだレポートがありません')
-              :castRpts.map(function(rpt){
-                return e('button',{key:rpt.id,style:{display:'flex',alignItems:'center',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'0',color:'#e5e7eb',cursor:'pointer',textAlign:'left',marginBottom:'10px',overflow:'hidden'},
-                  onClick:function(){setAiReportPage(rpt.id);}},
-                  e('div',{style:{width:'4px',alignSelf:'stretch',background:'#60a5fa',flexShrink:0}}),
-                  e('div',{style:{flex:1,padding:'14px 14px'}},
-                    e('div',{style:{fontSize:'13px',fontWeight:600}},rpt.date)
-                  ),
-                  e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
-                );
-              })
-          )
-        );
-      }
-      // キャスト一覧ページ
-      var aiCasts2=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&!c._leftRoom;});
-      return e('div',{style:AI_OV},
-        e('div',{style:AI_HDR},
-          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');setAiCastId(null);setAiReportPage(null);}},'‹ 戻る'),
-          e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'キャスト傾向'),
-          e('div',{style:{width:'40px'}})
-        ),
-        e('div',{style:AI_BODY},
-          aiCasts2.length===0
-            ?e('div',{style:{textAlign:'center',padding:'60px 24px',color:'#4b5563',fontSize:'14px'}},'キャストがいません')
-            :aiCasts2.map(function(cast){
-              return e('button',{key:cast.id,style:{display:'flex',alignItems:'center',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'0',color:'#e5e7eb',cursor:'pointer',textAlign:'left',marginBottom:'10px',overflow:'hidden'},onClick:function(){setAiCastId(cast.id);setAiReportPage(null);}},
-                e('div',{style:{width:'4px',alignSelf:'stretch',background:'#60a5fa',flexShrink:0}}),
-                e('div',{style:{flex:1,padding:'16px 14px'}},
-                  e('div',{style:{fontWeight:600,fontSize:'14px'}},cast.name)
-                ),
-                e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
-              );
-            })
         )
       );
     }
