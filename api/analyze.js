@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, type, castData, customerData, salesData } = req.body;
+    const { messages, type, castData, customerData, salesData, storeData } = req.body;
 
     let systemPrompt = '';
 
@@ -92,6 +92,177 @@ export default async function handler(req, res) {
         '最後に「最終判断はマネージャーが行ってください」を添える。',
         '',
         dataBlock
+      ].join('\n');
+
+    } else if (type === 'store-trends') {
+
+      const td = storeData || {};
+      const castRows = (td.casts || []).map(c => {
+        const mLine = (c.months || []).map(m =>
+          m.ym + '：売上¥' + (m.sales||0).toLocaleString()
+          + (m.target ? '（目標¥' + m.target.toLocaleString() + ' / ' + (m.target > 0 ? Math.round(m.sales/m.target*100) : '-') + '%）' : '')
+          + ' 出勤' + m.workDays + '日 指名' + m.nominations + '組 同伴' + m.companions + '回'
+        ).join('\n  ');
+        return '■ ' + c.name + '\n  ' + mLine;
+      }).join('\n');
+
+      systemPrompt = [
+        'あなたはキャバクラ店舗のキャスト管理を専門とするAIです。',
+        '提供されたキャスト別の直近3ヶ月データをもとに、黒服マネージャーが動ける分析と提案をしてください。',
+        '',
+        '【分析の視点】',
+        '・売上トレンド（上昇/横ばい/下降）を各キャストで判定する',
+        '・目標達成率が低いキャストは原因を出勤・指名・同伴の角度で切り分ける',
+        '・伸びているキャストへの継続サポート、停滞キャストへの介入タイミングを提案する',
+        '・同伴数が少ないキャストは関係値構築の課題がある可能性を考慮する',
+        '',
+        '【判断の原則】',
+        '・数字が出ていないキャストにも改善の余地を必ず見つける',
+        '・断定しない。「〜の可能性があります」「〜を検討してください」で提示する',
+        '・データが少ない場合は「データ不足」と明記する',
+        '',
+        '【回答フォーマット】',
+        '1. 全体傾向サマリー（2〜3行）',
+        '2. 注目キャスト（好調・要注意それぞれ名前付きで）',
+        '3. キャスト別の具体的アドバイス（優先度の高い順に）',
+        '4. 来月に向けた重点アクション',
+        '',
+        'iPadで読みやすい長さにする。',
+        '最後に「最終判断はマネージャーが行ってください」を添える。',
+        '',
+        '【キャスト別直近3ヶ月データ】',
+        '対象期間：' + (td.yearMonth || ''),
+        castRows
+      ].join('\n');
+
+    } else if (type === 'store-shift') {
+
+      const sd2 = storeData || {};
+      const dow = ['日','月','火','水','木','金','土'];
+      const dowBlock = (sd2.byDayOfWeek || []).map(d =>
+        '・' + dow[d.day] + '曜：目標' + d.quota + '人 実績' + d.avgShifts + '人'
+        + '（乖離' + (d.avgShifts - d.quota > 0 ? '+' : '') + (d.avgShifts - d.quota).toFixed(1) + '人）'
+        + ' 平均売上¥' + (d.avgSales||0).toLocaleString()
+        + '（' + d.count + '日分）'
+      ).join('\n');
+      const castBlock2 = (sd2.casts || []).map(c =>
+        '・' + c.name + '：契約' + (c.contractShift||'-') + ' / 今月出勤' + c.workDays + '日'
+        + (c.contractShift ? '（達成率' + Math.round(c.workDays / c.contractShift * 100) + '%）' : '')
+      ).join('\n');
+
+      systemPrompt = [
+        'あなたはキャバクラ店舗のシフト管理を専門とするAIです。',
+        '提供されたシフトデータをもとに、マネージャーが実行できるシフト最適化の提案をしてください。',
+        '',
+        '【分析の視点】',
+        '・quota（目標シフト人数）と実績の乖離が大きい曜日を特定する',
+        '・不足曜日 → 誰を追加投入すべきか、同伴・早上がりを活用できないか',
+        '・過剰曜日 → コスト圧迫のリスク、出勤調整の余地',
+        '・売上が低いのにシフトが多い曜日は構造的な問題の可能性',
+        '・キャストの契約シフトに対する達成率も評価する',
+        '',
+        '【判断の原則】',
+        '・断定しない。「〜の可能性があります」「〜を検討してください」で提示する',
+        '・短期（今月残り）と中期（来月）を分けてアドバイスする',
+        '',
+        '【回答フォーマット】',
+        '1. シフト全体評価（2〜3行）',
+        '2. 要改善曜日と理由',
+        '3. キャスト別の出勤状況で気になる点',
+        '4. 来月のシフト編成への提案',
+        '',
+        'iPadで読みやすい長さにする。',
+        '最後に「最終判断はマネージャーが行ってください」を添える。',
+        '',
+        '【曜日別シフトデータ】',
+        '対象期間：' + (sd2.yearMonth || ''),
+        dowBlock,
+        '',
+        '【キャスト別出勤状況】',
+        castBlock2
+      ].join('\n');
+
+    } else if (type === 'store-attendance') {
+
+      const ad = storeData || {};
+      const castBlock3 = (ad.casts || []).map(c => {
+        const rate = c.contractShift > 0 ? Math.round(c.workDays / c.contractShift * 100) : null;
+        return '・' + c.name + '：契約' + (c.contractShift||'-') + '日 / 実績' + c.workDays + '日'
+          + (rate !== null ? '（達成率' + rate + '%）' : '')
+          + (c.isDispatch ? '（派遣）' : '');
+      }).join('\n');
+
+      systemPrompt = [
+        'あなたはキャバクラ店舗の勤怠管理を専門とするAIです。',
+        '提供されたキャスト別の勤怠データをもとに、改善が必要なポイントと具体的なアクションを提案してください。',
+        '',
+        '【分析の視点】',
+        '・契約シフトに対して出勤日数が少ないキャストは要フォロー',
+        '・達成率が低い原因（体調・モチベ・プライベート）を想定しアドバイスに反映する',
+        '・逆に達成率が高いキャストへの感謝・維持施策も重要',
+        '・出勤不安定なキャストは売上も不安定になりやすい',
+        '',
+        '【判断の原則】',
+        '・断定しない。「〜の可能性があります」「〜を検討してください」で提示する',
+        '・勤怠の問題は個別に丁寧に対応する必要がある点を考慮する',
+        '',
+        '【回答フォーマット】',
+        '1. 全体の勤怠評価（2〜3行）',
+        '2. 要フォローキャスト（名前と理由）',
+        '3. 各キャストへの声がけ・対応提案',
+        '4. 来月に向けた勤怠改善アクション',
+        '',
+        'iPadで読みやすい長さにする。',
+        '最後に「最終判断はマネージャーが行ってください」を添える。',
+        '',
+        '【キャスト別勤怠データ】',
+        '対象期間：' + (ad.yearMonth || ''),
+        castBlock3
+      ].join('\n');
+
+    } else if (type === 'store-visits') {
+
+      const vd = storeData || {};
+      const upcomingBlock = (vd.upcoming || []).length > 0
+        ? (vd.upcoming || []).map(v =>
+            '・' + v.date + ' ' + (v.time||'') + ' ' + v.type + '：' + (v.guestName||'') + ' → ' + (v.castName||'担当未定')
+            + (v.count ? '（' + v.count + '名）' : '')
+          ).join('\n')
+        : '　なし';
+      const recentBlock = (vd.recent || []).length > 0
+        ? (vd.recent || []).map(v =>
+            '・' + v.date + ' ' + v.type + '：' + (v.guestName||'') + ' → ' + (v.castName||'')
+          ).join('\n')
+        : '　なし';
+
+      systemPrompt = [
+        'あなたはキャバクラ店舗の来店管理を専門とするAIです。',
+        '提供された来店予定・来店実績データをもとに、マネージャーが動ける具体的な提案をしてください。',
+        '',
+        '【分析の視点】',
+        '・直近の来店予定から、当日の準備・担当キャストへの指示を提案する',
+        '・同伴予定があるキャストのコンディション確認を促す',
+        '・来店頻度が高い顧客へのVIP対応を提案する',
+        '・来店が途絶えている顧客の再来店施策（LINEフォロー等）を提案する',
+        '',
+        '【判断の原則】',
+        '・断定しない。「〜の可能性があります」「〜を検討してください」で提示する',
+        '・直近の行動につながるアドバイスを優先する',
+        '',
+        '【回答フォーマット】',
+        '1. 来店状況の総評（2〜3行）',
+        '2. 直近予定への具体的な準備アドバイス',
+        '3. フォローが必要な顧客・キャスト',
+        '4. 来店数増加のための施策提案',
+        '',
+        'iPadで読みやすい長さにする。',
+        '最後に「最終判断はマネージャーが行ってください」を添える。',
+        '',
+        '【来店予定（直近）】',
+        upcomingBlock,
+        '',
+        '【来店実績（直近）】',
+        recentBlock
       ].join('\n');
 
     } else {

@@ -4474,13 +4474,31 @@ function App(){
     // 分析実行関数
     function runCatAnalysis(){
       if(catRemain<=0||catIsLoading)return;
-      if(aiPage!=='ai-sales')return; // ai-sales のみ実装済み
       setAiCatData({catKey:aiPage,status:'loading'});
       var now2=new Date();
       var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-      var sd=buildSalesData(data,yearMonth);
-      fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({type:'store-sales',messages:[{role:'user',content:'分析してください'}],salesData:sd})})
+      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'store-trends':aiPage==='ai-shift'?'store-shift':aiPage==='ai-attendance'?'store-attendance':'store-visits';
+      var body={type:apiType,messages:[{role:'user',content:'分析してください'}]};
+      if(apiType==='store-sales'){
+        body.salesData=buildSalesData(data,yearMonth);
+      } else if(apiType==='store-trends'){
+        var months3=[];for(var mi=2;mi>=0;mi--){var dm=new Date(now2.getFullYear(),now2.getMonth()-mi,1);months3.push(dm.getFullYear()+'-'+pad(dm.getMonth()+1));}
+        body.storeData={yearMonth:yearMonth,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){
+          return{name:c.name,months:months3.map(function(ym){var k=calcMonthlyCastKPI(data,c.id,ym);return{ym:ym,sales:k.salesTotal,workDays:k.workDays,nominations:k.nominationCount,companions:k.companionCount,target:(c.monthlyTargets||{})[ym]||0};})};
+        })};
+      } else if(apiType==='store-shift'){
+        var sd2=buildSalesData(data,yearMonth);
+        body.storeData={yearMonth:yearMonth,byDayOfWeek:sd2.byDayOfWeek,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){var k=calcMonthlyCastKPI(data,c.id,yearMonth);return{name:c.name,contractShift:c.contractShift||0,workDays:k.workDays,isDispatch:c.isDispatch||false};})};
+      } else if(apiType==='store-attendance'){
+        body.storeData={yearMonth:yearMonth,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){var k=calcMonthlyCastKPI(data,c.id,yearMonth);return{name:c.name,contractShift:c.contractShift||0,workDays:k.workDays,isDispatch:c.isDispatch||false};})};
+      } else {
+        var today2=new Date();var todayStr2=today2.getFullYear()+'-'+pad(today2.getMonth()+1)+'-'+pad(today2.getDate());
+        var visits2=data.visits||[];
+        var upcoming=visits2.filter(function(v){return v.date>=todayStr2;}).sort(function(a,b){return a.date<b.date?-1:1;}).slice(0,20);
+        var recent=visits2.filter(function(v){return v.date<todayStr2;}).sort(function(a,b){return a.date<b.date?1:-1;}).slice(0,20);
+        body.storeData={yearMonth:yearMonth,upcoming:upcoming,recent:recent};
+      }
+      fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(function(r){return r.json();})
       .then(function(d){
         var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
@@ -4493,7 +4511,7 @@ function App(){
       .catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
     }
 
-    var canAnalyze=catRemain>0&&!catIsLoading&&aiPage==='ai-sales';
+    var canAnalyze=catRemain>0&&!catIsLoading;
     return e('div',{style:AI_OV},
       e('div',{style:AI_HDR},
         e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');setAiCatReportPage(null);setAiCatData({catKey:null,status:'idle'});}},'‹ 戻る'),
@@ -4506,28 +4524,23 @@ function App(){
             style:{padding:'8px 18px',background:canAnalyze?'linear-gradient(135deg,#7c3aed,#4f46e5)':'#374151',border:'none',borderRadius:'10px',color:'#fff',fontSize:'13px',fontWeight:600,cursor:canAnalyze?'pointer':'default',opacity:canAnalyze?1:0.5},
             disabled:!canAnalyze,
             onClick:runCatAnalysis
-          },catIsLoading?'分析中...':(aiPage!=='ai-sales'?'準備中':'分析を開始')),
-          e('span',{style:{fontSize:'12px',color:'#6b7280'}},aiPage==='ai-sales'?('残り '+catRemain+'/4'):'')
+          },catIsLoading?'分析中...':'分析を開始'),
+          e('span',{style:{fontSize:'12px',color:'#6b7280'}},'残り '+catRemain+'/4')
         ),
-        aiPage==='ai-sales'&&e('div',{style:{fontSize:'11px',color:'#4b5563',marginBottom:'16px'}},'＊分析には30秒ほどかかります'),
+        e('div',{style:{fontSize:'11px',color:'#4b5563',marginBottom:'16px'}},'＊分析には30秒ほどかかります'),
         catIsError&&e('div',{style:{fontSize:'12px',color:'#ef4444',marginBottom:'12px'}},'エラーが発生しました'),
-        aiPage!=='ai-sales'
-          ?e('div',{style:{textAlign:'center',padding:'60px 24px',color:'#4b5563'}},
-              e('div',{style:{width:'40px',height:'4px',background:aiCat.color,borderRadius:'2px',margin:'0 auto 20px'}}),
-              e('div',{style:{fontSize:'14px',color:'#6b7280'}},'準備中')
-            )
-          :catReports.length===0
-            ?e('div',{style:{textAlign:'center',padding:'40px 24px',color:'#4b5563',fontSize:'13px'}},'まだレポートがありません')
-            :catReports.map(function(rpt){
-              return e('button',{key:rpt.id,style:{display:'flex',alignItems:'center',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'0',color:'#e5e7eb',cursor:'pointer',textAlign:'left',marginBottom:'10px',overflow:'hidden'},
-                onClick:function(){setAiCatReportPage(rpt.id);}},
-                e('div',{style:{width:'4px',alignSelf:'stretch',background:aiCat.color,flexShrink:0}}),
-                e('div',{style:{flex:1,padding:'14px 14px'}},
-                  e('div',{style:{fontSize:'13px',fontWeight:600}},rpt.date)
-                ),
-                e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
-              );
-            })
+        catReports.length===0
+          ?e('div',{style:{textAlign:'center',padding:'40px 24px',color:'#4b5563',fontSize:'13px'}},'まだレポートがありません')
+          :catReports.map(function(rpt){
+            return e('button',{key:rpt.id,style:{display:'flex',alignItems:'center',width:'100%',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:'14px',padding:'0',color:'#e5e7eb',cursor:'pointer',textAlign:'left',marginBottom:'10px',overflow:'hidden'},
+              onClick:function(){setAiCatReportPage(rpt.id);}},
+              e('div',{style:{width:'4px',alignSelf:'stretch',background:aiCat.color,flexShrink:0}}),
+              e('div',{style:{flex:1,padding:'14px 14px'}},
+                e('div',{style:{fontSize:'13px',fontWeight:600}},rpt.date)
+              ),
+              e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
+            );
+          })
       )
     );
   }
