@@ -24,6 +24,18 @@ export default async function handler(req, res) {
         '・' + w.week + '：売上¥' + (w.sales||0).toLocaleString() + ' / 客数' + (w.guests||0) + '人'
       ).join('\n');
 
+      const castBlock = (sd.casts || []).map(c => {
+        const pct = c.achieveRate !== null ? c.achieveRate + '%' : '-';
+        const mom = c.lastMonthSales ? Math.round(c.sales / c.lastMonthSales * 100) + '%' : '-';
+        return '・' + c.name + (c.isDispatch ? '（派遣）' : '')
+          + '：¥' + (c.sales||0).toLocaleString()
+          + (c.target ? '（目標¥' + c.target.toLocaleString() + ' / 達成率' + pct + '）' : '')
+          + ' 出勤' + c.workDays + '日'
+          + ' 1出勤¥' + (c.salesPerDay||0).toLocaleString()
+          + ' 指名' + c.nominations + '組 同伴' + c.companions + '回'
+          + (c.lastMonthSales ? ' 前月比' + mom : '');
+      }).join('\n');
+
       const dataBlock = [
         '【店舗売上データ】',
         '対象期間：' + (sd.yearMonth || ''),
@@ -42,12 +54,15 @@ export default async function handler(req, res) {
         dowBlock,
         '',
         '【週次推移（直近）】',
-        weekBlock
+        weekBlock,
+        '',
+        '【キャスト別今月実績（売上順）】',
+        castBlock || '　データなし'
       ].filter(Boolean).join('\n');
 
       systemPrompt = [
         'あなたはキャバクラ店舗の売上分析を専門とするAIです。',
-        '提供された店舗データをもとに、黒服マネージャーが明日から動ける具体的な分析と提案をしてください。',
+        '提供された店舗データとキャスト別データをもとに、黒服マネージャーが明日から動ける具体的な分析と提案をしてください。',
         '',
         '【業界知識・前提】',
         '・客数が全ての根本。客が入らない店に売上は伸びない',
@@ -75,6 +90,15 @@ export default async function handler(req, res) {
         '■ 週次トレンド',
         '  上昇・下降・横ばいの判断と、転換点があれば原因を推測する',
         '',
+        '■ 今月注力すべきキャスト（最重要）',
+        '  目標未達・達成済みにかかわらず、今月あと伸ばせる可能性の高いキャストを最大5名ピックアップする。',
+        '  選定基準（複合的に判断）：',
+        '  ・目標未達だが1出勤あたり売上が高い → 出勤増やせば即跳ね上がる',
+        '  ・目標達成済みでも同伴・指名が多く上限が見えていない → もう一押しで大幅UP',
+        '  ・前月比が上昇トレンド → 勢いを止めない声がけが有効',
+        '  ・目標未達で出勤も少ない → 出勤促進が最優先',
+        '  各キャストに対してマネージャーが明日できる具体的なアクション（声がけ内容・シフト調整・同伴促進など）を1〜2行で示す。',
+        '',
         '【判断の原則】',
         '・データが不足している場合は「データ不足」と明記する',
         '・断定を避ける。「〜の可能性があります」「〜を検討してください」で提示する',
@@ -85,8 +109,9 @@ export default async function handler(req, res) {
         '1. 今月の総合評価（2〜3行）',
         '2. 強みと弱みの分析（曜日・客数・AVGの観点で）',
         '3. 注目すべきポイント（異常値・改善のチャンスなど）',
-        '4. 今月残りでやるべき具体的なアクション',
-        '5. 来月に向けた準備',
+        '4. 今月注力すべきキャスト（名前・理由・具体的アクションをセットで、最大5名）',
+        '5. 今月残りでやるべき店舗全体のアクション',
+        '6. 来月に向けた準備',
         '',
         'iPadで読みやすい長さにする。',
         '最後に「最終判断はマネージャーが行ってください」を添える。',

@@ -2132,10 +2132,23 @@ function buildSalesData(data,yearMonth){
   });
   var recentWeeks=Object.keys(weekMap).sort().slice(-5).map(function(w){return{week:w,sales:weekMap[w].sales,guests:weekMap[w].guests};});
 
+  var castKPIs=allCasts.filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){
+    var kpi=calcMonthlyCastKPI(data,c.id,yearMonth);
+    var prevKpi=calcMonthlyCastKPI(data,c.id,prevYM);
+    var target=(c.monthlyTargets||{})[yearMonth]||0;
+    var achieveRate=target>0?Math.round(kpi.salesTotal/target*100):null;
+    var salesPerDay=kpi.workDays>0?Math.round(kpi.salesTotal/kpi.workDays):0;
+    return{name:c.name,isDispatch:c.isDispatch||false,sales:kpi.salesTotal,target:target,achieveRate:achieveRate,
+      workDays:kpi.workDays,nominations:kpi.nominationCount,companions:kpi.companionCount,
+      salesPerDay:salesPerDay,lastMonthSales:prevKpi.salesTotal||null};
+  }).filter(function(c){return c.workDays>0||c.sales>0;})
+    .sort(function(a,b){return b.sales-a.sales;});
+
   return{yearMonth:yearMonth,totalSales:totalSales,lastMonthSales:lastMonthSales||null,momRate:momRate,
     workingDays:workingDays,totalGuests:totalGuestsForAvg,totalCompanions:totalCompanions,
     totalNominations:totalNominations,totalFloorCount:totalFloorCount,
-    avgSalesPerDay:avgSalesPerDay,avgPerGuest:avgPerGuest,byDayOfWeek:byDayOfWeek,recentWeeks:recentWeeks};
+    avgSalesPerDay:avgSalesPerDay,avgPerGuest:avgPerGuest,byDayOfWeek:byDayOfWeek,recentWeeks:recentWeeks,
+    casts:castKPIs};
 }
 function AIPage(p){
   var s1=useState('idle');var status=s1[0];var setStatus=s1[1];
