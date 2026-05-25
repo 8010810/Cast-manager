@@ -2065,6 +2065,78 @@ function buildCustomerData(data,castId){
     return{name:c.name,nominationType:c.types[0]||'不明',visitCount:sorted.length,lastVisitDate:sorted[0]?sorted[0].toISOString().split('T')[0]:null,averageVisitInterval:avgInterval};
   }).filter(function(c){return c.lastVisitDate!==null;});
 }
+function buildSalesData(data,yearMonth){
+  var allCasts=data.casts||[];
+  var allRecords=data.records||{};
+  var allShifts=data.shifts||{};
+  var quota=data.quota||{};
+  var prevYM=getPrevMonth(yearMonth);
+
+  var monthRows=[];
+  var prevRows=[];
+  allCasts.forEach(function(c){
+    (allRecords[c.id]||[]).forEach(function(r){
+      if(r.date&&r.date.slice(0,7)===yearMonth)monthRows.push(r);
+      if(r.date&&r.date.slice(0,7)===prevYM)prevRows.push(r);
+    });
+  });
+
+  var totalSales=monthRows.reduce(function(s,r){return s+Number(r.sales||0);},0);
+  var lastMonthSales=prevRows.reduce(function(s,r){return s+Number(r.sales||0);},0);
+  var momRate=lastMonthSales>0?Math.round((totalSales/lastMonthSales)*100):null;
+  var totalGuests=monthRows.reduce(function(s,r){return s+Number(r.guests||r.companions||0);},0);
+  var totalCompanions=monthRows.reduce(function(s,r){return s+Number(r.companions||0);},0);
+  var totalNominations=monthRows.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+  var totalFloorCount=monthRows.reduce(function(s,r){return s+Number(r.floorCount||0);},0);
+
+  var dateSales={};
+  monthRows.forEach(function(r){
+    if(!r.date)return;
+    if(!dateSales[r.date])dateSales[r.date]={sales:0,guests:0};
+    dateSales[r.date].sales+=Number(r.sales||0);
+    dateSales[r.date].guests+=Number(r.guests||r.companions||0);
+  });
+  var workingDays=Object.keys(dateSales).length;
+  var avgSalesPerDay=workingDays>0?Math.round(totalSales/workingDays):0;
+  var totalGuestsForAvg=Object.values(dateSales).reduce(function(s,v){return s+v.guests;},0);
+  var avgPerGuest=totalGuestsForAvg>0?Math.round(totalSales/totalGuestsForAvg):0;
+
+  var dowMap={};
+  Object.keys(dateSales).forEach(function(date){
+    var d=new Date(date);var dow=d.getDay();
+    if(!dowMap[dow])dowMap[dow]={sales:[],guests:[],shifts:[]};
+    dowMap[dow].sales.push(dateSales[date].sales);
+    dowMap[dow].guests.push(dateSales[date].guests);
+    var shiftsOnDay=0;
+    allCasts.forEach(function(c){
+      var sh=((allShifts[c.id]||{})[date]||{});
+      if(sh.status==='work'||sh.status==='douhan')shiftsOnDay++;
+    });
+    dowMap[dow].shifts.push(shiftsOnDay);
+  });
+  var byDayOfWeek=[0,1,2,3,4,5,6].filter(function(d){return dowMap[d];}).map(function(d){
+    var v=dowMap[d];
+    var avg=function(arr){return arr.length>0?Math.round(arr.reduce(function(a,b){return a+b;},0)/arr.length):0;};
+    return{day:d,avgSales:avg(v.sales),avgGuests:avg(v.guests),avgShifts:avg(v.shifts),quota:quota[d]||0,count:v.sales.length};
+  });
+
+  var weekMap={};
+  Object.keys(dateSales).forEach(function(date){
+    var d=new Date(date);
+    var jan1=new Date(d.getFullYear(),0,1);
+    var weekNum=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+    var wk=d.getFullYear()+'-W'+String(weekNum).padStart(2,'0');
+    if(!weekMap[wk])weekMap[wk]={sales:0,guests:0};
+    weekMap[wk].sales+=dateSales[date].sales;
+    weekMap[wk].guests+=dateSales[date].guests;
+  });
+  var recentWeeks=Object.keys(weekMap).sort().slice(-5).map(function(w){return{week:w,sales:weekMap[w].sales,guests:weekMap[w].guests};});
+
+  return{yearMonth:yearMonth,totalSales:totalSales,lastMonthSales:lastMonthSales||null,momRate:momRate,
+    workingDays:workingDays,totalGuests:totalGuestsForAvg,totalCompanions:totalCompanions,
+    totalNominations:totalNominations,totalFloorCount:totalFloorCount,
+    avgSalesPerDay:avgSalesPerDay,avgPerGuest:avgPerGuest,byDayOfWeek:byDayOfWeek,recentWeeks:recentWeeks};
+}
 function AIPage(p){
   var s1=useState('idle');var status=s1[0];var setStatus=s1[1];
   var s2=useState('');var result=s2[0];var setResult=s2[1];
@@ -3295,6 +3367,11 @@ function App(){
   var s_jrql=useState(false);var joinReqsLoading=s_jrql[0];var setJoinReqsLoading=s_jrql[1];
   var s_rh=useState([]);var roomHolidays=s_rh[0];var setRoomHolidays=s_rh[1];
   var s_ai=useState(null);var aiPage=s_ai[0];var setAiPage=s_ai[1]; // null|'hub'|'ai-sales'|'ai-trends'|'ai-shift'|'ai-attendance'|'ai-visits'
+  var s_ssl=useState(false);var salesLoading=s_ssl[0];var setSalesLoading=s_ssl[1];
+  var s_ssr=useState('');var salesResult=s_ssr[0];var setSalesResult=s_ssr[1];
+  var s_ssi=useState('');var salesInput=s_ssi[0];var setSalesInput=s_ssi[1];
+  var s_ssm=useState([]);var salesMessages=s_ssm[0];var setSalesMessages=s_ssm[1];
+  var s_sse=useState(false);var salesError=s_sse[0];var setSalesError=s_sse[1];
   var s_cper=useState({mini:'monthly',std:'monthly'});var checkoutPeriod=s_cper[0];var setCheckoutPeriod=s_cper[1];
   var s_cl=useState(false);var checkoutLoading=s_cl[0];var setCheckoutLoading=s_cl[1];
   var s_ppr=useState(null);var pendingPaymentRoom=s_ppr[0];var setPendingPaymentRoom=s_ppr[1];
@@ -3829,6 +3906,25 @@ function App(){
     return function(){window.removeEventListener('pageshow',handlePageShow);};
   },[]);
 
+  useEffect(function(){
+    if(aiPage!=='ai-sales'||!data)return;
+    if(salesLoading||salesResult||salesError)return;
+    var now2=new Date();
+    var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+    var sd=buildSalesData(data,yearMonth);
+    var initMessages=[{role:'user',content:'分析してください'}];
+    setSalesLoading(true);setSalesError(false);setSalesResult('');setSalesMessages(initMessages);
+    fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'store-sales',messages:initMessages,salesData:sd})})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
+      setSalesResult(txt);setSalesLoading(false);
+      setSalesMessages([{role:'user',content:'分析してください'},{role:'assistant',content:txt}]);
+    })
+    .catch(function(){setSalesError(true);setSalesLoading(false);});
+  },[aiPage]);
+
   function notify(msg,type){setToast({msg:msg,type:type||'success'});setTimeout(function(){setToast(null);},2800);}
   function refreshData(showToast){
     if(!user||!roomId)return;
@@ -4360,6 +4456,67 @@ function App(){
               e('div',{style:{paddingRight:'14px'}},AI_CHEVRON)
             );
           })
+        )
+      );
+    }
+    if(aiPage==='ai-sales'){
+      function sendSalesQuestion(){
+        var q=salesInput.trim();if(!q||salesLoading)return;
+        setSalesInput('');
+        var newMsgs=salesMessages.concat([{role:'user',content:q}]);
+        setSalesMessages(newMsgs);setSalesLoading(true);setSalesError(false);
+        var now2=new Date();var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+        var sd=buildSalesData(data,yearMonth);
+        fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({type:'store-sales',messages:newMsgs,salesData:sd})})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'応答に失敗しました';
+          setSalesLoading(false);
+          setSalesMessages(newMsgs.concat([{role:'assistant',content:txt}]));
+        })
+        .catch(function(){setSalesError(true);setSalesLoading(false);});
+      }
+      return e('div',{style:AI_OV},
+        e('div',{style:AI_HDR},
+          e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',cursor:'pointer',fontSize:'13px'},onClick:function(){setAiPage('hub');setSalesResult('');setSalesMessages([]);setSalesError(false);setSalesLoading(false);}},'‹ 戻る'),
+          e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'15px'}},'店舗売上分析'),
+          e('div',{style:{width:'40px'}})
+        ),
+        e('div',{style:Object.assign({},AI_BODY,{display:'flex',flexDirection:'column',padding:'0'})},
+          e('div',{style:{flex:1,overflowY:'auto',padding:'16px'}},
+            salesLoading&&salesMessages.length<=1
+              ? e('div',{style:{textAlign:'center',padding:'60px 24px',color:'#9ca3af'}},
+                  e('div',{style:{fontSize:'14px',marginBottom:'8px'}},'分析中...'),
+                  e('div',{style:{fontSize:'11px',color:'#6b7280'}},'＊分析には30秒ほどかかります')
+                )
+              : null,
+            salesError&&salesMessages.length<=1
+              ? e('div',{style:{textAlign:'center',padding:'60px 24px'}},
+                  e('div',{style:{color:'#f87171',marginBottom:'12px',fontSize:'14px'}},'エラーが発生しました'),
+                  e('button',{style:{background:'#7c3aed',color:'#fff',border:'none',borderRadius:'8px',padding:'8px 16px',cursor:'pointer',fontSize:'13px'},onClick:function(){setSalesError(false);setSalesResult('');setSalesMessages([]);}},'再試行')
+                )
+              : null,
+            salesMessages.filter(function(m){return m.role==='assistant';}).map(function(m,i){
+              return e('div',{key:i,style:{background:'rgba(124,58,237,0.08)',border:'1px solid rgba(124,58,237,0.2)',borderRadius:'12px',padding:'16px',marginBottom:'16px',whiteSpace:'pre-wrap',fontSize:'13px',lineHeight:1.7,color:'#e5e7eb'}},m.content);
+            }),
+            salesMessages.filter(function(m){return m.role==='user'&&m.content!=='分析してください';}).length>0
+              ? salesMessages.filter(function(m){return m.role==='user'&&m.content!=='分析してください';}).map(function(m,i){
+                  return e('div',{key:'q'+i,style:{background:'rgba(232,184,109,0.08)',border:'1px solid rgba(232,184,109,0.2)',borderRadius:'12px',padding:'12px 16px',marginBottom:'8px',fontSize:'13px',color:'#e8b86d'}},m.content);
+                })
+              : null,
+            salesLoading&&salesMessages.length>1
+              ? e('div',{style:{textAlign:'center',padding:'16px',color:'#9ca3af',fontSize:'13px'}},'返答中...')
+              : null
+          ),
+          salesResult
+            ? e('div',{style:{padding:'12px 16px',borderTop:'1px solid rgba(255,255,255,0.07)',background:'rgba(10,10,22,0.95)',display:'flex',gap:'8px',alignItems:'flex-end'}},
+                e('textarea',{style:{flex:1,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.12)',borderRadius:'10px',padding:'10px 12px',color:'#e5e7eb',fontSize:'13px',resize:'none',outline:'none',minHeight:'40px',maxHeight:'120px',lineHeight:1.5},placeholder:'追加質問を入力...',value:salesInput,
+                  onChange:function(ev){setSalesInput(ev.target.value);},
+                  onKeyDown:function(ev){if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();sendSalesQuestion();}}}),
+                e('button',{style:{background:salesLoading?'#4b5563':'#7c3aed',color:'#fff',border:'none',borderRadius:'10px',padding:'10px 14px',cursor:salesLoading?'not-allowed':'pointer',fontSize:'13px',flexShrink:0},onClick:sendSalesQuestion,disabled:salesLoading},'送信')
+              )
+            : null
         )
       );
     }
