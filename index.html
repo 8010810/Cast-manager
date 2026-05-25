@@ -2187,6 +2187,55 @@ function buildTrendsData(data,yearMonth){
   }).filter(function(p){return p!==null;});
   return{yearMonth:yearMonth,castProfiles:castProfiles};
 }
+function buildShiftData(data,yearMonth){
+  var casts=data.casts||[];
+  var quota=data.quota||{};
+  var year=Number(yearMonth.split('-')[0]);
+  var month=Number(yearMonth.split('-')[1])-1;
+  var dates=[];
+  var dd=new Date(year,month,1);
+  while(dd.getMonth()===month){dates.push(dd.toISOString().slice(0,10));dd.setDate(dd.getDate()+1);}
+
+  var dowStats=[0,1,2,3,4,5,6].map(function(di){
+    var dayDates=dates.filter(function(dt){return new Date(dt).getDay()===di;});
+    var dayData=dayDates.map(function(dt){
+      var actual=casts.filter(function(c){var s=((data.shifts||{})[c.id]||{})[dt];return s&&(s.status==='work'||s.status==='douhan');}).length;
+      var sales=casts.reduce(function(sum,c){var r=((data.records||{})[c.id]||[]).find(function(r){return r.date===dt;});return sum+(r?Number(r.sales||0):0);},0);
+      return{date:dt,actual:actual,sales:sales};
+    }).filter(function(d){return d.actual>0||d.sales>0;});
+    if(!dayData.length)return null;
+    var q=quota[di]||0;
+    var over=dayData.filter(function(d){return d.actual>q;});
+    var under=dayData.filter(function(d){return d.actual<q;});
+    var avgOf=function(arr){return arr.length?Math.round(arr.reduce(function(s,d){return s+d.sales;},0)/arr.length):null;};
+    return{day:di,quota:q,
+      avgActual:Math.round(dayData.reduce(function(s,d){return s+d.actual;},0)/dayData.length*10)/10,
+      totalDays:dayData.length,overDays:over.length,underDays:under.length,
+      avgSales:avgOf(dayData),avgSalesWhenOver:avgOf(over),avgSalesWhenUnder:avgOf(under)};
+  }).filter(Boolean);
+
+  var castProfiles=casts.filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(cast){
+    var monthRecs=((data.records||{})[cast.id]||[]).filter(function(r){return r.date&&r.date.slice(0,7)===yearMonth;});
+    var monthActualDays=monthRecs.length;
+    if(monthActualDays===0)return null;
+    var totalSales=monthRecs.reduce(function(s,r){return s+Number(r.sales||0);},0);
+    var totalNominations=monthRecs.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+    var avgSalesPerDay=Math.round(totalSales/monthActualDays);
+    var workDowCount={};
+    monthRecs.forEach(function(r){var di=new Date(r.date).getDay();workDowCount[di]=(workDowCount[di]||0)+1;});
+    var actualWorkDays=Object.keys(workDowCount).sort(function(a,b){return workDowCount[b]-workDowCount[a];}).slice(0,3).map(Number);
+    var custVisits=((data.customers||{})[cast.id]||[]).filter(function(v){return v.date&&v.date.slice(0,7)===yearMonth;});
+    var custDowCount={};
+    custVisits.forEach(function(v){var di=new Date(v.date).getDay();custDowCount[di]=(custDowCount[di]||0)+1;});
+    var topCustomerDays=Object.keys(custDowCount).sort(function(a,b){return custDowCount[b]-custDowCount[a];}).slice(0,3).map(Number);
+    return{name:cast.name,isDispatch:cast.isDispatch||false,contractShift:cast.contractShift||'',
+      monthActualDays:monthActualDays,actualWorkDays:actualWorkDays,
+      totalSales:totalSales,avgSalesPerDay:avgSalesPerDay,
+      totalNominations:totalNominations,topCustomerDays:topCustomerDays};
+  }).filter(Boolean).sort(function(a,b){return b.avgSalesPerDay-a.avgSalesPerDay;});
+
+  return{yearMonth:yearMonth,byDayOfWeek:dowStats,castProfiles:castProfiles};
+}
 function AIPage(p){
   var s1=useState('idle');var status=s1[0];var setStatus=s1[1];
   var s2=useState('');var result=s2[0];var setResult=s2[1];
@@ -4527,16 +4576,16 @@ function App(){
       setAiCatData({catKey:aiPage,status:'loading'});
       var now2=new Date();
       var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'store-shift':aiPage==='ai-attendance'?'store-attendance':'store-visits';
+      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'ai-shift':aiPage==='ai-attendance'?'store-attendance':'store-visits';
       var body={type:apiType,messages:[{role:'user',content:'分析してください'}]};
       if(apiType==='store-sales'){
         body.salesData=buildSalesData(data,yearMonth);
       } else if(apiType==='ai-trends'){
         body.messages=[{role:'user',content:'現在のキャスト構成を分析して採用戦略を提案してください'}];
         body.trendsData=buildTrendsData(data,yearMonth);
-      } else if(apiType==='store-shift'){
-        var sd2=buildSalesData(data,yearMonth);
-        body.storeData={yearMonth:yearMonth,byDayOfWeek:sd2.byDayOfWeek,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){var k=calcMonthlyCastKPI(data,c.id,yearMonth);return{name:c.name,contractShift:c.contractShift||0,workDays:k.workDays,isDispatch:c.isDispatch||false};})};
+      } else if(apiType==='ai-shift'){
+        body.messages=[{role:'user',content:'今月のシフト状況を分析して、キャストごとに具体的な最適化提案をしてください'}];
+        body.shiftData=buildShiftData(data,yearMonth);
       } else if(apiType==='store-attendance'){
         body.storeData={yearMonth:yearMonth,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){var k=calcMonthlyCastKPI(data,c.id,yearMonth);return{name:c.name,contractShift:c.contractShift||0,workDays:k.workDays,isDispatch:c.isDispatch||false};})};
       } else {

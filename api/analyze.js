@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, type, castData, customerData, salesData, storeData, trendsData } = req.body;
+    const { messages, type, castData, customerData, salesData, storeData, trendsData, shiftData } = req.body;
 
     let systemPrompt = '';
 
@@ -248,51 +248,97 @@ export default async function handler(req, res) {
         dataBlock
       ].join('\n');
 
-    } else if (type === 'store-shift') {
+    } else if (type === 'ai-shift') {
 
-      const sd2 = storeData || {};
+      const sd = shiftData || {};
       const dow = ['日','月','火','水','木','金','土'];
-      const dowBlock = (sd2.byDayOfWeek || []).map(d =>
-        '・' + dow[d.day] + '曜：目標' + d.quota + '人 実績' + d.avgShifts + '人'
-        + '（乖離' + (d.avgShifts - d.quota > 0 ? '+' : '') + (d.avgShifts - d.quota).toFixed(1) + '人）'
-        + ' 平均売上¥' + (d.avgSales||0).toLocaleString()
-        + '（' + d.count + '日分）'
-      ).join('\n');
-      const castBlock2 = (sd2.casts || []).map(c =>
-        '・' + c.name + '：契約' + (c.contractShift||'-') + ' / 今月出勤' + c.workDays + '日'
-        + (c.contractShift ? '（達成率' + Math.round(c.workDays / c.contractShift * 100) + '%）' : '')
-      ).join('\n');
+
+      const dowBlock = (sd.byDayOfWeek || []).map(d => {
+        const diff = d.avgActual - d.quota;
+        const diffStr = diff >= 0 ? '+' + diff.toFixed(1) : diff.toFixed(1);
+        return [
+          '・' + dow[d.day] + '曜（' + d.totalDays + '日分）',
+          '  目標:' + d.quota + '人 / 実績平均:' + d.avgActual.toFixed(1) + '人 / 差:' + diffStr,
+          '  過多:' + d.overDays + '日 / 不足:' + d.underDays + '日',
+          '  平均売上:¥' + (d.avgSales||0).toLocaleString(),
+          d.avgSalesWhenUnder ? '  不足時売上:¥' + d.avgSalesWhenUnder.toLocaleString() : '',
+          d.avgSalesWhenOver  ? '  過多時売上:¥' + d.avgSalesWhenOver.toLocaleString()  : ''
+        ].filter(Boolean).join('\n');
+      }).join('\n\n');
+
+      const castBlock = (sd.castProfiles || []).map(c => {
+        const topDays = (c.topCustomerDays || []).map(di => dow[di] + '曜').join('・');
+        const workDays = (c.actualWorkDays || []).map(di => dow[di] + '曜').join('・');
+        return [
+          '【' + c.name + (c.isDispatch ? '（派遣）' : '') + '】',
+          '  契約シフト：' + (c.contractShift || '未設定'),
+          '  今月実出勤日数：' + c.monthActualDays + '日',
+          '  出勤曜日の傾向：' + (workDays || 'データなし'),
+          '  月間売上：¥' + (c.totalSales||0).toLocaleString(),
+          '  1出勤あたり売上：¥' + (c.avgSalesPerDay||0).toLocaleString(),
+          '  月間指名組数：' + (c.totalNominations||0) + '組',
+          '  顧客の来店が多い曜日：' + (topDays || 'データなし')
+        ].join('\n');
+      }).join('\n\n');
+
+      const dataBlock = [
+        '【店舗シフト乖離データ：' + (sd.yearMonth||'') + '】',
+        dowBlock,
+        '',
+        '【キャスト別シフト・売上・顧客来店パターン】',
+        castBlock
+      ].join('\n');
 
       systemPrompt = [
-        'あなたはキャバクラ店舗のシフト管理を専門とするAIです。',
-        '提供されたシフトデータをもとに、マネージャーが実行できるシフト最適化の提案をしてください。',
+        'あなたはキャバクラのシフト最適化を専門とするAIです。',
+        '店舗全体の乖離データとキャスト個別の売上・顧客来店パターンを組み合わせて分析し、',
+        '具体的にどのキャストをいつ出勤させるべきかを提案してください。',
+        '',
+        '【業界知識・前提】',
+        '・シフト不足の日は機会損失（席が回らない）、過多の日は人件費の無駄',
+        '・週末（特に金曜・土曜）は基本的に多めで攻める',
+        '・キャストの顧客が来やすい曜日にそのキャストが出勤していないと、客が離れるリスクがある',
+        '・契約シフト（週○日）と実出勤が乖離しているキャストは要確認',
+        '・1出勤あたり売上が高いキャストは出勤を増やすほど店の利益が上がる',
+        '・指名が多いキャストが休みの日に太客が来ても売上に繋がりにくい',
         '',
         '【分析の視点】',
-        '・quota（目標シフト人数）と実績の乖離が大きい曜日を特定する',
-        '・不足曜日 → 誰を追加投入すべきか、同伴・早上がりを活用できないか',
-        '・過剰曜日 → コスト圧迫のリスク、出勤調整の余地',
-        '・売上が低いのにシフトが多い曜日は構造的な問題の可能性',
-        '・キャストの契約シフトに対する達成率も評価する',
+        '',
+        '■ 店舗レベルの乖離',
+        '  不足が多い曜日・過多が多い曜日を特定する',
+        '  売上と乖離の相関を確認する',
+        '',
+        '■ キャスト個別の最適化',
+        '  以下の観点でキャストごとに評価する：',
+        '  1. 契約シフト vs 実出勤：大きく乖離していれば要対応',
+        '  2. 1出勤あたり売上が高いキャスト → 不足曜日に追加出勤させると効果的',
+        '  3. 顧客の来店が多い曜日 vs 実際の出勤曜日：ズレていれば修正提案',
+        '  4. 指名が多いキャストが店舗不足曜日に休んでいる → 優先的に調整',
+        '',
+        '■ 具体的な推奨アクション',
+        '  「○○さんを金曜に追加出勤させる」',
+        '  「○○さんの水曜を金曜にずらす」',
+        '  のように、名前と曜日を明示した提案をする',
         '',
         '【判断の原則】',
-        '・断定しない。「〜の可能性があります」「〜を検討してください」で提示する',
-        '・短期（今月残り）と中期（来月）を分けてアドバイスする',
+        '・データが少ない場合は「サンプル不足」と明記する',
+        '・断定を避け「〜の可能性があります」「〜を検討してください」で提示する',
+        '・派遣キャストへの出勤増加提案はコスト面の注意を添える',
+        '・来月すぐ動けるアクションベースで答える',
         '',
         '【回答フォーマット】',
-        '1. シフト全体評価（2〜3行）',
-        '2. 要改善曜日と理由',
-        '3. キャスト別の出勤状況で気になる点',
-        '4. 来月のシフト編成への提案',
+        '1. 店舗全体のシフト状況評価（2〜3行）',
+        '2. 改善が必要な曜日と理由（不足・過多それぞれ）',
+        '3. キャスト個別の推奨アクション',
+        '   ・追加出勤を勧めるキャスト（名前・追加すべき曜日・理由）',
+        '   ・出勤曜日をずらすべきキャスト（名前・現状→推奨・理由）',
+        '   ・出勤を減らしてもよいキャスト（名前・理由）',
+        '4. 来月のシフト定数見直し提案（曜日別に具体的な数字で）',
         '',
         'iPadで読みやすい長さにする。',
         '最後に「最終判断はマネージャーが行ってください」を添える。',
         '',
-        '【曜日別シフトデータ】',
-        '対象期間：' + (sd2.yearMonth || ''),
-        dowBlock,
-        '',
-        '【キャスト別出勤状況】',
-        castBlock2
+        dataBlock
       ].join('\n');
 
     } else if (type === 'store-attendance') {
