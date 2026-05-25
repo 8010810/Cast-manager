@@ -2249,6 +2249,44 @@ function buildShiftData(data,yearMonth){
 
   return{yearMonth:yearMonth,byDayOfWeek:dowStats,castProfiles:castProfiles,nextWeekSchedule:nextWeekSchedule};
 }
+function estimateMonthlyDays(contractShift){
+  if(!contractShift)return null;
+  var wm=contractShift.match(/週\s*(\d+)/);if(wm)return Math.round(Number(wm[1])*4.3);
+  var mm=contractShift.match(/月\s*(\d+)/);if(mm)return Number(mm[1]);
+  return null;
+}
+function buildAttendanceData(data,absenceData,yearMonth){
+  var casts=(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;});
+  var castProfiles=casts.map(function(cast){
+    var shifts=data.shifts[cast.id]||{};
+    var monthActualDays=0,pendingDays=0;
+    Object.keys(shifts).forEach(function(date){
+      if(!date.startsWith(yearMonth))return;
+      var s=shifts[date].status;
+      if(s==='work'||s==='douhan')monthActualDays++;
+      else if(s==='pending')pendingDays++;
+    });
+    var absenceCount=0,tardyCount=0;
+    Object.keys(absenceData||{}).forEach(function(date){
+      if(!date.startsWith(yearMonth))return;
+      ((absenceData[date].absences)||[]).forEach(function(a){
+        if(a.castId!==cast.id)return;
+        if(a.type==='当欠')absenceCount++;
+        else if(a.type==='遅刻')tardyCount++;
+      });
+    });
+    var recs=((data.records||{})[cast.id]||[]).filter(function(r){return r.date&&r.date.startsWith(yearMonth);});
+    var totalSales=recs.reduce(function(s,r){return s+Number(r.sales||0);},0);
+    var avgSalesPerDay=monthActualDays>0?Math.round(totalSales/monthActualDays):0;
+    var expectedDays=estimateMonthlyDays(cast.contractShift);
+    var hasIssue=absenceCount>0||tardyCount>0||pendingDays>=2||(expectedDays&&monthActualDays/expectedDays<0.85);
+    if(!hasIssue)return null;
+    return{name:cast.name,contractShift:cast.contractShift||'',expectedDays:expectedDays,
+      monthActualDays:monthActualDays,pendingDays:pendingDays,absenceCount:absenceCount,
+      tardyCount:tardyCount,totalSales:totalSales,avgSalesPerDay:avgSalesPerDay};
+  }).filter(Boolean).sort(function(a,b){return b.totalSales-a.totalSales;});
+  return{yearMonth:yearMonth,castProfiles:castProfiles};
+}
 function AIPage(p){
   var s1=useState('idle');var status=s1[0];var setStatus=s1[1];
   var s2=useState('');var result=s2[0];var setResult=s2[1];
@@ -4589,7 +4627,7 @@ function App(){
       setAiCatData({catKey:aiPage,status:'loading'});
       var now2=new Date();
       var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'ai-shift':aiPage==='ai-attendance'?'store-attendance':'store-visits';
+      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'ai-shift':aiPage==='ai-attendance'?'ai-attendance':'store-visits';
       var body={type:apiType,messages:[{role:'user',content:'分析してください'}]};
       if(apiType==='store-sales'){
         body.salesData=buildSalesData(data,yearMonth);
@@ -4599,8 +4637,26 @@ function App(){
       } else if(apiType==='ai-shift'){
         body.messages=[{role:'user',content:'今月のシフト状況を分析して、キャストごとに具体的な最適化提案をしてください'}];
         body.shiftData=buildShiftData(data,yearMonth);
-      } else if(apiType==='store-attendance'){
-        body.storeData={yearMonth:yearMonth,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){var k=calcMonthlyCastKPI(data,c.id,yearMonth);return{name:c.name,contractShift:c.contractShift||0,workDays:k.workDays,isDispatch:c.isDispatch||false};})};
+      } else if(apiType==='ai-attendance'){
+        body.messages=[{role:'user',content:'今月の勤怠状況を分析してキャストごとに改善案を提案してください'}];
+        var attRoomId=roomId||'';
+        (attRoomId
+          ?db.collection('rooms').doc(attRoomId).collection('attendance').doc('settings').get()
+          :Promise.resolve(null)
+        ).then(function(doc){
+          var absData=doc&&doc.exists&&doc.data().absenceData?doc.data().absenceData:{};
+          body.attendanceData=buildAttendanceData(data,absData,yearMonth);
+          return fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        }).then(function(r){return r.json();})
+        .then(function(d){
+          var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';
+          var rpt={id:String(Date.now()),date:now2.toISOString().slice(0,10),text:txt};
+          var newRpts=(aiCatReports[aiPage]||[]).concat([rpt]);
+          var upd={};upd[aiPage]=newRpts;
+          if(user){db.collection('users').doc(user.uid).collection('meta').doc('aiCatReports').set(upd,{merge:true}).catch(function(){});}
+          setAiCatData({catKey:aiPage,status:'idle'});
+        }).catch(function(){setAiCatData({catKey:aiPage,status:'error'});});
+        return;
       } else {
         var today2=new Date();var todayStr2=today2.getFullYear()+'-'+pad(today2.getMonth()+1)+'-'+pad(today2.getDate());
         var visits2=data.visits||[];

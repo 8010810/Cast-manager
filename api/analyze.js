@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, type, castData, customerData, salesData, storeData, trendsData, shiftData } = req.body;
+    const { messages, type, castData, customerData, salesData, storeData, trendsData, shiftData, attendanceData } = req.body;
 
     let systemPrompt = '';
 
@@ -324,6 +324,87 @@ export default async function handler(req, res) {
         '2. 優先調整が必要な日と理由',
         '3. キャスト別アクション（今週中に打診・声がけすべき内容を名前と曜日付きで）',
         '4. 来週以降の改善ポイント（シフト定数・曜日構成の見直し提案）',
+        '',
+        'iPadで読みやすい長さにする。',
+        '最後に「最終判断はマネージャーが行ってください」を添える。',
+        '',
+        dataBlock
+      ].join('\n');
+
+    } else if (type === 'ai-attendance') {
+
+      const ad = attendanceData || {};
+
+      const castBlock = (ad.castProfiles || []).map(c => {
+        const lines = [
+          '【' + c.name + '】',
+          '  契約シフト：' + (c.contractShift || '未設定'),
+          '  月間想定日数：' + (c.expectedDays != null ? c.expectedDays + '日' : '算出不可'),
+          '  月間実出勤日数：' + c.monthActualDays + '日',
+          '  保留（未確定）日数：' + c.pendingDays + '日',
+          '  当欠：' + c.absenceCount + '回',
+          '  遅刻：' + c.tardyCount + '回',
+          '  月間売上：¥' + (c.totalSales||0).toLocaleString(),
+          '  1出勤あたり売上：¥' + (c.avgSalesPerDay||0).toLocaleString()
+        ];
+        if (c.expectedDays != null && c.expectedDays > 0) {
+          lines.push('  出勤達成率：' + Math.round(c.monthActualDays / c.expectedDays * 100) + '%');
+        }
+        return lines.join('\n');
+      }).join('\n\n');
+
+      const dataBlock = [
+        '【勤怠データ：' + (ad.yearMonth||'') + '】',
+        '対象キャスト数：' + (ad.castProfiles||[]).length + '名（問題あり）',
+        '',
+        castBlock || '　問題のあるキャストはいません'
+      ].join('\n');
+
+      systemPrompt = [
+        'あなたはキャバクラのキャスト勤怠管理を専門とするAIです。',
+        '提供された勤怠データをもとに、どのキャストにどんな改善が必要かを具体的に提案してください。',
+        '※データは問題があるキャストのみ（当欠・遅刻・保留多数・達成率85%未満）を抽出しています。',
+        '',
+        '【業界知識・前提】',
+        '・当欠（当日欠勤）は店舗運営に直接ダメージを与える。特に売上が高いキャストの当欠は損失が大きい',
+        '・遅刻は客への対応が遅れ、席の回転やキャストの印象に影響する',
+        '・保留（pending）が多いキャストはシフト管理が不安定で計画が立てにくい',
+        '・契約シフトと実出勤の乖離が大きいキャストは離職リスクが高い可能性がある',
+        '・売上が高いキャストの当欠は低いキャストの当欠より店へのダメージが大きい',
+        '・当欠が繰り返される場合は振替出勤・ペナルティルール適用を検討する',
+        '・遅刻が多い場合は出勤予定時刻の設定を見直す可能性もある',
+        '',
+        '【分析の視点】',
+        '',
+        '■ 問題の深刻度の判定',
+        '  当欠2回以上 → 要対応',
+        '  遅刻3回以上 → 要対応',
+        '  出勤達成率70%未満 → 要対応',
+        '  保留が多い（月3日以上）→ シフト管理が不安定',
+        '',
+        '■ 売上との掛け合わせ',
+        '  売上が高いキャストの問題は優先度を上げる',
+        '  当欠×高売上 → 緊急対応',
+        '  当欠×低売上 → 勤怠改善と同時に売上改善も必要',
+        '',
+        '■ 改善提案の方向性',
+        '  当欠が多い → 面談・振替出勤・ペナルティルール適用を検討',
+        '  遅刻が多い → 出勤予定時刻の見直し・原因のヒアリング',
+        '  保留が多い → シフト確定を早める・連絡ルールの徹底',
+        '  達成率が低い → 契約シフトの見直し or 出勤を増やすアプローチ',
+        '',
+        '【判断の原則】',
+        '・名前を出して具体的に言及する',
+        '・深刻度を「緊急・要対応・経過観察」で分類する',
+        '・断定を避け「〜を検討してください」で提示する',
+        '・データが少ない場合は「サンプル不足」と明記する',
+        '',
+        '【回答フォーマット】',
+        '1. 全体の勤怠評価（2〜3行）',
+        '2. 緊急対応が必要なキャスト（名前・問題・推奨アクション）',
+        '3. 要対応キャスト（名前・問題・推奨アクション）',
+        '4. 経過観察キャスト（名前・気になる点）',
+        '5. 店舗全体の勤怠ルール改善案',
         '',
         'iPadで読みやすい長さにする。',
         '最後に「最終判断はマネージャーが行ってください」を添える。',
