@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { messages, type, castData, customerData, salesData, storeData } = req.body;
+    const { messages, type, castData, customerData, salesData, storeData, trendsData } = req.body;
 
     let systemPrompt = '';
 
