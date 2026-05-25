@@ -119,45 +119,133 @@ export default async function handler(req, res) {
         dataBlock
       ].join('\n');
 
-    } else if (type === 'store-trends') {
+    } else if (type === 'ai-trends') {
 
-      const td = storeData || {};
-      const castRows = (td.casts || []).map(c => {
-        const mLine = (c.months || []).map(m =>
-          m.ym + '：売上¥' + (m.sales||0).toLocaleString()
-          + (m.target ? '（目標¥' + m.target.toLocaleString() + ' / ' + (m.target > 0 ? Math.round(m.sales/m.target*100) : '-') + '%）' : '')
-          + ' 出勤' + m.workDays + '日 指名' + m.nominations + '組 同伴' + m.companions + '回'
-        ).join('\n  ');
-        return '■ ' + c.name + '\n  ' + mLine;
+      const td = trendsData || {};
+      const profiles = td.castProfiles || [];
+
+      const typeGroups = {};
+      profiles.forEach(p => {
+        const t = p.castType || '未設定';
+        if (!typeGroups[t]) typeGroups[t] = { count:0, totalSales:0, totalNoms:0 };
+        typeGroups[t].count++;
+        typeGroups[t].totalSales += p.avgMonthlySales;
+        typeGroups[t].totalNoms += p.avgNominations;
+      });
+      const typeBlock = Object.keys(typeGroups).map(t => {
+        const g = typeGroups[t];
+        return '・' + t + '：' + g.count + '名'
+          + ' / 平均月売上¥' + Math.round(g.totalSales/g.count).toLocaleString()
+          + ' / 平均月指名' + Math.round(g.totalNoms/g.count) + '組';
       }).join('\n');
 
+      const ageGroups = {'18-20':{count:0,sales:0},'21-23':{count:0,sales:0},'24-26':{count:0,sales:0},'27-29':{count:0,sales:0},'30+':{count:0,sales:0}};
+      profiles.forEach(p => {
+        if (p.age === null) return;
+        const age = p.age;
+        const g = age<=20?'18-20':age<=23?'21-23':age<=26?'24-26':age<=29?'27-29':'30+';
+        ageGroups[g].count++; ageGroups[g].sales += p.avgMonthlySales;
+      });
+      const ageBlock = Object.keys(ageGroups)
+        .filter(k => ageGroups[k].count > 0)
+        .map(k => {
+          const g = ageGroups[k];
+          return '・' + k + '歳：' + g.count + '名'
+            + ' / 平均月売上¥' + Math.round(g.sales/g.count).toLocaleString();
+        }).join('\n');
+
+      const heightGroups = {'-155':{count:0,sales:0},'156-160':{count:0,sales:0},'161-165':{count:0,sales:0},'166-170':{count:0,sales:0},'171+':{count:0,sales:0}};
+      profiles.forEach(p => {
+        if (!p.height) return;
+        const h = p.height;
+        const g = h<=155?'-155':h<=160?'156-160':h<=165?'161-165':h<=170?'166-170':'171+';
+        heightGroups[g].count++; heightGroups[g].sales += p.avgMonthlySales;
+      });
+      const heightBlock = Object.keys(heightGroups)
+        .filter(k => heightGroups[k].count > 0)
+        .map(k => {
+          const g = heightGroups[k];
+          return '・' + k + 'cm：' + g.count + '名'
+            + ' / 平均月売上¥' + Math.round(g.sales/g.count).toLocaleString();
+        }).join('\n');
+
+      const cupGroups = {};
+      profiles.forEach(p => {
+        const c = p.cup || '未設定';
+        if (!cupGroups[c]) cupGroups[c] = {count:0,sales:0};
+        cupGroups[c].count++; cupGroups[c].sales += p.avgMonthlySales;
+      });
+      const cupBlock = Object.keys(cupGroups).sort().map(c => {
+        const g = cupGroups[c];
+        return '・' + (c !== '未設定' ? c + 'カップ' : c) + '：' + g.count + '名'
+          + ' / 平均月売上¥' + Math.round(g.sales/g.count).toLocaleString();
+      }).join('\n');
+
+      const regular = profiles.filter(p => !p.isDispatch);
+      const dispatch = profiles.filter(p => p.isDispatch);
+
+      const dataBlock = [
+        '【キャスト在籍状況】',
+        '在籍キャスト：' + regular.length + '名',
+        '派遣キャスト：' + dispatch.length + '名',
+        '集計期間：直近3ヶ月平均',
+        '',
+        '【系統別分布×実績】',
+        typeBlock || 'データなし',
+        '',
+        '【年齢別分布×実績】',
+        ageBlock || 'データなし',
+        '',
+        '【身長別分布×実績】',
+        heightBlock || 'データなし',
+        '',
+        '【カップ別分布×実績】',
+        cupBlock || 'データなし'
+      ].join('\n');
+
       systemPrompt = [
-        'あなたはキャバクラ店舗のキャスト管理を専門とするAIです。',
-        '提供されたキャスト別の直近3ヶ月データをもとに、黒服マネージャーが動ける分析と提案をしてください。',
+        'あなたはキャバクラの採用戦略を専門とするAIです。',
+        '提供された在籍キャストの特性データと実績を分析し、',
+        '店舗が次にどんなキャストを採用すべきかを提案してください。',
         '',
         '【分析の視点】',
-        '・売上トレンド（上昇/横ばい/下降）を各キャストで判定する',
-        '・目標達成率が低いキャストは原因を出勤・指名・同伴の角度で切り分ける',
-        '・伸びているキャストへの継続サポート、停滞キャストへの介入タイミングを提案する',
-        '・同伴数が少ないキャストは関係値構築の課題がある可能性を考慮する',
         '',
-        '【判断の原則】',
-        '・数字が出ていないキャストにも改善の余地を必ず見つける',
-        '・断定しない。「〜の可能性があります」「〜を検討してください」で提示する',
-        '・データが少ない場合は「データ不足」と明記する',
+        '■ 系統の分析',
+        '  castTypeは自由入力のため、似た系統（例：清楚系・清楚など）は同一グループとして解釈する',
+        '  特定の系統に偏りすぎていないか確認する',
+        '  実績（売上・指名）が高い系統を特定する',
+        '',
+        '■ 年齢バランス',
+        '  若手・中堅・ベテランのバランスを評価する',
+        '  特定年齢層に偏っている場合はリスクを指摘する',
+        '  実績との相関を読む',
+        '',
+        '■ 身長・スタイル',
+        '  現在の分布を確認し、偏りがあれば指摘する',
+        '  実績との相関があれば言及する',
+        '',
+        '■ ギャップ分析',
+        '  現在のラインナップで不足している属性・系統を特定する',
+        '  客層のバランス（幅広い客を取り込めているか）を評価する',
+        '',
+        '【採用提案の原則】',
+        '・既存の強みを維持しながら弱点を補う採用を優先する',
+        '・1タイプへの集中は長期的リスク（その系統が流行り廃りする）',
+        '・実績データに基づいた提案をする',
+        '・断定せず「〜の傾向があります」「〜を検討してください」で提示する',
+        '・データが少ない属性については「サンプル数が少ないため参考程度に」と明記する',
         '',
         '【回答フォーマット】',
-        '1. 全体傾向サマリー（2〜3行）',
-        '2. 注目キャスト（好調・要注意それぞれ名前付きで）',
-        '3. キャスト別の具体的アドバイス（優先度の高い順に）',
-        '4. 来月に向けた重点アクション',
+        '1. 現在のキャスト構成の評価（強みと偏り）',
+        '2. 実績が高い属性の傾向',
+        '3. 不足している・補強すべき属性',
+        '4. 次の採用でターゲットにすべきキャスト像（具体的に）',
+        '5. 中長期の採用方針',
         '',
         'iPadで読みやすい長さにする。',
         '最後に「最終判断はマネージャーが行ってください」を添える。',
         '',
-        '【キャスト別直近3ヶ月データ】',
-        '対象期間：' + (td.yearMonth || ''),
-        castRows
+        dataBlock
       ].join('\n');
 
     } else if (type === 'store-shift') {

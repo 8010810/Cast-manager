@@ -2150,6 +2150,43 @@ function buildSalesData(data,yearMonth){
     avgSalesPerDay:avgSalesPerDay,avgPerGuest:avgPerGuest,byDayOfWeek:byDayOfWeek,recentWeeks:recentWeeks,
     casts:castKPIs};
 }
+function calcAge(birthday){
+  if(!birthday)return null;
+  var today=new Date();
+  var parts=birthday.split('-');
+  var birth=new Date(Number(parts[0]),Number(parts[1])-1,Number(parts[2]));
+  var age=today.getFullYear()-birth.getFullYear();
+  var m=today.getMonth()-birth.getMonth();
+  if(m<0||(m===0&&today.getDate()<birth.getDate()))age--;
+  return age;
+}
+function buildTrendsData(data,yearMonth){
+  var months=[];
+  for(var i=0;i<3;i++){
+    var dm=new Date(yearMonth+'-01');
+    dm.setMonth(dm.getMonth()-i);
+    months.push(dm.toISOString().slice(0,7));
+  }
+  var castProfiles=(data.casts||[]).map(function(cast){
+    var monthlyStats=months.map(function(ym){
+      var recs=((data.records||{})[cast.id]||[]).filter(function(r){return r.date&&r.date.slice(0,7)===ym;});
+      return{sales:recs.reduce(function(s,r){return s+Number(r.sales||0);},0),
+        workDays:recs.length,
+        nominations:recs.reduce(function(s,r){return s+Number(r.nominations||0);},0),
+        floorCount:recs.reduce(function(s,r){return s+Number(r.floorCount||0);},0),
+        companions:recs.reduce(function(s,r){return s+Number(r.companions||0);},0)};
+    });
+    var active=monthlyStats.filter(function(m){return m.workDays>0;});
+    if(active.length===0)return null;
+    var avg=function(key){return Math.round(active.reduce(function(s,m){return s+m[key];},0)/active.length);};
+    return{castType:cast.castType||'未設定',age:calcAge(cast.birthday),
+      height:cast.height?Number(cast.height):null,cup:cast.cup||null,
+      isDispatch:cast.isDispatch||false,contractShift:cast.contractShift||'',
+      avgMonthlySales:avg('sales'),avgWorkDays:avg('workDays'),
+      avgNominations:avg('nominations'),avgFloorCount:avg('floorCount'),avgCompanions:avg('companions')};
+  }).filter(function(p){return p!==null;});
+  return{yearMonth:yearMonth,castProfiles:castProfiles};
+}
 function AIPage(p){
   var s1=useState('idle');var status=s1[0];var setStatus=s1[1];
   var s2=useState('');var result=s2[0];var setResult=s2[1];
@@ -4490,15 +4527,13 @@ function App(){
       setAiCatData({catKey:aiPage,status:'loading'});
       var now2=new Date();
       var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
-      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'store-trends':aiPage==='ai-shift'?'store-shift':aiPage==='ai-attendance'?'store-attendance':'store-visits';
+      var apiType=aiPage==='ai-sales'?'store-sales':aiPage==='ai-trends'?'ai-trends':aiPage==='ai-shift'?'store-shift':aiPage==='ai-attendance'?'store-attendance':'store-visits';
       var body={type:apiType,messages:[{role:'user',content:'分析してください'}]};
       if(apiType==='store-sales'){
         body.salesData=buildSalesData(data,yearMonth);
-      } else if(apiType==='store-trends'){
-        var months3=[];for(var mi=2;mi>=0;mi--){var dm=new Date(now2.getFullYear(),now2.getMonth()-mi,1);months3.push(dm.getFullYear()+'-'+pad(dm.getMonth()+1));}
-        body.storeData={yearMonth:yearMonth,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){
-          return{name:c.name,months:months3.map(function(ym){var k=calcMonthlyCastKPI(data,c.id,ym);return{ym:ym,sales:k.salesTotal,workDays:k.workDays,nominations:k.nominationCount,companions:k.companionCount,target:(c.monthlyTargets||{})[ym]||0};})};
-        })};
+      } else if(apiType==='ai-trends'){
+        body.messages=[{role:'user',content:'現在のキャスト構成を分析して採用戦略を提案してください'}];
+        body.trendsData=buildTrendsData(data,yearMonth);
       } else if(apiType==='store-shift'){
         var sd2=buildSalesData(data,yearMonth);
         body.storeData={yearMonth:yearMonth,byDayOfWeek:sd2.byDayOfWeek,casts:(data.casts||[]).filter(function(c){return !c._archived&&!c._leftRoom;}).map(function(c){var k=calcMonthlyCastKPI(data,c.id,yearMonth);return{name:c.name,contractShift:c.contractShift||0,workDays:k.workDays,isDispatch:c.isDispatch||false};})};
