@@ -2234,7 +2234,20 @@ function buildShiftData(data,yearMonth){
       totalNominations:totalNominations,topCustomerDays:topCustomerDays};
   }).filter(Boolean).sort(function(a,b){return b.avgSalesPerDay-a.avgSalesPerDay;});
 
-  return{yearMonth:yearMonth,byDayOfWeek:dowStats,castProfiles:castProfiles};
+  // 来週7日分のシフト予定
+  var dow7=['日','月','火','水','木','金','土'];
+  var today2=new Date();
+  var nextWeekSchedule=[];
+  for(var nw=1;nw<=7;nw++){
+    var nd=new Date(today2);nd.setDate(today2.getDate()+nw);
+    var ndStr=nd.toISOString().slice(0,10);
+    var di=nd.getDay();
+    var scheduled=casts.filter(function(c){var s=((data.shifts||{})[c.id]||{})[ndStr];return s&&(s.status==='work'||s.status==='douhan');}).map(function(c){return c.name;});
+    nextWeekSchedule.push({date:ndStr,dow:di,dowLabel:dow7[di],scheduled:scheduled,quota:quota[di]||0,
+      gap:scheduled.length-(quota[di]||0)});
+  }
+
+  return{yearMonth:yearMonth,byDayOfWeek:dowStats,castProfiles:castProfiles,nextWeekSchedule:nextWeekSchedule};
 }
 function AIPage(p){
   var s1=useState('idle');var status=s1[0];var setStatus=s1[1];
