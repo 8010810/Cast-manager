@@ -3972,6 +3972,10 @@ function App(){
             clearTimeout(authTimeout);
             // ログイン時に実際のメンバーシップを検証（退室後のキャッシュを弾く）
             Promise.all(rooms.map(function(r){
+              // 直近60秒以内に参加したルームはAPI書き込み伝播の遅延があるためスキップ
+              var joinedAt=r.joinedAt?new Date(r.joinedAt):null;
+              var isRecentJoin=joinedAt&&(Date.now()-joinedAt.getTime())<60000;
+              if(isRecentJoin)return Promise.resolve(r);
               return db.collection('rooms').doc(r.roomId).collection('members').doc(u.uid).get()
                 .then(function(memDoc){return memDoc.exists?r:null;})
                 .catch(function(){return r;});
