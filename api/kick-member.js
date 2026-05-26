@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 
 function getDb() {
   try {
@@ -19,10 +20,28 @@ function getDb() {
   }
 }
 
+function getAdminAuth() {
+  try {
+    if (getApps().length === 0) {
+      var privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
+      initializeApp({ credential: cert({
+        type: 'service_account',
+        project_id: process.env.FIREBASE_PROJECT_ID || '',
+        private_key: privateKey,
+        client_email: process.env.FIREBASE_CLIENT_EMAIL || '',
+      }) });
+    }
+    return getAuth();
+  } catch (_e) {
+    console.error('[kick-member] Firebase init error:', _e.message);
+    throw _e;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -34,7 +53,18 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'targetUid and roomId are required' });
     }
 
+    var authHeader = req.headers['authorization'] || '';
+    var idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
+    var decoded = await getAdminAuth().verifyIdToken(idToken).catch(function() { return null; });
+    if (!decoded) return res.status(401).json({ error: 'Invalid token' });
+    var callerUid = decoded.uid;
+
     var db = getDb();
+    var callerDoc = await db.collection('rooms').doc(roomId).collection('members').doc(callerUid).get();
+    if (!callerDoc.exists || (callerDoc.data().role !== 'admin' && callerDoc.data().role !== 'sub-admin')) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
 
     // Admin SDK でセキュリティルールを迂回して確実に削除
     await Promise.all([
