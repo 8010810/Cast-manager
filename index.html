@@ -3384,13 +3384,6 @@ function ProfileSettingsPage(p){
           ?e('input',{style:INP,type:'tel',placeholder:'',value:editPhone,onChange:function(ev){setEditPhone(ev.target.value);},autoFocus:true})
           :e('div',{style:Object.assign({},VAL,{color:phoneFromDB?'#f3f4f6':'#6b7280'})},phoneFromDB||'未設定')
       ),
-      e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'20px',marginBottom:'10px',fontWeight:600,letterSpacing:'0.05em'}},'マネジメントスタイル'),
-      renderProfText('経験年数','experienceYears',false),
-      renderProfSelect('キャストとの距離感','castRelationStyle',['寄り添い型','バランス型','厳しめ']),
-      renderProfSelect('リスク許容度','riskTolerance',['攻め型','バランス型','守り型']),
-      renderProfSelect('育成方針','trainingPolicy',['短期結果重視','じっくり育成','バランス']),
-      renderProfText('得意領域','specialtyArea',true),
-      renderProfText('判断スタイル・特記事項','decisionStyle',true)
     )
   );
 }
