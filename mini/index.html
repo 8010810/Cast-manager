@@ -620,7 +620,7 @@ function CastListPage(p){
   var s_sm=useState(false);var showSortMenu=s_sm[0];var setShowSortMenu=s_sm[1];
   var SORT_OPTS=[['default','登録順'],['name','50音順'],['age','年齢順'],['height','身長順'],['cup','カップ数順']];
   var SORT_LABEL=(SORT_OPTS.find(function(o){return o[0]===sortBy;})||SORT_OPTS[0])[1];
-  var folders=(p.data.folders||[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===p.uid));});
+  var folders=(p.data.folders||[]).filter(function(f){return !f._archived&&(f._personal===true||(f.ownerUid&&f.ownerUid===p.uid));}).sort(function(a,b){return (a._personal?1:0)-(b._personal?1:0);});
 
   // detail開いた時にsubBackを設定
   React.useEffect(function(){
@@ -2463,7 +2463,7 @@ function MiniApp(){
 
     if(aiPage){
       var myUidAI=user?user.uid:'';
-      var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI));});
+      var aiFolders=(data?data.folders||[]:[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f._personal===true||(f.ownerUid&&f.ownerUid===myUidAI));}).sort(function(a,b){return (a._personal?1:0)-(b._personal?1:0);});
       var aiCastIdSet=new Set();
       aiFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){aiCastIdSet.add(cid);});});
       var aiCasts=(data?data.casts||[]:[]).filter(function(c){return !c._archived&&!c._leftRoom&&aiCastIdSet.has(c.id);});
@@ -2969,7 +2969,7 @@ function MiniApp(){
     var nowYear=new Date().getFullYear();
     var targetYears=[String(nowYear)];
     var myUid2=user?user.uid:'';
-    var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f.ownerUid===myUid2||f._personal);});
+    var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f.ownerUid===myUid2||f._personal);}).sort(function(a,b){return (a._personal?1:0)-(b._personal?1:0);});
     var myFolderCastIds=new Set();allTargetFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){myFolderCastIds.add(cid);});});
     var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived&&myFolderCastIds.has(c.id);});
     var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
@@ -3177,7 +3177,7 @@ function MiniApp(){
               result.push({rid:rid,label:rName});
             }
           });
-          result.sort(function(a,b){return a.rid==='__none__'?-1:b.rid==='__none__'?1:0;});
+          result.sort(function(a,b){return a.rid==='__none__'?1:b.rid==='__none__'?-1:0;});
           return result;
         })();
         var multiRoom=myRooms.length>1;
