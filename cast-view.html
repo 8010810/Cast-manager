@@ -94,25 +94,13 @@ function gt(mk){var m=CAST&&CAST.monthlyTargets;return m&&m[mk]!=null?Number(m[m
 if(!CAST_ID||!UID){
   document.getElementById('loading').innerHTML='<p style="color:#fca5a5">無効なURLです</p>';
 }else{
-  fetch('https://firestore.googleapis.com/v1/projects/cast-manager-b0ae2/databases/(default)/documents/users/'+UID+'/data/main')
+  fetch('/api/cast-view-data?uid='+encodeURIComponent(UID)+'&id='+encodeURIComponent(CAST_ID))
   .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-  .then(function(json){
-    function pv(v){
-      if(!v)return null;
-      if(v.stringValue!==undefined)return v.stringValue;
-      if(v.integerValue!==undefined)return Number(v.integerValue);
-      if(v.doubleValue!==undefined)return Number(v.doubleValue);
-      if(v.booleanValue!==undefined)return v.booleanValue;
-      if(v.arrayValue)return(v.arrayValue.values||[]).map(pv);
-      if(v.mapValue){var o={};Object.keys(v.mapValue.fields||{}).forEach(function(k){o[k]=pv(v.mapValue.fields[k]);});return o;}
-      return null;
-    }
-    function pm(f){var o={};Object.keys(f).forEach(function(k){o[k]=pv(f[k]);});return o;}
-    var data=pm(json.fields||{});
-    CAST=(data.casts||[]).find(function(c){return c.id===CAST_ID;});
-    if(!CAST){document.getElementById('loading').innerHTML='<p style="color:#fca5a5">キャストが見つかりません</p>';return;}
-    RECORDS=(data.records||{})[CAST_ID]||[];
-    CUSTOMERS=(data.customers||{})[CAST_ID]||[];
+  .then(function(d){
+    if(d.error){document.getElementById('loading').innerHTML='<p style="color:#fca5a5">'+d.error+'</p>';return;}
+    CAST=d.cast;
+    RECORDS=d.records||[];
+    CUSTOMERS=d.customers||[];
     init();
   })
   .catch(function(e){document.getElementById('loading').innerHTML='<p style="color:#fca5a5;padding:10px">エラー: '+e.message+'</p>';});
