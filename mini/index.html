@@ -2429,26 +2429,53 @@ function MiniApp(){
     function runCastAI(castId){
       var cast=(data.casts||[]).find(function(c){return c.id===castId;});
       if(!cast)return;
-      if((aiReports[castId]||[]).length>=4)return;
-      setAiCastData({castId:castId,text:'',status:'loading'});
-      var now2=new Date();
+      var now2=new Date();now2.setHours(0,0,0,0);
       var yearMonth=now2.getFullYear()+'-'+pad(now2.getMonth()+1);
+      var _thisMonthRpts=(aiReports[castId]||[]).filter(function(r){return r.date&&r.date.slice(0,7)===yearMonth;});
+      if(_thisMonthRpts.length>=4)return;
+      setAiCastData({castId:castId,text:'',status:'loading'});
+
+      // 週次トレンド（直近4週 月〜日）
+      var dowN=now2.getDay();var diffToMon=dowN===0?6:dowN-1;
+      var weekStart=new Date(now2);weekStart.setDate(weekStart.getDate()-diffToMon);
+      var weeks=[];
+      for(var wi=3;wi>=0;wi--){
+        var ws=new Date(weekStart);ws.setDate(ws.getDate()-wi*7);
+        var we=new Date(ws);we.setDate(we.getDate()+6);
+        var wsStr=ws.toISOString().slice(0,10);var weStr=we.toISOString().slice(0,10);
+        var wRecs=(data.records[castId]||[]).filter(function(r){return r.date>=wsStr&&r.date<=weStr;});
+        weeks.push({label:wsStr.slice(5)+'〜'+weStr.slice(5),sales:wRecs.reduce(function(s,r){return s+Number(r.sales||0);},0),workDays:wRecs.length,nominations:wRecs.reduce(function(s,r){return s+Number(r.nominations||0);},0),companions:wRecs.reduce(function(s,r){return s+Number(r.companions||0);},0)});
+      }
+
+      // シフト実績・予定
+      var castShifts=data.shifts[castId]||{};
+      var thisMonthWorkDays=Object.entries(castShifts).filter(function(e){return e[0].slice(0,7)===yearMonth&&(e[1].status==='work'||e[1].status==='douhan');}).length;
+      var thisMonthPending=Object.entries(castShifts).filter(function(e){return e[0].slice(0,7)===yearMonth&&e[1].status==='pending';}).length;
+      var contractShift=cast.contractShift||'';
+      var expectedDays=null;
+      var _wm=contractShift.match(/週\s*(\d+)/);if(_wm)expectedDays=Math.round(Number(_wm[1])*4.3);
+      var _mm=contractShift.match(/月\s*(\d+)/);if(_mm)expectedDays=Number(_mm[1]);
+      var todayStr2=now2.toISOString().slice(0,10);
+      var in14=new Date(now2);in14.setDate(in14.getDate()+14);var in14Str=in14.toISOString().slice(0,10);
+      var upShifts=Object.entries(castShifts).filter(function(e){return e[0]>=todayStr2&&e[0]<=in14Str&&e[1].status!=='off';}).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(e){return{date:e[0],status:e[1].status};});
+
+      // 来店予定（今後14日）
+      var upVisits=(data.visits||[]).filter(function(v){return v.castName===cast.name&&v.date>=todayStr2&&v.date<=in14Str;}).sort(function(a,b){return a.date.localeCompare(b.date);}).map(function(v){return{date:v.date,guestName:v.guestName||'',count:v.count||'',note:v.note||''};});
+
       var kpi=calcMonthlyCastKPI(data,castId,yearMonth);
       var customerData=buildCustomerData(data,castId);
       var castData={
-        name:cast.name,
-        isDispatch:cast.isDispatch||false,
-        period:yearMonth,
+        name:cast.name,isDispatch:cast.isDispatch||false,period:yearMonth,
         targetSales:(cast.monthlyTargets||{})[yearMonth]||0,
-        salesTotal:kpi.salesTotal,
-        workDays:kpi.workDays,
-        nominationCount:kpi.nominationCount,
-        floorNominationCount:kpi.floorNominationCount,
-        companionCount:kpi.companionCount,
-        lastMonthSales:kpi.lastMonthSales
+        salesTotal:kpi.salesTotal,workDays:kpi.workDays,
+        nominationCount:kpi.nominationCount,floorNominationCount:kpi.floorNominationCount,
+        companionCount:kpi.companionCount,lastMonthSales:kpi.lastMonthSales,
+        contractShift:contractShift,expectedDays:expectedDays,
+        thisMonthWorkDays:thisMonthWorkDays,thisMonthPending:thisMonthPending,
+        upcomingShifts:upShifts,upcomingVisits:upVisits
       };
       fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({messages:[{role:'user',content:'分析してください'}],castData:castData,customerData:customerData})})
+        body:JSON.stringify({messages:[{role:'user',content:'分析してください'}],castData:castData,customerData:customerData,weeklyData:{weeks:weeks}})})
       .then(function(r){return r.json();})
       .then(function(d){
         var txt=(d.content||[]).map(function(c){return c.text||'';}).join('')||'分析に失敗しました';

@@ -654,15 +654,17 @@ export default async function handler(req, res) {
       ].join('\n');
 
     } else {
-      // type === 'cast'（既存ロジック）
+      // type === 'cast'（週次キャスト個別分析）
+      const wd = req.body.weeklyData || null;
+
       const castBlock = [
-        '【分析対象キャストのデータ】',
+        '【分析対象キャストのデータ（今月累計）】',
         'キャスト名：' + castData.name + (castData.isDispatch ? '（派遣）' : ''),
-        '対象期間：' + castData.period,
+        '対象月：' + castData.period,
         '月間目標：¥' + (castData.targetSales || 0).toLocaleString(),
-        '現在の売上：¥' + (castData.salesTotal || 0).toLocaleString(),
+        '今月売上：¥' + (castData.salesTotal || 0).toLocaleString(),
         '達成率：' + (castData.targetSales ? Math.round((castData.salesTotal / castData.targetSales) * 100) : '-') + '%',
-        '出勤日数：' + castData.workDays + '日',
+        '今月出勤日数：' + castData.workDays + '日',
         '本指名組数：' + castData.nominationCount + '組',
         '場内指名組数：' + castData.floorNominationCount + '組',
         '同伴数：' + castData.companionCount + '回',
@@ -670,6 +672,45 @@ export default async function handler(req, res) {
         castData.lastMonthSales != null ? '前月売上：¥' + castData.lastMonthSales.toLocaleString() : null,
         castData.lastMonthSales ? '前月比：' + Math.round((castData.salesTotal / castData.lastMonthSales) * 100) + '%' : null
       ].filter(Boolean).join('\n');
+
+      const weeklyBlock = wd && (wd.weeks || []).length > 0
+        ? ['【週次トレンド（直近4週）】',
+            ...wd.weeks.map(w =>
+              '・' + w.label + '：売上¥' + (w.sales||0).toLocaleString()
+              + ' 出勤' + w.workDays + '日'
+              + ' 指名' + w.nominations + '組'
+              + ' 同伴' + w.companions + '回'
+            )
+          ].join('\n')
+        : null;
+
+      const STATUS_LABEL = { work:'出勤', douhan:'同伴', pending:'保留' };
+      const shiftBlock = castData.contractShift
+        ? [
+            '【シフト状況】',
+            '契約シフト：' + castData.contractShift,
+            castData.expectedDays != null ? '今月想定出勤日数：' + castData.expectedDays + '日' : null,
+            '今月実出勤日数：' + (castData.thisMonthWorkDays || 0) + '日'
+              + (castData.thisMonthPending > 0 ? '（保留' + castData.thisMonthPending + '日含む）' : ''),
+            castData.expectedDays != null && castData.expectedDays > 0
+              ? '出勤達成率：' + Math.round((castData.thisMonthWorkDays || 0) / castData.expectedDays * 100) + '%'
+              : null,
+            castData.upcomingShifts && castData.upcomingShifts.length > 0
+              ? '今後14日のシフト：' + castData.upcomingShifts.map(s => s.date.slice(5) + '（' + (STATUS_LABEL[s.status] || s.status) + '）').join('  ')
+              : '今後14日のシフト：未登録'
+          ].filter(Boolean).join('\n')
+        : null;
+
+      const visitBlock = castData.upcomingVisits && castData.upcomingVisits.length > 0
+        ? ['【来店予定（今後14日）：' + castData.upcomingVisits.length + '件】',
+            ...castData.upcomingVisits.map(v =>
+              '・' + v.date.slice(5)
+              + (v.guestName ? ' ' + v.guestName : '')
+              + (v.count ? ' ' + v.count + '名' : '')
+              + (v.note ? '（' + v.note + '）' : '')
+            )
+          ].join('\n')
+        : '【来店予定（今後14日）：0件】\n　来店予定なし';
 
       const today = new Date();
       const analyzed = (customerData || []).map(c => {
@@ -700,64 +741,65 @@ export default async function handler(req, res) {
 
       systemPrompt = [
         'あなたはキャバクラの黒服マネージャーを支援するAIです。',
-        '提供されたキャスト個人のデータと担当顧客データを分析し、マネージャーが具体的に動けるアドバイスをしてください。',
+        '週次レビューとして、今週の振り返りと来週に向けた具体的なアクションを提案してください。',
+        'シフト・来店予定・顧客データを組み合わせてマネージャーが今週中に動ける内容を中心に答えてください。',
         '',
         '【分析の視点】',
         '',
-        '■ 売上・目標達成率',
-        '- 目標に対して現在どのポジションにいるか',
-        '- 月の経過日数を考慮した進捗評価（月初と月末では意味が違う）',
-        '- 前月比がある場合はトレンドも評価する',
+        '■ 今週の売上トレンド',
+        '- 直近4週の推移から今週のパフォーマンスを評価する',
+        '- 週ごとの出勤日数・指名・同伴の変化も見る',
+        '- 今月累計の達成率を月の経過日数と合わせて評価する',
         '',
-        '■ 出勤安定性',
-        '- 出勤日数の多寡と1出勤あたり売上で効率を判断',
-        '- 売上不振の原因が出勤にあるのか接客にあるのかを切り分ける',
+        '■ シフト管理',
+        '- 契約シフトに対して今月の実出勤が足りているか',
+        '- 出勤達成率が低い場合は出勤増の打診が必要',
+        '- 今後14日のシフトが少ない場合は今週中に調整を促す',
+        '- 保留（未確定）が多い場合はシフト確定を急ぐよう促す',
         '',
-        '■ 指名力',
-        '- 本指名数：既存顧客関係の強さ',
-        '- 場内指名数：フロアでの接客力',
+        '■ 来週の来店予定の立ち具合',
+        '- 来店予定が0件なら今週中に顧客への連絡を指示する',
+        '- 来店予定が少ない場合は具体的にどの顧客に連絡すべきかを顧客データから提案する',
+        '- 来週のシフト出勤日と来店予定日が一致しているか確認する',
+        '',
+        '■ 指名力・接客評価',
+        '- 本指名：既存顧客関係の強さ',
+        '- 場内指名：フロアでの接客力',
         '- 本指名が少なく場内が多い → リピートに繋げられていない可能性',
-        '- 両方少ない → 接客の改善が必要',
         '',
         '■ 同伴',
-        '- 同伴数は顧客との関係値の深さを示す',
-        '- 売上はあるが同伴ゼロ → 関係値が浅い客が多い可能性',
+        '- 同伴は関係値の深さを示す。売上があっても同伴ゼロは関係が浅い可能性',
         '',
-        '■ 顧客ポートフォリオ分析',
-        '来店リスクの判定基準：',
-        '- 平均来店間隔の2倍以上 → 高リスク',
-        '- 平均来店間隔の1.5倍以上 → 要注意',
-        '- 直近1ヶ月以内 → 良好',
+        '■ 顧客ポートフォリオ',
+        '- 高リスク（平均来店間隔の2倍超）→ 今すぐ担当キャストに連絡させる',
+        '- 要注意（1.5倍超）→ 今週中にアプローチ',
         '',
         '■ 派遣キャストの場合',
-        'isDispatch が true の場合、長期的な本指名の積み上げより当日の接客貢献度で評価する。',
-        '同伴・アフターのアドバイスは控えめにする。',
+        'isDispatch が true なら長期指名より当日接客貢献で評価。同伴・アフターのアドバイスは控えめにする。',
         '',
         '【判断の原則】',
-        '- マネージャーは見切りをつけない。数字が出ていないキャストにも改善の余地を必ず見つける',
-        '- 売上だけで評価しない。出勤・場内指名・同伴・顧客ポートフォリオを複合的に見る',
-        '- 数字が良いキャストへの「当たり前扱い」をしない',
-        '- 短期（今月）と中期（来月以降）を分けてアドバイスする',
-        '- 断定しない。「〜という可能性があります」「〜を検討してください」で提示する',
-        '- データが少ない場合は「データ不足のため判断は慎重に」と明記する',
+        '- 来週中に動ける具体的なアクションに絞る',
+        '- 数字が出ていないキャストにも改善の余地を必ず見つける',
+        '- 断定しない。「〜を検討してください」「〜を打診してみてください」で提示する',
+        '- データが少ない場合は「データ不足のため参考程度に」と明記する',
         '',
         '【回答フォーマット】',
-        '以下の構成で日本語で答える：',
-        '',
-        '1. 総合評価（2〜3行）',
-        '2. 良い点',
-        '3. 課題',
-        '4. 要フォロー顧客リスト（高リスク・要注意を名前付きで、優先順位と一言コメント）',
-        '5. 今月の具体的なアクション（マネージャーがキャストに指示できる内容）',
-        '6. 来月に向けた準備',
+        '1. 今週の総合評価（月次目標進捗・週トレンドを含め2〜3行）',
+        '2. シフト状況と来週に向けた調整アクション',
+        '3. 来店予定の状況と今週中に連絡すべき顧客（名前・理由・優先度）',
+        '4. 売上・指名・同伴の課題と改善アドバイス',
+        '5. 来週のアクションプラン（優先順位順）',
         '',
         'iPadで読みやすい長さにする。長くなりすぎない。',
         '最後に「最終判断はマネージャーが行ってください」を添える。',
         '',
         castBlock,
+        weeklyBlock || '',
+        shiftBlock || '',
+        visitBlock,
         '',
         customerBlock
-      ].join('\n');
+      ].filter(s => s !== null).join('\n');
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
