@@ -3740,7 +3740,7 @@ function App(){
       setConsentState('loading');
       db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
         if(subDoc.exists&&subDoc.data().plan==='mini'){
-          if(subDoc.data().status==='paused'){
+          if(subDoc.data().status==='paused'&&subDoc.data().subscriptionId){
             setConsentState('mini-resume-confirm');setLoading(false);
           }else{
             window.location.href='/mini';
@@ -4053,7 +4053,7 @@ function App(){
                   if(subDoc.exists&&subDoc.data().plan==='mini'){
                     if(subDoc.data().status==='active'||subDoc.data().status==='trialing'){
                       window.location.href='/mini';
-                    }else if(subDoc.data().status==='paused'){
+                    }else if(subDoc.data().status==='paused'&&subDoc.data().subscriptionId){
                       setConsentState('mini-resume-confirm');setLoading(false);
                     }else{
                       setConsentState('planselect');setLoading(false);
@@ -5280,7 +5280,7 @@ function App(){
                 setRoomId(null);setRoomRole('member');setCurrentRoom(null);setData(null);
                 setSettingsPage(null);
                 db.collection('users').doc(user.uid).collection('subscription').doc('main').get().then(function(subDoc){
-                  if(subDoc.exists&&subDoc.data().plan==='mini'&&subDoc.data().status==='paused'){
+                  if(subDoc.exists&&subDoc.data().plan==='mini'&&subDoc.data().status==='paused'&&subDoc.data().subscriptionId){
                     setConsentState('mini-resume-confirm');setLoading(false);
                   }else if(subDoc.exists&&(subDoc.data().status==='active'||subDoc.data().status==='trialing')){
                     window.location.href='/mini';
