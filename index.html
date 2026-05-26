@@ -331,14 +331,10 @@ function HomeScreen(p){
         e('div',{style:{fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",fontSize:'24px',fontWeight:300,letterSpacing:'0.25em',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}},p.roomName)
       ),
       e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'12px'}},(now.getMonth()+1)+'月 チーム状況'),
-      e('div',{style:{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px',marginBottom:'12px'}},
+      e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'8px'}},
         e('div',{style:{background:'#0d0d1a',borderRadius:'8px',padding:'10px',textAlign:'center',border:'1px solid #1e2035'}},
           e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'総在籍'),
           e('div',{style:{color:'#e5e7eb',fontSize:'18px',fontWeight:700}},total+'名')
-        ),
-        e('div',{style:{background:'#0d0d1a',borderRadius:'8px',padding:'10px',textAlign:'center',border:'1px solid #e8b86d33'}},
-          e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'月売上'),
-          e('div',{style:{color:'#e8b86d',fontSize:'14px',fontWeight:700}},totalSales>=10000?(totalSales/10000).toFixed(1)+'万':yen(totalSales))
         ),
         e('div',{style:{background:'#0d0d1a',borderRadius:'8px',padding:'10px',textAlign:'center',border:'1px solid #34d39933'}},
           e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'生在籍'),
@@ -348,6 +344,10 @@ function HomeScreen(p){
           e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'死在籍'),
           e('div',{style:{color:'#6b7280',fontSize:'18px',fontWeight:700}},dead+'名')
         )
+      ),
+      e('div',{style:{background:'#0d0d1a',borderRadius:'8px',padding:'10px',display:'flex',alignItems:'center',justifyContent:'space-between',border:'1px solid #e8b86d33'}},
+        e('div',{style:{color:'#6b7280',fontSize:'10px'}},'月売上'),
+        e('div',{style:{color:'#e8b86d',fontSize:'15px',fontWeight:700}},yen(totalSales))
       )
     ),
     // 今月のバースデー
