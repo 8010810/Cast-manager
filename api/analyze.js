@@ -63,6 +63,7 @@ export default async function handler(req, res) {
       _mc.chars.map(c => '・' + c).join('\n'),
       _evList.length ? '\n直近30日以内のイベント：\n' + _evList.map(e => '・' + e).join('\n') : '',
       _storeLines.length ? '\n【店舗情報】\n' + _storeLines.join('\n') : '',
+      si.area ? '\n【エリア特性の活用】\nエリア「' + si.area + '」について、あなたが知っている以下の観点を分析に反映してください：\n・そのエリアの客層の傾向（年齢層・職種・消費傾向）\n・競合環境（キャバクラ激戦区か否か・価格帯の相場）\n・エリアの人の流れ・繁忙時間帯・曜日特性\n・そのエリアならではの集客チャンスや注意点' : '',
     ].filter(Boolean).join('\n');
     // ─────────────────────────────────────────────────────────────────────
 
