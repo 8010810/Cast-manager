@@ -3996,9 +3996,13 @@ function App(){
               }
               setRoomsList(validRooms);
               if(validRooms.length===0){
-                // 招待URLの場合: pendingInviteがセットされるのを待つ（planselect抑制）
+                // 招待URLの場合: invite-waiting状態でpendingInviteを待つ（8秒でplanselect fallback）
                 var _invP=new URLSearchParams(window.location.search);
-                if(_invP.get('inviteToken')&&_invP.get('rid')){clearTimeout(authTimeout);setLoading(false);return;}
+                if(_invP.get('inviteToken')&&_invP.get('rid')){
+                  clearTimeout(authTimeout);setConsentState('invite-waiting');setLoading(false);
+                  setTimeout(function(){if(gen===currentAuthGen){setConsentState('planselect');setLoading(false);}},8000);
+                  return;
+                }
                 db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'}).then(function(subDoc){
                   if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='mini'){
                     window.location.href='/mini';
@@ -4064,9 +4068,13 @@ function App(){
                 clearTimeout(authTimeout);
                 setTimeout(function(){
                   if(gen===currentAuthGen&&!appliedRooms){
-                    // 招待URLの場合: pendingInviteがセットされるのを待つ（planselect抑制）
+                    // 招待URLの場合: invite-waiting状態でpendingInviteを待つ（8秒でplanselect fallback）
                     var _invP2=new URLSearchParams(window.location.search);
-                    if(_invP2.get('inviteToken')&&_invP2.get('rid'))return;
+                    if(_invP2.get('inviteToken')&&_invP2.get('rid')){
+                      setConsentState('invite-waiting');setLoading(false);
+                      setTimeout(function(){if(gen===currentAuthGen){setConsentState('planselect');setLoading(false);}},8000);
+                      return;
+                    }
                     db.collection('users').doc(u.uid).collection('subscription').doc('main').get({source:'server'}).then(function(subDoc){
                       if(subDoc.exists&&subDoc.data().status==='active'&&subDoc.data().plan==='mini'){
                         // miniサブスクがactiveでも、ルームがあるか確認してから遷移
