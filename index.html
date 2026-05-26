@@ -2649,8 +2649,10 @@ function StoreSettingsPage(p){
     p.db.collection('rooms').doc(p.roomId).collection('members').doc(targetUid).get().then(function(memDoc){
       isInvited=memDoc.exists&&!!memDoc.data().isInvited;
       // Admin SDK 経由でセキュリティルールを迂回して確実に両ドキュメントを削除
-      return fetch('/api/kick-member',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({targetUid:targetUid,roomId:p.roomId})}).then(function(r){return r.json();}).then(function(d){
+      return (firebase.auth().currentUser?firebase.auth().currentUser.getIdToken():Promise.resolve(''))
+        .then(function(tok){return fetch('/api/kick-member',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+        body:JSON.stringify({targetUid:targetUid,roomId:p.roomId})});})
+        .then(function(r){return r.json();}).then(function(d){
         if(d.error)throw new Error(d.error);
       });
     }).then(function(){
@@ -3356,8 +3358,9 @@ function App(){
 
   function handleTransferOwner(newMemberUid,newMemberName){
     if(!confirm(newMemberName+'さんに管理者を引き継ぎますか？'))return;
-    fetch('/api/stripe-transfer-owner',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({oldOwnerUid:user.uid,newOwnerUid:newMemberUid,roomId:roomId})})
+    (firebase.auth().currentUser?firebase.auth().currentUser.getIdToken():Promise.resolve(''))
+    .then(function(tok){return fetch('/api/stripe-transfer-owner',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+      body:JSON.stringify({oldOwnerUid:user.uid,newOwnerUid:newMemberUid,roomId:roomId})});})
     .then(function(r){return r.json();})
     .then(function(d){
       if(d.error)throw new Error(d.error);
@@ -3837,14 +3840,15 @@ function App(){
   }
   function approveRequest(req){
     setJoinRequests(function(prev){return prev.filter(function(r){return r.uid!==req.uid;});});
-    fetch('/api/approve-member',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    (firebase.auth().currentUser?firebase.auth().currentUser.getIdToken():Promise.resolve(''))
+    .then(function(tok){return fetch('/api/approve-member',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({
       ownerUid:user?user.uid:null,
       memberUid:req.uid,
       memberUserName:req.userName||'',
       roomId:roomId,
       roomName:currentRoom?currentRoom.name||'':'',
       inviteCode:currentRoom?currentRoom.inviteCode||'':'',
-    })}).then(function(r){return r.json();}).then(function(d){
+    })});}).then(function(r){return r.json();}).then(function(d){
       if(d.error){
         setJoinRequests(function(prev){return [req].concat(prev);});
         notify('承認に失敗しました','error');
@@ -3938,7 +3942,8 @@ function App(){
       }).then(function(){return userRef.delete().catch(function(){});});
     }
     function doDeleteAuth(){
-      return fetch('/api/delete-auth-account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uid:uid2})})
+      return (firebase.auth().currentUser?firebase.auth().currentUser.getIdToken():Promise.resolve(''))
+        .then(function(tok){return fetch('/api/delete-auth-account',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({uid:uid2})});})
         .catch(function(){})
         .then(function(){return auth.signOut().catch(function(){});});
     }

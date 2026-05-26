@@ -22,7 +22,7 @@ function getAdminAuth() {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -32,7 +32,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'uid is required' });
     }
 
+    var authHeader = req.headers['authorization'] || '';
+    var idToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    if (!idToken) return res.status(401).json({ error: 'Unauthorized' });
     var adminAuth = getAdminAuth();
+    var decoded = await adminAuth.verifyIdToken(idToken).catch(function() { return null; });
+    if (!decoded) return res.status(401).json({ error: 'Invalid token' });
+    if (decoded.uid !== uid) return res.status(403).json({ error: 'Forbidden' });
+
     await adminAuth.deleteUser(uid);
     console.log('[delete-auth-account] Deleted auth user:', uid);
     return res.status(200).json({ success: true });
