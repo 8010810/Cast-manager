@@ -70,7 +70,10 @@ export default async function handler(req, res) {
     var tokenDoc = await db.collection('rooms').doc(roomId).collection('inviteTokens').doc(token).get();
     if (!tokenDoc.exists) return res.status(400).json({ error: 'Invalid invite token' });
     var tokenData = tokenDoc.data();
-    if (tokenData.used) return res.status(400).json({ error: 'Invite token already used' });
+    // 他の人が使用済みのトークンは無効。同一ユーザーが退室後に再利用する場合は許可
+    if (tokenData.used && tokenData.usedBy !== callerUid) {
+      return res.status(400).json({ error: 'Invite token already used' });
+    }
     if (tokenData.expiresAt && new Date(tokenData.expiresAt) < new Date()) {
       return res.status(400).json({ error: 'Invite token expired' });
     }

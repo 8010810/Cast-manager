@@ -4100,8 +4100,11 @@ function App(){
     var invToken=params.get('inviteToken');var invRid=params.get('rid');
     if(!invToken||!invRid||!user)return;
     db.collection('rooms').doc(invRid).collection('inviteTokens').doc(invToken).get().then(function(tokDoc){
-      if(!tokDoc.exists||tokDoc.data().used)return;
-      var exp=tokDoc.data().expiresAt;
+      if(!tokDoc.exists)return;
+      var td=tokDoc.data();
+      // 他の人が使用済みのトークンは無効。同一ユーザーが退室後に再利用する場合は許可
+      if(td.used&&td.usedBy!==user.uid)return;
+      var exp=td.expiresAt;
       if(exp&&new Date(exp)<new Date())return;
       db.collection('rooms').doc(invRid).get().then(function(roomDoc){
         if(!roomDoc.exists)return;
