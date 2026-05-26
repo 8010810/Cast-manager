@@ -2680,13 +2680,6 @@ function MiniApp(){
                   ?e('input',{style:MPINP,type:'tel',value:editMiniPhoneVal,onChange:function(ev){setEditMiniPhoneVal(ev.target.value);},autoFocus:true})
                   :e('div',{style:{fontSize:'14px',color:miniPhone?'#f3f4f6':'#6b7280'}},miniPhone||'未設定')
               ),
-              e('div',{style:{fontSize:'11px',color:'#6b7280',marginTop:'20px',marginBottom:'10px',fontWeight:600,letterSpacing:'0.05em'}},'マネジメントスタイル'),
-              mpText('経験年数','experienceYears',false),
-              mpSelect('キャストとの距離感','castRelationStyle',['寄り添い型','バランス型','厳しめ']),
-              mpSelect('リスク許容度','riskTolerance',['攻め型','バランス型','守り型']),
-              mpSelect('育成方針','trainingPolicy',['短期結果重視','じっくり育成','バランス']),
-              mpText('得意領域','specialtyArea',true),
-              mpText('判断スタイル・特記事項','decisionStyle',true)
             )
           )
         ));
