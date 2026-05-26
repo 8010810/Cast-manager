@@ -2972,7 +2972,7 @@ function MiniApp(){
     var myUid2=user?user.uid:'';
     var allTargetFolders=(data&&data.folders||[]).filter(function(f){return !f._archived&&!f._leftRoom&&(f.ownerUid===myUid2||f._personal);}).sort(function(a,b){return (a._personal?1:0)-(b._personal?1:0);});
     var myFolderCastIds=new Set();allTargetFolders.forEach(function(f){(f.castIds||[]).forEach(function(cid){myFolderCastIds.add(cid);});});
-    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c.inactive&&!c._archived&&myFolderCastIds.has(c.id);});
+    var activeCastsT=(data&&data.casts||[]).filter(function(c){return !c._archived&&myFolderCastIds.has(c.id);});
     var curTF=targetFolder&&allTargetFolders.some(function(f){return f.id===targetFolder;})?targetFolder:(allTargetFolders.length>0?allTargetFolders[0].id:null);
     var curTFObj=allTargetFolders.find(function(f){return f.id===curTF;})||null;
     var castsInTF=curTFObj?activeCastsT.filter(function(c){return (curTFObj.castIds||[]).includes(c.id);}):activeCastsT;
@@ -3054,7 +3054,7 @@ function MiniApp(){
       var myUidH=user?user.uid:'';
       var myCastIds=new Set();
       (data.folders||[]).filter(function(f){return !f._archived&&f.ownerUid&&f.ownerUid===myUidH;}).forEach(function(f){(f.castIds||[]).forEach(function(id){myCastIds.add(id);});});
-      data.casts.filter(function(c){return !c.inactive&&myCastIds.has(c.id);}).forEach(function(c){
+      data.casts.filter(function(c){return myCastIds.has(c.id);}).forEach(function(c){
         var recs=(data.records||{})[c.id]||[];
         recs.forEach(function(r){if(r.date&&r.date.startsWith(thisMonth))allSalesThisMonth+=r.sales||0;});
         allTargetThisMonth+=getMonthlyTarget(c,thisMonth);
