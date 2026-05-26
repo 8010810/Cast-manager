@@ -3684,16 +3684,11 @@ function App(){
     setPendingInviteJoining(true);
     var rid=pendingInvite.roomId;var rName=pendingInvite.roomName||'';
     var ownerUid=pendingInvite.ownerUid;var token=pendingInvite.token;
-    var now=new Date().toISOString();
-    db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({
-      role:'member',userName:userName||'',joinedAt:now,isInvited:true,invitedBy:ownerUid
-    }).then(function(){
-      return Promise.all([
-        db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({
-          name:rName,role:'member',inviteCode:pendingInvite.inviteCode||'',joinedAt:now
-        }),
-        db.collection('rooms').doc(rid).collection('inviteTokens').doc(token).update({used:true,usedBy:user.uid,usedAt:now})
-      ]);
+    firebase.auth().currentUser.getIdToken().then(function(tok){
+      return fetch('/api/join-via-invite',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},
+        body:JSON.stringify({roomId:rid,token:token,userName:userName||'',ownerUid:ownerUid,roomName:rName,inviteCode:pendingInvite.inviteCode||''})});
+    }).then(function(r){return r.json();}).then(function(d){
+      if(d.error)throw new Error(d.error);
     }).then(function(){
       return fetch('/api/stripe-add-member',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({roomId:rid,memberUid:user.uid,memberUserName:userName||''})});
