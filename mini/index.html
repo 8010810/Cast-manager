@@ -2513,7 +2513,8 @@ function MiniApp(){
           )
         );
       }
-      var castRpts=(aiReports[aiPage]||[]).slice().sort(function(a,b){return Number(b.id)-Number(a.id);});
+      var _aiNow=new Date();var _aiYM=_aiNow.getFullYear()+'-'+pad(_aiNow.getMonth()+1);
+      var castRpts=(aiReports[aiPage]||[]).filter(function(r){return r.date&&r.date.slice(0,7)===_aiYM;}).sort(function(a,b){return Number(b.id)-Number(a.id);});
       var remainCount=4-castRpts.length;
       var acd=aiCastData.castId===aiPage?aiCastData:{castId:aiPage,text:'',status:'idle'};
       var isAnalyzing=acd.status==='loading';

@@ -4739,7 +4739,8 @@ function App(){
     }
     // カテゴリページ共通: 分析開始ボタン＋レポート一覧スタイル
     var aiCat=AI_CATS.find(function(c){return c.key===aiPage;})||{label:'',color:'#a78bfa'};
-    var catReports=(aiCatReports[aiPage]||[]).slice().sort(function(a,b){return Number(b.id)-Number(a.id);});
+    var _aiNow=new Date();var _aiYM=_aiNow.getFullYear()+'-'+pad(_aiNow.getMonth()+1);
+    var catReports=(aiCatReports[aiPage]||[]).filter(function(r){return r.date&&r.date.slice(0,7)===_aiYM;}).sort(function(a,b){return Number(b.id)-Number(a.id);});
     var catRemain=4-catReports.length;
     var catAcd=aiCatData.catKey===aiPage?aiCatData:{catKey:aiPage,status:'idle'};
     var catIsLoading=catAcd.status==='loading';
