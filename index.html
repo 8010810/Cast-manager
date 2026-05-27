@@ -3441,8 +3441,7 @@ function RoomSelectScreen(p){
     var inviteCode=generateInviteCode();
     var rid=p.db.collection('rooms').doc().id;
     var now=new Date().toISOString();
-    var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
-    var roomData={name:roomName.trim(),ownerUid:p.user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt};
+    var roomData={name:roomName.trim(),ownerUid:p.user.uid,createdAt:now,inviteCode:inviteCode};
     var folderName=p.userName||'オーナー';
     var initData={casts:[],records:{},customers:{},folders:[{id:p.uid(),name:'新入店',castIds:[]},{id:p.uid(),name:folderName,castIds:[],ownerUid:p.user.uid}],shifts:{},visits:[],quota:{}};
     p.db.collection('rooms').doc(rid).set(roomData)
@@ -3852,10 +3851,9 @@ function App(){
     var inviteCode=generateInviteCode();
     var rid=db.collection('rooms').doc().id;
     var now=new Date().toISOString();
-    var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
     var folderName=userName||'オーナー';
     var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:folderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
-    db.collection('rooms').doc(rid).set({name:createRoomName.trim(),ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt})
+    db.collection('rooms').doc(rid).set({name:createRoomName.trim(),ownerUid:user.uid,createdAt:now,inviteCode:inviteCode})
     .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
     .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
     .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:createRoomName.trim(),role:'admin',inviteCode:inviteCode,joinedAt:now});})
@@ -3888,10 +3886,9 @@ function App(){
     var inviteCode=generateInviteCode();
     var rid=db.collection('rooms').doc().id;
     var now=new Date().toISOString();
-    var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
     var folderName=userName||'オーナー';
     var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:folderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
-    db.collection('rooms').doc(rid).set({name:createRoomName.trim(),ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt})
+    db.collection('rooms').doc(rid).set({name:createRoomName.trim(),ownerUid:user.uid,createdAt:now,inviteCode:inviteCode})
     .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
     .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
     .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:createRoomName.trim(),role:'admin',inviteCode:inviteCode,joinedAt:now});})
@@ -5060,14 +5057,13 @@ function App(){
         setSettRoomLoading(true);
         var now=new Date().toISOString();
         var inviteCode=generateInviteCode();
-        var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
         var rid=db.collection('rooms').doc().id;
         var sFolderName=userName||'管理者';
         var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:sFolderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
-        db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt,pendingPayment:true})
+        db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode})
           .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
           .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
-          .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now,pendingPayment:true});})
+          .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now});})
           .then(function(){return db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});})
           .then(function(){
             setSettRoomLoading(false);
