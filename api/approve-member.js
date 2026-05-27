@@ -75,10 +75,12 @@ export default async function handler(req, res) {
     }
     var now = new Date().toISOString();
 
-    // ルームのサブスクが有効かを先に確認してブロック
+    // ルームのサブスク状態を確認
     var subDoc = await db.collection('rooms').doc(roomId).collection('subscription').doc('main').get();
-    if (!subDoc.exists || !subDoc.data().subscriptionId || subDoc.data().status !== 'active') {
-      console.log('[approve-member] No active subscription for room, blocking approval');
+    var subStatus = subDoc.exists ? subDoc.data().status : null;
+    var isTrialing = subStatus === 'trialing';
+    if (!subDoc.exists || (subStatus !== 'active' && !isTrialing)) {
+      console.log('[approve-member] No valid subscription for room, blocking approval');
       return res.status(400).json({ error: 'ルームのサブスクリプションが有効ではないため承認できません' });
     }
 
@@ -136,6 +138,12 @@ export default async function handler(req, res) {
       } catch (_subErr) {
         console.log('[approve-member] Mini sub pause skipped:', _subErr.message);
       }
+    }
+
+    // トライアル中はStripe課金をスキップ（有料転換時に webhook で一括同期）
+    if (isTrialing) {
+      console.log('[approve-member] Trial room: skipping Stripe billing. member:', memberUid, 'room:', roomId);
+      return res.status(200).json({ success: true, billed: false, trial: true });
     }
 
     // Stripe即時課金

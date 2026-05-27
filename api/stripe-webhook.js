@@ -105,6 +105,38 @@ export default async function handler(req, res) {
             console.log('[stripe-webhook] Paused old mini subscription for uid:', uid);
           }
         }
+        // トライアル中に承認済みのメンバーをStripeに同期・請求
+        try {
+          var ACCOUNT_ADD_PRICE = 'price_1TXgqSQaq3EwNY4QdQVc6rNT';
+          var stripeSync = new Stripe(process.env.STRIPE_SECRET_KEY);
+          var membersSnap = await db.collection('rooms').doc(roomId).collection('members').get();
+          var invitedCount = membersSnap.docs.filter(function(d) { return d.data().isInvited === true; }).length;
+          if (invitedCount > 0) {
+            var newSubId = session.subscription;
+            var newCustId = session.customer;
+            var newSub = await stripeSync.subscriptions.retrieve(newSubId);
+            var existingItem = newSub.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
+            if (existingItem) {
+              await stripeSync.subscriptionItems.update(existingItem.id, { quantity: invitedCount, proration_behavior: 'none' });
+            } else {
+              await stripeSync.subscriptionItems.create({ subscription: newSubId, price: ACCOUNT_ADD_PRICE, quantity: invitedCount, proration_behavior: 'none' });
+            }
+            // トライアル期間中のメンバー分を即時請求
+            var syncInvoice = null;
+            try {
+              await stripeSync.invoiceItems.create({ customer: newCustId, subscription: newSubId, amount: 1000 * invitedCount, currency: 'jpy', description: 'トライアル期間中の承認メンバー（'+invitedCount+'人）' });
+              syncInvoice = await stripeSync.invoices.create({ customer: newCustId, subscription: newSubId, auto_advance: false });
+              await stripeSync.invoices.pay(syncInvoice.id, { off_session: true });
+            } catch (_billingErr) {
+              console.error('[stripe-webhook] Trial member billing error:', _billingErr.message);
+              if (syncInvoice && syncInvoice.id) await stripeSync.invoices.voidInvoice(syncInvoice.id).catch(function(){});
+            }
+            await db.collection('rooms').doc(roomId).collection('subscription').doc('main').update({ memberCount: invitedCount });
+            console.log('[stripe-webhook] Synced trial members to Stripe. count:', invitedCount, 'room:', roomId);
+          }
+        } catch (_syncErr) {
+          console.error('[stripe-webhook] Trial member sync error:', _syncErr.message);
+        }
         console.log('[stripe-webhook] Subscription saved to room:', roomId);
       } else if (uid) {
         // Mini plan: save subscription to user doc
