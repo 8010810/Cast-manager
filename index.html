@@ -3627,6 +3627,7 @@ function App(){
   var roomRoleRef=React.useRef('member');
   var unsubConsentRef=React.useRef(null);
   var unsubSubRef=React.useRef(null);
+  var unsubDataRef=React.useRef(null);
   var planSelectShownAtRef=React.useRef(0);
   var s2=useState(null);var data=s2[0];var setData=s2[1];
   var s3=useState(true);var loading=s3[0];var setLoading=s3[1];
@@ -3794,6 +3795,18 @@ function App(){
     };
   }
 
+  function setupDataListener(rid){
+    if(unsubDataRef.current){unsubDataRef.current();unsubDataRef.current=null;}
+    unsubDataRef.current=db.collection('rooms').doc(rid).collection('data').doc('main').onSnapshot(function(doc){
+      if(doc.metadata.hasPendingWrites)return;
+      if(!doc.exists)return;
+      var d=doc.data();
+      var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
+      if(!nd.folders||nd.folders.length===0){nd.folders=[{id:uid(),name:'新入店',castIds:[]}];}
+      setData(nd);
+    },function(){});
+  }
+
   function handleTransferOwner(newMemberUid,newMemberName){
     if(!confirm(newMemberName+'さんに管理者を引き継ぎますか？'))return;
     (firebase.auth().currentUser?firebase.auth().currentUser.getIdToken():Promise.resolve(''))
@@ -3857,8 +3870,8 @@ function App(){
 
   var layer=navStack[navStack.length-1]||'home';
 
-  function navigate(pg){setNavStack(function(st){return [...st,pg];});setSubBack(null);refreshData();}
-  function goHome(){setNavStack(['home']);setSubBack(null);refreshData();}
+  function navigate(pg){setNavStack(function(st){return [...st,pg];});setSubBack(null);}
+  function goHome(){setNavStack(['home']);setSubBack(null);}
   function switchToRoom(r){
     loadFromRoom(r.roomId).then(function(d){
       var nd=Object.assign({casts:[],records:{},customers:{},folders:[],shifts:{},visits:[],quota:{}},d);
@@ -3866,6 +3879,7 @@ function App(){
       setRoomId(r.roomId);setRoomRole(r.role||'member');
       setCurrentRoom({id:r.roomId,name:r.name,inviteCode:r.inviteCode||''});
       setData(nd);
+      setupDataListener(r.roomId);
       db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:r.roomId}).catch(function(){});
       var nowR=new Date();if(nowR.getHours()<9)nowR.setDate(nowR.getDate()-1);
       var tsR=nowR.getFullYear()+'-'+pad(nowR.getMonth()+1)+'-'+pad(nowR.getDate());
@@ -3895,12 +3909,10 @@ function App(){
       setSubBack(null);
       if(popStack){
         setNavStack(function(st){return st.length>1?st.slice(0,-1):['home'];});
-        refreshData();
       }
       return;
     }
     setNavStack(function(st){return st.length>1?st.slice(0,-1):['home'];});
-    refreshData();
   }
 
     useEffect(function(){
@@ -3916,6 +3928,7 @@ function App(){
       if(unsubRoleRef.current){unsubRoleRef.current();unsubRoleRef.current=null;}
       if(unsubUserRoomRef.current){unsubUserRoomRef.current();unsubUserRoomRef.current=null;}
       if(unsubRoomsListRef.current){unsubRoomsListRef.current();unsubRoomsListRef.current=null;}
+      if(unsubDataRef.current){unsubDataRef.current();unsubDataRef.current=null;}
       if(!u){
         window._castManagerDeleting=false;
         setConsentState('loading');setData(null);setLoading(false);
@@ -3966,6 +3979,7 @@ function App(){
             if(unsubUserRoomRef.current){unsubUserRoomRef.current();unsubUserRoomRef.current=null;}
             unsubRoleRef.current=db.collection('rooms').doc(coRoomId).collection('members').doc(u.uid).onSnapshot(makeRoleListener(coRoomId),function(){});
             unsubUserRoomRef.current=db.collection('users').doc(u.uid).collection('rooms').doc(coRoomId).onSnapshot(makeUserRoomListener(coRoomId),function(){});
+            setupDataListener(coRoomId);
             db.collection('users').doc(u.uid).collection('meta').doc('consent').get({source:'cache'}).then(function(doc){
               if(doc.exists&&doc.data().userName){setUserName(doc.data().userName||'');setStoreName(doc.data().storeName||'');}
             }).catch(function(){});
@@ -4295,15 +4309,18 @@ function App(){
           localStorage.removeItem('_co_retry');
           setData(final);setLoading(false);setConsentState('done');
           doMiniSync(rid,rName||'',final);
+          setupDataListener(rid);
         });
       }else{
         localStorage.removeItem('_co_retry');
         setData(nd);setLoading(false);setConsentState('done');
         doMiniSync(rid,rName||'',nd);
+        setupDataListener(rid);
       }
     }).catch(function(){
       var empty={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]}],shifts:{},visits:[],quota:{}};
       setData(empty);setLoading(false);setConsentState('done');
+      setupDataListener(rid);
     });
   }
   function persist(next){
