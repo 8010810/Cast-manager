@@ -2826,20 +2826,16 @@ function MiniApp(){
         function createUpgradeRoom(callback){
           var rn=upgradeRoomName.trim();
           if(!rn){notify('ルーム名を入力してください','error');return;}
-          var inviteCode=Math.random().toString(36).slice(2,8).toUpperCase();
-          var rid=db.collection('rooms').doc().id;
-          var now=new Date().toISOString();
-          var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
-          var folderName=userName||'オーナー';
-          var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:folderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
           setCheckoutLoading(true);
-          db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt,pendingPayment:true})
-            .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
-            .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
-            .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now,pendingPayment:true});})
-            .then(function(){return db.collection('users').doc(user.uid).collection('meta').doc('consent').update({lastRoomId:rid}).catch(function(){});})
-            .then(function(){callback(rid,rn,inviteCode);})
-            .catch(function(_e){setCheckoutLoading(false);notify('ルームの作成に失敗しました: '+_e.message,'error');});
+          user.getIdToken().then(function(tok){
+            return fetch('/api/create-room',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({roomName:rn,userName:userName||'',trial:false})});
+          }).then(function(r){
+            if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+' '+t.slice(0,120));});
+            return r.json();
+          }).then(function(d){
+            if(d.error){setCheckoutLoading(false);notify('ルームの作成に失敗しました: '+d.error,'error');return;}
+            callback(d.roomId,rn,d.inviteCode);
+          }).catch(function(_e){console.error('[mini createUpgradeRoom]',_e);setCheckoutLoading(false);notify('ルームの作成に失敗しました: '+_e.message,'error');});
         }
         function doUpgradeToStd(){
           if(!user||checkoutLoading)return;
