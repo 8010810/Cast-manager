@@ -199,19 +199,14 @@ function LoginScreen(){
   var useState=React.useState;var useEffect=React.useEffect;var e=React.createElement;
   var s1=useState(false);var loading=s1[0];var setLoading=s1[1];
   var s2=useState('');var err=s2[0];var setErr=s2[1];
-  var s3=useState('login');var mode=s3[0];var setMode=s3[1]; // 'login'|'register'|'reset'|'verify'
+  var s3=useState('login');var mode=s3[0];var setMode=s3[1]; // 'login'|'register'|'reset'
   var s4=useState('');var email=s4[0];var setEmail=s4[1];
   var s5=useState('');var pass=s5[0];var setPass=s5[1];
   var s6=useState(false);var resetSent=s6[0];var setResetSent=s6[1];
-  var s7=useState(false);var registered=s7[0];var setRegistered=s7[1];
-  var s8=useState(false);var verifySent=s8[0];var setVerifySent=s8[1];
 
   function handleGoogle(){
     setLoading(true);setErr('');
     signInWithGoogle().catch(function(e){setErr('Googleログインに失敗しました');setLoading(false);});
-  }
-  function sendVerificationEmail(addr){
-    return fetch('/api/send-email-verification',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:addr})}).then(function(r){return r.json();});
   }
   function handleEmail(){
     if(!email.trim()||!pass.trim()){setErr('メールアドレスとパスワードを入力してください');return;}
@@ -219,17 +214,7 @@ function LoginScreen(){
     var fn=mode==='login'
       ?auth.signInWithEmailAndPassword(email,pass)
       :auth.createUserWithEmailAndPassword(email,pass);
-    fn.then(function(cred){
-      if(mode==='register'){
-        // 確認メール送信→サインアウト→ログイン画面へ
-        var addr=cred.user.email;
-        sendVerificationEmail(addr).finally(function(){
-          auth.signOut();
-          setPass('');setRegistered(true);setMode('login');setLoading(false);
-        });
-      }
-      // ログイン成功はonAuthStateChangedが処理する
-    }).catch(function(e){
+    fn.catch(function(e){
       if(e.code==='auth/email-already-in-use'){
         setMode('login');setErr('このメールアドレスはすでに登録済みです。ログインしてください。');setLoading(false);return;
       }
@@ -238,16 +223,6 @@ function LoginScreen(){
         :'ログインに失敗しました';
       setErr(msg);setLoading(false);
     });
-  }
-  function handleResendVerification(){
-    if(!email.trim()){setErr('メールアドレスを入力してください');return;}
-    setLoading(true);setErr('');
-    sendVerificationEmail(email.trim())
-      .then(function(d){
-        if(d.success){setVerifySent(true);}else{setErr(d.error||'エラーが発生しました');}
-        setLoading(false);
-      })
-      .catch(function(){setErr('通信エラーが発生しました');setLoading(false);});
   }
 
   function handleReset(){
@@ -274,25 +249,7 @@ function LoginScreen(){
       ),
       e('h1',{style:{fontSize:'26px',fontWeight:300,fontFamily:"'Cormorant Garamond','Noto Serif JP',serif",letterSpacing:'0.3em',background:'linear-gradient(135deg,#c9983a,#e8b86d,#f5d08a,#e8b86d)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text',margin:'0 0 4px 0'}},'CAST MANAGER'),
       e('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,rgba(232,184,109,0.6),transparent)',margin:'0 auto 20px',width:'80%'}}),
-      registered&&e('div',{style:{background:'#052e16',border:'1px solid #16a34a',borderRadius:'8px',padding:'10px 12px',marginBottom:'16px',fontSize:'13px',color:'#86efac',textAlign:'left'}},'✓ 確認メールをお送りしました。メールのリンクをクリックした後、ログインしてください。'),
-      mode==='verify'
-        ?e(React.Fragment,null,
-          verifySent
-            ?e('div',{style:{textAlign:'center',padding:'8px 0 20px'}},
-              e('div',{style:{fontSize:'32px',marginBottom:'12px'}},'✉'),
-              e('p',{style:{color:'#e8b86d',fontWeight:700,marginBottom:'8px',fontSize:'15px'}},'確認メールを再送しました'),
-              e('p',{style:{color:'#9ca3af',fontSize:'13px',marginBottom:'20px'}},'メールのリンクをクリック後、ログインしてください。'),
-              e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',fontSize:'13px',cursor:'pointer'},onClick:function(){setMode('login');setVerifySent(false);}},'← ログイン画面に戻る')
-            )
-            :e(React.Fragment,null,
-              e('p',{style:{color:'#fca5a5',fontSize:'13px',marginBottom:'16px',textAlign:'left'}},'メールアドレスが未確認です。登録時に送信した確認メールのリンクをクリックしてからログインしてください。'),
-              e('input',{type:'email',placeholder:'メールアドレス',value:email,onChange:function(ev){setEmail(ev.target.value);},style:inp}),
-              e('button',{style:{width:'100%',padding:'13px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#d4a017,#e8b86d)',color:'#0d0d1a',fontSize:'14px',fontWeight:700,cursor:'pointer',marginBottom:'12px'},onClick:handleResendVerification,disabled:loading},loading?'送信中...':'確認メールを再送する'),
-              e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setMode('login');setErr('');}},'← ログインに戻る'),
-              err&&e('div',{style:{color:'#f87171',fontSize:'12px',marginTop:'14px',textAlign:'left',background:'#7f1d1d22',borderRadius:'8px',padding:'10px 12px'}},err)
-            )
-          )
-        :mode==='reset'
+      mode==='reset'
         ?e(React.Fragment,null,
           resetSent
             ?e('div',{style:{textAlign:'center',padding:'8px 0 20px'}},

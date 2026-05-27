@@ -231,40 +231,16 @@ function LoginScreen(){
   var s4=useState('');var email=s4[0];var setEmail=s4[1];
   var s5=useState('');var pass=s5[0];var setPass=s5[1];
   var s6=useState(false);var resetSent=s6[0];var setResetSent=s6[1];
-  var s7=useState(false);var registered=s7[0];var setRegistered=s7[1];
-  var s8=useState(false);var verifySent=s8[0];var setVerifySent=s8[1];
 
   function handleGoogle(){setLoading(true);setErr('');signInWithGoogle().catch(function(){setErr('Googleログインに失敗しました');setLoading(false);});}
-  function sendVerificationEmail(addr){
-    return fetch('/api/send-email-verification',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:addr})}).then(function(r){return r.json();});
-  }
   function handleEmail(){
     if(!email||!pass){setErr('メールとパスワードを入力してください');return;}
     setLoading(true);setErr('');
     var promise=mode==='register'?auth.createUserWithEmailAndPassword(email,pass):auth.signInWithEmailAndPassword(email,pass);
-    promise.then(function(cred){
-      if(mode==='register'){
-        var addr=cred.user.email;
-        sendVerificationEmail(addr).finally(function(){
-          auth.signOut();
-          setPass('');setRegistered(true);setMode('login');setLoading(false);
-        });
-      }
-      // ログイン成功はonAuthStateChangedが処理する
-    }).catch(function(ex){
+    promise.catch(function(ex){
       var msg=ex.code==='auth/user-not-found'?'アカウントが見つかりません':ex.code==='auth/wrong-password'||ex.code==='auth/invalid-credential'?'メールまたはパスワードが正しくありません':ex.code==='auth/email-already-in-use'?'このメールは既に登録済みです':ex.code==='auth/weak-password'?'パスワードは6文字以上にしてください':'エラーが発生しました';
       setErr(msg);setLoading(false);
     });
-  }
-  function handleResendVerification(){
-    if(!email.trim()){setErr('メールアドレスを入力してください');return;}
-    setLoading(true);setErr('');
-    sendVerificationEmail(email.trim())
-      .then(function(d){
-        if(d.success){setVerifySent(true);}else{setErr(d.error||'エラーが発生しました');}
-        setLoading(false);
-      })
-      .catch(function(){setErr('通信エラーが発生しました');setLoading(false);});
   }
   function handleReset(){
     if(!email.trim()){setErr('メールアドレスを入力してください');return;}
@@ -291,25 +267,7 @@ function LoginScreen(){
         e('div',{style:{height:'1px',background:'linear-gradient(90deg,transparent,rgba(232,184,109,0.6),transparent)',margin:'8px auto 0',width:'80%'}})
       ),
       e('p',{style:{color:'#6b7280',fontSize:'12px',marginBottom:'28px'}},'黒服マネージャー専用 キャスト売上管理'),
-      registered&&e('div',{style:{background:'#052e16',border:'1px solid #16a34a',borderRadius:'8px',padding:'10px 12px',marginBottom:'16px',fontSize:'13px',color:'#86efac',textAlign:'left'}},'✓ 確認メールをお送りしました。メールのリンクをクリックした後、ログインしてください。'),
-      mode==='verify'
-        ?e(React.Fragment,null,
-          verifySent
-            ?e('div',{style:{textAlign:'center',padding:'8px 0 20px'}},
-              e('div',{style:{fontSize:'32px',marginBottom:'12px'}},'✉'),
-              e('p',{style:{color:'#e8b86d',fontWeight:700,marginBottom:'8px',fontSize:'15px'}},'確認メールを再送しました'),
-              e('p',{style:{color:'#9ca3af',fontSize:'13px',marginBottom:'20px'}},'メールのリンクをクリック後、ログインしてください。'),
-              e('button',{style:{background:'transparent',border:'none',color:'#e8b86d',fontSize:'13px',cursor:'pointer'},onClick:function(){setMode('login');setVerifySent(false);}},'← ログイン画面に戻る')
-            )
-            :e(React.Fragment,null,
-              e('p',{style:{color:'#fca5a5',fontSize:'13px',marginBottom:'16px',textAlign:'left'}},'メールアドレスが未確認です。登録時に送信した確認メールのリンクをクリックしてからログインしてください。'),
-              e('input',{type:'email',placeholder:'メールアドレス',value:email,onChange:function(ev){setEmail(ev.target.value);},style:inp}),
-              e('button',{style:{width:'100%',padding:'13px',borderRadius:'8px',border:'none',background:'linear-gradient(135deg,#d4a017,#e8b86d)',color:'#0d0d1a',fontSize:'14px',fontWeight:700,cursor:'pointer',marginBottom:'12px'},onClick:handleResendVerification,disabled:loading},loading?'送信中...':'確認メールを再送する'),
-              e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setMode('login');setErr('');}},'← ログインに戻る'),
-              err&&e('p',{style:{color:'#fca5a5',fontSize:'12px',marginTop:'14px',lineHeight:1.5}},err)
-            )
-          )
-        :mode==='reset'
+      mode==='reset'
         ?e(React.Fragment,null,
           resetSent
             ?e('div',{style:{textAlign:'center',padding:'8px 0 20px'}},
