@@ -113,7 +113,6 @@ export default async function handler(req, res) {
           var invitedCount = membersSnap.docs.filter(function(d) { return d.data().isInvited === true; }).length;
           if (invitedCount > 0) {
             var newSubId = session.subscription;
-            var newCustId = session.customer;
             var newSub = await stripeSync.subscriptions.retrieve(newSubId);
             var existingItem = newSub.items.data.find(function(i) { return i.price.id === ACCOUNT_ADD_PRICE; });
             if (existingItem) {
@@ -121,18 +120,8 @@ export default async function handler(req, res) {
             } else {
               await stripeSync.subscriptionItems.create({ subscription: newSubId, price: ACCOUNT_ADD_PRICE, quantity: invitedCount, proration_behavior: 'none' });
             }
-            // トライアル期間中のメンバー分を即時請求
-            var syncInvoice = null;
-            try {
-              await stripeSync.invoiceItems.create({ customer: newCustId, subscription: newSubId, amount: 1000 * invitedCount, currency: 'jpy', description: 'トライアル期間中の承認メンバー（'+invitedCount+'人）' });
-              syncInvoice = await stripeSync.invoices.create({ customer: newCustId, subscription: newSubId, auto_advance: false });
-              await stripeSync.invoices.pay(syncInvoice.id, { off_session: true });
-            } catch (_billingErr) {
-              console.error('[stripe-webhook] Trial member billing error:', _billingErr.message);
-              if (syncInvoice && syncInvoice.id) await stripeSync.invoices.voidInvoice(syncInvoice.id).catch(function(){});
-            }
             await db.collection('rooms').doc(roomId).collection('subscription').doc('main').update({ memberCount: invitedCount });
-            console.log('[stripe-webhook] Synced trial members to Stripe. count:', invitedCount, 'room:', roomId);
+            console.log('[stripe-webhook] Synced trial members to Stripe (quantity only). count:', invitedCount, 'room:', roomId);
           }
         } catch (_syncErr) {
           console.error('[stripe-webhook] Trial member sync error:', _syncErr.message);
