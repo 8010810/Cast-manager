@@ -4595,6 +4595,7 @@ function App(){
   if(consentState==='planselect'){
     var adminNeedsSub=!!(roomId&&roomRole==='admin');
     return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      toast&&e('div',{style:Object.assign({},S.toast,{background:toast.type==='error'?'#7f1d1d':'#14532d'})},toast.msg),
       e('div',{style:{maxWidth:'480px',width:'100%'}},
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'}},'CAST MANAGER'),
         e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},adminNeedsSub?'決済方法を登録してください':'プランを選択してください'),
