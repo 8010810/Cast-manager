@@ -3848,9 +3848,12 @@ function App(){
   function handleCreateRoomForCheckout(){
     if(!createRoomName.trim()||!user||createRoomStdLoading)return;
     setCreateRoomStdLoading(true);
-    firebase.auth().currentUser.getIdToken().then(function(tok){
+    user.getIdToken().then(function(tok){
       return fetch('/api/create-room',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({roomName:createRoomName.trim(),userName:userName||'',trial:false})});
-    }).then(function(r){return r.json();})
+    }).then(function(r){
+      if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+' '+t.slice(0,120));});
+      return r.json();
+    })
     .then(function(d){
       if(d.error){setCreateRoomStdLoading(false);notify('ルームの作成に失敗しました: '+d.error,'error');return;}
       setCreateRoomStdLoading(false);
@@ -3863,23 +3866,29 @@ function App(){
   function handleStartMiniTrial(){
     if(!user||createRoomStdLoading)return;
     setCreateRoomStdLoading(true);
-    firebase.auth().currentUser.getIdToken().then(function(tok){
+    user.getIdToken().then(function(tok){
       return fetch('/api/start-trial',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({plan:'mini'})});
-    }).then(function(r){return r.json();})
+    }).then(function(r){
+      if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+' '+t.slice(0,120));});
+      return r.json();
+    })
     .then(function(d){
       setCreateRoomStdLoading(false);
-      if(d.error){notify('トライアルの開始に失敗しました','error');return;}
+      if(d.error){notify('トライアルの開始に失敗しました: '+d.error,'error');return;}
       window.location.href='/mini';
     })
-    .catch(function(){setCreateRoomStdLoading(false);notify('トライアルの開始に失敗しました','error');});
+    .catch(function(_e){setCreateRoomStdLoading(false);notify('トライアルの開始に失敗しました: '+_e.message,'error');});
   }
 
   function handleCreateRoomForTrial(){
     if(!createRoomName.trim()||!user||createRoomStdLoading)return;
     setCreateRoomStdLoading(true);
-    firebase.auth().currentUser.getIdToken().then(function(tok){
+    user.getIdToken().then(function(tok){
       return fetch('/api/create-room',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({roomName:createRoomName.trim(),userName:userName||'',trial:true})});
-    }).then(function(r){return r.json();})
+    }).then(function(r){
+      if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+' '+t.slice(0,120));});
+      return r.json();
+    })
     .then(function(d){
       setCreateRoomStdLoading(false);
       if(d.error){notify('トライアルの開始に失敗しました: '+d.error,'error');return;}
@@ -4723,6 +4732,7 @@ function App(){
 
   if(consentState==='create-room-for-std'){
     return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      toast&&e('div',{style:Object.assign({},S.toast,{background:toast.type==='error'?'#7f1d1d':'#14532d'})},toast.msg),
       e('div',{style:{maxWidth:'420px',width:'100%'}},
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'}},'CAST MANAGER'),
         e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'ルームを作成してください'),
@@ -4755,6 +4765,7 @@ function App(){
 
   if(consentState==='create-room-for-trial'){
     return e('div',{style:{minHeight:'100vh',background:'#0d0d1a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'24px'}},
+      toast&&e('div',{style:Object.assign({},S.toast,{background:toast.type==='error'?'#7f1d1d':'#14532d'})},toast.msg),
       e('div',{style:{maxWidth:'420px',width:'100%'}},
         e('div',{style:{fontFamily:"'Cormorant Garamond',serif",letterSpacing:'0.15em',fontSize:'18px',color:'#e8b86d',textAlign:'center',marginBottom:'8px'}},'CAST MANAGER'),
         e('h2',{style:{fontSize:'15px',fontWeight:700,color:'#f3f4f6',textAlign:'center',marginBottom:'6px'}},'ルームを作成してください'),
@@ -5038,9 +5049,12 @@ function App(){
         var rn=settRoomName.trim();
         if(!rn||settRoomLoading)return;
         setSettRoomLoading(true);
-        firebase.auth().currentUser.getIdToken().then(function(tok){
+        user.getIdToken().then(function(tok){
           return fetch('/api/create-room',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tok},body:JSON.stringify({roomName:rn,userName:userName||'',trial:false})});
-        }).then(function(r){return r.json();})
+        }).then(function(r){
+          if(!r.ok)return r.text().then(function(t){throw new Error('HTTP '+r.status+' '+t.slice(0,120));});
+          return r.json();
+        })
         .then(function(d){
           if(d.error){setSettRoomLoading(false);notify('作成に失敗しました: '+d.error,'error');return;}
           setSettRoomLoading(false);
