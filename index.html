@@ -227,12 +227,8 @@ function LoginScreen(){
           auth.signOut();
           setPass('');setRegistered(true);setMode('login');setLoading(false);
         });
-      } else if(!cred.user.emailVerified){
-        // 未確認→サインアウト→確認促す画面へ
-        auth.signOut();
-        setMode('verify');setLoading(false);
       }
-      // emailVerified=true の場合はonAuthStateChangedが処理する
+      // ログイン成功はonAuthStateChangedが処理する
     }).catch(function(e){
       if(e.code==='auth/email-already-in-use'){
         setMode('login');setErr('このメールアドレスはすでに登録済みです。ログインしてください。');setLoading(false);return;

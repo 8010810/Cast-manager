@@ -249,10 +249,8 @@ function LoginScreen(){
           auth.signOut();
           setPass('');setRegistered(true);setMode('login');setLoading(false);
         });
-      } else if(!cred.user.emailVerified){
-        auth.signOut();
-        setMode('verify');setLoading(false);
       }
+      // ログイン成功はonAuthStateChangedが処理する
     }).catch(function(ex){
       var msg=ex.code==='auth/user-not-found'?'アカウントが見つかりません':ex.code==='auth/wrong-password'||ex.code==='auth/invalid-credential'?'メールまたはパスワードが正しくありません':ex.code==='auth/email-already-in-use'?'このメールは既に登録済みです':ex.code==='auth/weak-password'?'パスワードは6文字以上にしてください':'エラーが発生しました';
       setErr(msg);setLoading(false);
