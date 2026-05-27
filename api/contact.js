@@ -1,3 +1,5 @@
+import nodemailer from 'nodemailer';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -18,11 +20,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'メールアドレスまたは電話番号を入力してください' });
     }
 
-    var apiKey = process.env.RESEND_API_KEY;
-    var toEmail = process.env.SUPPORT_EMAIL;
-
-    if (!apiKey || !toEmail) {
-      console.error('[contact] Missing RESEND_API_KEY or SUPPORT_EMAIL env vars');
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD || !process.env.SUPPORT_EMAIL) {
+      console.error('[contact] Missing GMAIL_USER, GMAIL_APP_PASSWORD, or SUPPORT_EMAIL');
       return res.status(500).json({ error: 'メール設定が未完了です' });
     }
 
@@ -37,26 +36,21 @@ export default async function handler(req, res) {
       message,
     ].join('\n');
 
-    var response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer ' + apiKey,
-        'Content-Type': 'application/json',
+    var transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
       },
-      body: JSON.stringify({
-        from: 'Cast Manager <onboarding@resend.dev>',
-        to: [toEmail],
-        subject: '【お問い合わせ】' + (userName || '匿名') + 'さんからのメッセージ',
-        text: body,
-        reply_to: email || undefined,
-      }),
     });
 
-    if (!response.ok) {
-      var errData = await response.json().catch(function() { return {}; });
-      console.error('[contact] Resend error:', errData);
-      return res.status(500).json({ error: '送信に失敗しました' });
-    }
+    await transporter.sendMail({
+      from: 'CAST MANAGER <' + process.env.GMAIL_USER + '>',
+      to: process.env.SUPPORT_EMAIL,
+      replyTo: email || undefined,
+      subject: '【お問い合わせ】' + (userName || '匿名') + 'さんからのメッセージ',
+      text: body,
+    });
 
     console.log('[contact] Sent inquiry from', email || phone);
     return res.status(200).json({ success: true });
