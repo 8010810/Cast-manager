@@ -3441,7 +3441,8 @@ function RoomSelectScreen(p){
     var inviteCode=generateInviteCode();
     var rid=p.db.collection('rooms').doc().id;
     var now=new Date().toISOString();
-    var roomData={name:roomName.trim(),ownerUid:p.user.uid,createdAt:now,inviteCode:inviteCode};
+    var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
+    var roomData={name:roomName.trim(),ownerUid:p.user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt};
     var folderName=p.userName||'オーナー';
     var initData={casts:[],records:{},customers:{},folders:[{id:p.uid(),name:'新入店',castIds:[]},{id:p.uid(),name:folderName,castIds:[],ownerUid:p.user.uid}],shifts:{},visits:[],quota:{}};
     p.db.collection('rooms').doc(rid).set(roomData)
@@ -3465,6 +3466,7 @@ function RoomSelectScreen(p){
     p.db.collection('rooms').where('inviteCode','==',actualCode).limit(1).get().then(function(snap){
       if(snap.empty){setErr('招待コードが見つかりません');setLoading(false);return;}
       var roomDoc=snap.docs[0];var rid=roomDoc.id;var rd=roomDoc.data();
+      if(rd.inviteCodeExpiresAt&&new Date(rd.inviteCodeExpiresAt)<new Date()){setErr('招待コードの有効期限が切れています。管理者に再発行してもらってください。');setLoading(false);return;}
       var now=new Date().toISOString();
       return p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).get().then(function(mem){
         if(mem.exists){
@@ -3511,6 +3513,7 @@ function RoomSelectScreen(p){
       p.db.collection('rooms').where('inviteCode','==',code).limit(1).get().then(function(snap){
         if(snap.empty){setErr('招待コードが見つかりません');setLoading(false);setMode('join');setInviteInput(code);return;}
         var roomDoc=snap.docs[0];var rid=roomDoc.id;var rd=roomDoc.data();
+        if(rd.inviteCodeExpiresAt&&new Date(rd.inviteCodeExpiresAt)<new Date()){setErr('招待コードの有効期限が切れています。管理者に再発行してもらってください。');setLoading(false);setMode('join');return;}
         var now=new Date().toISOString();
         p.db.collection('rooms').doc(rid).collection('members').doc(p.user.uid).get().then(function(mem){
           if(mem.exists){
@@ -3836,9 +3839,10 @@ function App(){
     var inviteCode=generateInviteCode();
     var rid=db.collection('rooms').doc().id;
     var now=new Date().toISOString();
+    var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
     var folderName=userName||'オーナー';
     var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:folderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
-    db.collection('rooms').doc(rid).set({name:createRoomName.trim(),ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,pendingPayment:true})
+    db.collection('rooms').doc(rid).set({name:createRoomName.trim(),ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt,pendingPayment:true})
     .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
     .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
     .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:createRoomName.trim(),role:'admin',inviteCode:inviteCode,joinedAt:now,pendingPayment:true});})
@@ -4317,7 +4321,8 @@ function App(){
     setJoinRoomLoading(true);setJoinReqMsg('');
     db.collection('rooms').where('inviteCode','==',actualCode).limit(1).get().then(function(snap){
       if(snap.empty){setJoinReqMsg('招待コードが見つかりません');setJoinRoomLoading(false);return;}
-      var rid=snap.docs[0].id;
+      var rid=snap.docs[0].id;var rd0=snap.docs[0].data();
+      if(rd0.inviteCodeExpiresAt&&new Date(rd0.inviteCodeExpiresAt)<new Date()){setJoinReqMsg('招待コードの有効期限が切れています。管理者に再発行してもらってください。');setJoinRoomLoading(false);return;}
       db.collection('rooms').doc(rid).collection('members').doc(user.uid).get().then(function(mem){
         if(mem.exists){setJoinReqMsg('すでに参加済みです');setJoinRoomLoading(false);return;}
         db.collection('rooms').doc(rid).collection('joinRequests').doc(user.uid).get().then(function(req){
@@ -4936,10 +4941,11 @@ function App(){
         setSettRoomLoading(true);
         var now=new Date().toISOString();
         var inviteCode=generateInviteCode();
+        var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
         var rid=db.collection('rooms').doc().id;
         var sFolderName=userName||'管理者';
         var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:sFolderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
-        db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,pendingPayment:true})
+        db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt,pendingPayment:true})
           .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
           .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
           .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now,pendingPayment:true});})
@@ -5007,7 +5013,7 @@ function App(){
       if(!invCode&&(roomRole==='admin'||roomRole==='sub-admin')&&roomId){
         db.collection('rooms').doc(roomId).get().then(function(doc){
           if(doc.exists&&doc.data().inviteCode){
-            setCurrentRoom(function(prev){return Object.assign({},prev,{inviteCode:doc.data().inviteCode});});
+            setCurrentRoom(function(prev){return Object.assign({},prev,{inviteCode:doc.data().inviteCode,inviteCodeExpiresAt:doc.data().inviteCodeExpiresAt||null});});
           }
         }).catch(function(){});
       }
@@ -5029,10 +5035,22 @@ function App(){
                 e('div',{style:{background:'#12122a',borderRadius:'12px',padding:'20px',marginBottom:'16px',textAlign:'center'}},
                   e('div',{style:{fontSize:'11px',color:'#6b7280',marginBottom:'8px'}},'招待コード'),
                   e('div',{style:{fontSize:'36px',fontWeight:700,color:'#e8b86d',letterSpacing:'0.3em',fontFamily:"'Cormorant Garamond',serif"}},invCode),
-                  e('button',{style:{marginTop:'12px',background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 16px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){
-                    if(navigator.clipboard){navigator.clipboard.writeText(invCode);}
-                    var el=document.createElement('textarea');el.value=invCode;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
-                  }},'コードをコピー')
+                  (function(){var exp=currentRoom&&currentRoom.inviteCodeExpiresAt;if(!exp)return null;var d=new Date(exp);var expired=d<new Date();return e('div',{style:{fontSize:'11px',color:expired?'#f87171':'#6b7280',marginTop:'6px'}},(expired?'期限切れ：':'有効期限：')+d.getFullYear()+'/'+(d.getMonth()+1)+'/'+(d.getDate()));})(),
+                  e('div',{style:{display:'flex',gap:'8px',justifyContent:'center',marginTop:'12px'}},
+                    e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 16px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){
+                      if(navigator.clipboard){navigator.clipboard.writeText(invCode);}
+                      var el=document.createElement('textarea');el.value=invCode;document.body.appendChild(el);el.select();document.execCommand('copy');document.body.removeChild(el);
+                    }},'コードをコピー'),
+                    e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 16px',color:'#9ca3af',fontSize:'12px',cursor:'pointer'},onClick:function(){
+                      if(!window.confirm('招待コードを再発行しますか？\n現在のコードは無効になります。'))return;
+                      var newCode=generateInviteCode();
+                      var newExp=new Date(Date.now()+30*24*60*60*1000).toISOString();
+                      db.collection('rooms').doc(roomId).update({inviteCode:newCode,inviteCodeExpiresAt:newExp}).then(function(){
+                        setCurrentRoom(function(prev){return Object.assign({},prev,{inviteCode:newCode,inviteCodeExpiresAt:newExp});});
+                        notify('招待コードを再発行しました');
+                      }).catch(function(){notify('再発行に失敗しました');});
+                    }},'再発行')
+                  )
                 ),
                 e('div',{style:{height:'1px',background:'rgba(232,184,109,0.1)',margin:'20px 0'}}),
                 e('div',{style:{fontSize:'13px',color:'#e8b86d',fontWeight:700,marginBottom:'10px'}},'招待リンク'),

@@ -2265,6 +2265,7 @@ function MiniApp(){
       if(snap.empty){setMiniJoinMsg('招待コードが見つかりません');setMiniJoinLoading(false);return;}
       var rid=snap.docs[0].id;
       var roomInfo=snap.docs[0].data();
+      if(roomInfo.inviteCodeExpiresAt&&new Date(roomInfo.inviteCodeExpiresAt)<new Date()){setMiniJoinMsg('招待コードの有効期限が切れています。管理者に再発行してもらってください。');setMiniJoinLoading(false);return;}
       db.collection('rooms').doc(rid).collection('members').doc(user.uid).get().then(function(mem){
         if(mem.exists){setMiniJoinMsg('すでに参加済みです');setMiniJoinLoading(false);return;}
         db.collection('rooms').doc(rid).collection('joinRequests').doc(user.uid).get().then(function(req){
@@ -2828,10 +2829,11 @@ function MiniApp(){
           var inviteCode=Math.random().toString(36).slice(2,8).toUpperCase();
           var rid=db.collection('rooms').doc().id;
           var now=new Date().toISOString();
+          var inviteCodeExpiresAt=new Date(Date.now()+30*24*60*60*1000).toISOString();
           var folderName=userName||'オーナー';
           var initData={casts:[],records:{},customers:{},folders:[{id:uid(),name:'新入店',castIds:[]},{id:uid(),name:folderName,castIds:[],ownerUid:user.uid}],shifts:{},visits:[],quota:{}};
           setCheckoutLoading(true);
-          db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,pendingPayment:true})
+          db.collection('rooms').doc(rid).set({name:rn,ownerUid:user.uid,createdAt:now,inviteCode:inviteCode,inviteCodeExpiresAt:inviteCodeExpiresAt,pendingPayment:true})
             .then(function(){return db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);})
             .then(function(){return db.collection('rooms').doc(rid).collection('members').doc(user.uid).set({role:'admin',userName:userName||'',joinedAt:now});})
             .then(function(){return db.collection('users').doc(user.uid).collection('rooms').doc(rid).set({name:rn,role:'admin',inviteCode:inviteCode,joinedAt:now,pendingPayment:true});})
