@@ -228,9 +228,13 @@ function LoginScreen(){
   function handleReset(){
     if(!email.trim()){setErr('メールアドレスを入力してください');return;}
     setLoading(true);setErr('');
-    auth.sendPasswordResetEmail(email.trim()).then(function(){setResetSent(true);setLoading(false);}).catch(function(ex){
-      setErr(ex.code==='auth/user-not-found'?'このメールアドレスは登録されていません':'エラーが発生しました');setLoading(false);
-    });
+    fetch('/api/send-password-reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.trim()})})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.success){setResetSent(true);}else{setErr(d.error||'エラーが発生しました');}
+        setLoading(false);
+      })
+      .catch(function(){setErr('通信エラーが発生しました');setLoading(false);});
   }
 
   var inp={width:'100%',padding:'12px 14px',borderRadius:'8px',border:'1px solid #2d2d4e',background:'#0d0d1a',color:'#e5e7eb',fontSize:'14px',outline:'none',boxSizing:'border-box',marginBottom:'10px'};
