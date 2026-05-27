@@ -48,6 +48,7 @@ export default async function handler(req, res) {
     var inviteCode = generateInviteCode();
     var rid = db.collection('rooms').doc().id;
     var now = new Date().toISOString();
+    var inviteCodeExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
     var folderName = userName || 'オーナー';
     var initData = {
@@ -61,6 +62,7 @@ export default async function handler(req, res) {
 
     await db.collection('rooms').doc(rid).set({
       name: roomName, ownerUid: uid, createdAt: now, inviteCode: inviteCode,
+      inviteCodeExpiresAt: inviteCodeExpiresAt,
     });
     await db.collection('rooms').doc(rid).collection('data').doc('main').set(initData);
     await db.collection('rooms').doc(rid).collection('members').doc(uid).set({

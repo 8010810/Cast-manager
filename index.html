@@ -3860,7 +3860,7 @@ function App(){
       var priceId=createRoomStdPeriod==='yearly'?PRICE_IDS.STD_YEARLY:PRICE_IDS.STD_MONTHLY;
       handleCheckout(priceId,'/?checkout=success','/?checkout=cancel',d.roomId,createRoomName.trim());
     })
-    .catch(function(_e){setCreateRoomStdLoading(false);notify('ルームの作成に失敗しました: '+_e.message,'error');});
+    .catch(function(_e){console.error('[create-room checkout]',_e);setCreateRoomStdLoading(false);notify('ルームの作成に失敗しました: '+_e.message,'error');});
   }
 
   function handleStartMiniTrial(){
@@ -3896,7 +3896,7 @@ function App(){
       setRoomId(d.roomId);setRoomRole('admin');
       loadRoomData(d.roomId,createRoomName.trim(),'admin');
     })
-    .catch(function(_e){setCreateRoomStdLoading(false);notify('トライアルの開始に失敗しました: '+_e.message,'error');});
+    .catch(function(_e){console.error('[create-room trial]',_e);setCreateRoomStdLoading(false);notify('トライアルの開始に失敗しました: '+_e.message,'error');});
   }
 
   var layer=navStack[navStack.length-1]||'home';
