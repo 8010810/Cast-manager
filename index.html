@@ -6550,6 +6550,8 @@ function AttendancePage(p){
           else if(s==='当欠')absent.push({cast:c,time:t});
         });
         var total=douhan.length+working.length+passing.length+absent.length;
+        function sortByTime(arr){return arr.slice().sort(function(a,b){if(!a.time&&!b.time)return 0;if(!a.time)return 1;if(!b.time)return -1;return a.time.localeCompare(b.time);});}
+        douhan=sortByTime(douhan);working=sortByTime(working);passing=sortByTime(passing);
         if(total===0)return e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'この日の記録はありません');
         var row=function(item,color){return e('div',{key:item.cast.id,style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',marginBottom:'6px'}},e('span',{style:{fontWeight:700,fontSize:'14px',color:color}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));};
         return e('div',null,
