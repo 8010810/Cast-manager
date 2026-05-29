@@ -3060,17 +3060,36 @@ function CastViewerPage(){
           e('div',{style:{color:'#e8b86d',fontWeight:700}},(function(){var d=chartData.find(function(x){return x.key===selChartKey;});if(!d)return'';if(chartMode==='daily'){var kp=selChartKey.split('-');return parseInt(kp[1])+'月'+parseInt(kp[2])+'日';}return d.label;})()),
           e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setSelChartKey(null);}},'✗')
         ),
-        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',marginBottom:'12px'}},
+        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'6px',marginBottom:'12px'}},
           (function(){
             var d=chartData.find(function(x){return x.key===selChartKey;});
             if(!d)return null;
-            var tg2=gt(selChartKey);
-            var pct2=tg2>0?Math.min(999,Math.round(d.sales/tg2*100)):null;
-            return[
-              e('div',{key:'s',style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},'売上'),e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},yen2(d.sales))),
-              tg2>0&&e('div',{key:'t',style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},'目標'),e('div',{style:{color:'#e5e7eb',fontWeight:700,fontSize:'14px'}},yen2(tg2))),
-              pct2!==null&&e('div',{key:'p',style:Object.assign({},boxStyle,{borderColor:pct2>=100?'#34d39933':'#1e2035'})},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},'達成率'),e('div',{style:{color:pct2>=100?'#34d399':pct2>=70?'#fbbf24':'#fca5a5',fontWeight:700,fontSize:'14px'}},pct2+'%'))
+            var filtRec=records.filter(function(r){
+              return chartMode==='daily'?r.date===selChartKey:chartMode==='monthly'?r.date&&r.date.slice(0,7)===selChartKey:r.date&&r.date.slice(0,4)===selChartKey;
+            });
+            var totalSales=filtRec.reduce(function(s,r){return s+Number(r.sales||0);},0);
+            var totalNom=filtRec.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+            var totalComp=filtRec.reduce(function(s,r){return s+Number(r.companions||0);},0);
+            var totalFloor=filtRec.reduce(function(s,r){return s+Number(r.floorCount||0);},0);
+            var tg2=chartMode==='monthly'?gt(selChartKey):0;
+            var pct2=tg2>0?Math.min(999,Math.round(totalSales/tg2*100)):null;
+            var avgS=filtRec.length>0?Math.round(totalSales/filtRec.length):0;
+            if(chartMode==='daily'){
+              return[
+                e('div',{key:'s',style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},'売上'),e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},yen2(totalSales))),
+                e('div',{key:'n',style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},'指名'),e('div',{style:{color:'#34d399',fontWeight:700,fontSize:'14px'}},totalNom+'組')),
+                e('div',{key:'c',style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},'同伴'),e('div',{style:{color:'#a78bfa',fontWeight:700,fontSize:'14px'}},totalComp+'回')),
+                e('div',{key:'f',style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},'場内'),e('div',{style:{color:'#818cf8',fontWeight:700,fontSize:'14px'}},totalFloor+'組')),
+              ];
+            }
+            var items=[
+              ['売上',yen2(totalSales),'#e8b86d'],['平均売上',yen2(avgS),'#fbbf24'],
+              ['出勤',filtRec.length+'日','#fb923c'],['指名',totalNom+'組','#34d399'],
+              ['同伴',totalComp+'回','#a78bfa'],['場内',totalFloor+'組','#818cf8'],
             ];
+            if(tg2>0)items.push(['目標',yen2(tg2),'#e5e7eb']);
+            if(pct2!==null)items.push(['達成率',pct2+'%',pct2>=100?'#34d399':pct2>=70?'#fbbf24':'#fca5a5']);
+            return items.map(function(x){return e('div',{key:x[0],style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'2px'}},x[0]),e('div',{style:{color:x[2],fontWeight:700,fontSize:'14px'}},x[1]));});
           })()
         ),
         e('div',{style:{color:'#9ca3af',fontSize:'12px',fontWeight:600,marginBottom:'8px'}},'この期間の来店顧客'),
