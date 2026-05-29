@@ -1760,11 +1760,13 @@ var initForm=function(date){return{date:date||todayStr(),sales:'',companions:'',
 var initGuests=function(){return[blankGuest()];};
 var custToGuest=function(c){return{_id:c.id,type:c.type,name:c.name,sales:c.sales||'',hour:c.hour||'',tableNo:c.tableNo||'',count:c.count||'',partnerCast:c.partnerCast||'',bottleNeck:c.bottleNeck||'',orderBottle:c.orderBottle||'',receipt:c.receipt||'',note:c.note||''};};
 
-function calcWorkHours(startTimeStr,endHour){
-  if(!startTimeStr||endHour==null)return null;
+function calcWorkHours(startTimeStr,endHour,endTimeStr){
+  if(!startTimeStr||(endHour==null&&!endTimeStr))return null;
   var pts=startTimeStr.split(':');if(pts.length<2)return null;
   var sh=parseInt(pts[0]),sm=parseInt(pts[1]);if(isNaN(sh)||isNaN(sm))return null;
-  var startMin=sh*60+sm,endMin=endHour*60;
+  var startMin=sh*60+sm,endMin;
+  if(endTimeStr){var ep=endTimeStr.split(':');endMin=parseInt(ep[0])*60+parseInt(ep[1]);}
+  else{endMin=endHour*60;}
   if(endMin<=startMin)endMin+=1440;
   return((endMin-startMin)/60).toFixed(1)+'h';
 }
@@ -1789,7 +1791,7 @@ function InputPage(p){
         if(!doc.exists){setWorkHoursInfo(null);return;}
         var st=(doc.data().status||{})[p.castId];
         if(!st||!st.time){setWorkHoursInfo(null);return;}
-        var h=calcWorkHours(st.time,attEndHour!=null?attEndHour:1);
+        var h=calcWorkHours(st.time,attEndHour!=null?attEndHour:1,st.endTime||null);
         setWorkHoursInfo(h?{time:st.time,hours:h}:null);
       }).catch(function(){setWorkHoursInfo(null);});
   }
@@ -1890,7 +1892,7 @@ function ChartPage(p){
         if(!doc.exists){setChartWorkHours(null);return;}
         var st=(doc.data().status||{})[p.castId];
         if(!st||!st.time){setChartWorkHours(null);return;}
-        var h=calcWorkHours(st.time,chartEndHour!=null?chartEndHour:1);
+        var h=calcWorkHours(st.time,chartEndHour!=null?chartEndHour:1,st.endTime||null);
         setChartWorkHours(h?{time:st.time,hours:h}:null);
       }).catch(function(){setChartWorkHours(null);});
   },[selectedKey,mode,p.roomId,chartEndHour]);
@@ -5887,6 +5889,7 @@ function AttendancePage(p){
   var s25=useState(null);var recEditTarget=s25[0];var setRecEditTarget=s25[1];
   var s12=useState('');var modalTime=s12[0];var setModalTime=s12[1];
   var s15=useState('');var editTime=s15[0];var setEditTime=s15[1];
+  var s_eet=useState('');var editEndTime=s_eet[0];var setEditEndTime=s_eet[1];
   var s16=useState(String(20));var settingHour=s16[0];var setSettingHour=s16[1];
   var s17=useState(String(30));var settingIntv=s17[0];var setSettingIntv=s17[1];
   var s20=useState('1');var settingEnd=s20[0];var setSettingEnd=s20[1];
@@ -5914,7 +5917,8 @@ function AttendancePage(p){
     setConfirmTypes(p.attData.confirmTypes||{});
   },[p.attData]);
   useEffect(function(){if(timeModal)setModalTime(timeModal.defaultTime||'');},[timeModal]);
-  useEffect(function(){if(editTarget)setEditTime(editTarget.time||'');},[editTarget]);
+  useEffect(function(){if(editTarget){setEditTime(editTarget.time||'');setEditEndTime(editTarget.endTime||'');}},[editTarget]);
+  useEffect(function(){if(recEditTarget){setEditTime(recEditTarget.time||'');setEditEndTime(recEditTarget.endTime||'');}},[recEditTarget]);
 
   function saveSettings(ts,ad){
     if(!p.roomId)return;
@@ -6046,10 +6050,10 @@ function AttendancePage(p){
     var slots=getSlots();var curSlot=getCurrentSlot();
     var douhan=[];var bySlot=[];var passing=[];var absent=[];var notPassed=[];
     allTodayCasts.forEach(function(item){
-      var c=item.cast;var att=getAtt(c.id);var st=att.status;var tm=att.time;
-      if(st==='同伴'){douhan.push({cast:c,time:tm});return;}
-      if(st==='当欠'){absent.push({cast:c,time:tm});return;}
-      if(st==='通過'){passing.push({cast:c,time:tm});return;}
+      var c=item.cast;var att=getAtt(c.id);var st=att.status;var tm=att.time;var etm=att.endTime||'';
+      if(st==='同伴'){douhan.push({cast:c,time:tm,endTime:etm});return;}
+      if(st==='当欠'){absent.push({cast:c,time:tm,endTime:etm});return;}
+      if(st==='通過'){passing.push({cast:c,time:tm,endTime:etm});return;}
       if(st==='出勤'){
         var tMin=tm?parseInt(tm.split(':')[0])*60+parseInt(tm.split(':')[1]):null;
         // 深夜(0-3時)のみ+1440、19時台などは+1440しない
@@ -6069,8 +6073,8 @@ function AttendancePage(p){
         if(!slot&&slots.length>0)slot=slots[slots.length-1];
         var sl=slot?slot.label:'--:--';
         var ex=bySlot.find(function(s){return s.label===sl;});
-        if(ex)ex.casts.push({cast:c,time:tm});
-        else bySlot.push({label:sl,startMin:slot?slot.startMin:0,casts:[{cast:c,time:tm}]});
+        if(ex)ex.casts.push({cast:c,time:tm,endTime:etm});
+        else bySlot.push({label:sl,startMin:slot?slot.startMin:0,casts:[{cast:c,time:tm,endTime:etm}]});
         return;
       }
       // 未通過: 保留は除外、出勤予定時間が直近スロット内のみ（追加出勤も含む）
@@ -6190,13 +6194,17 @@ function AttendancePage(p){
     // 記録タブ 時間編集モーダル
     recEditTarget&&e('div',{style:modalBg},
       e('div',{style:Object.assign({},modalBox,{animation:'scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both'})},
-        e('div',{style:modalTitle},getCastName(recEditTarget.castId)+' 時間編集'),
-        e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle}),
+        e('div',{style:modalTitle},getCastName(recEditTarget.castId)+' 出退勤時間編集'),
+        e('div',{style:{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}},
+          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'出勤時間'),e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle})),
+          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'退勤時間（任意・早退時）'),e('input',{type:'time',value:editEndTime,onChange:function(ev){setEditEndTime(ev.target.value);},style:timeInputStyle}))
+        ),
         e('div',{style:btnRow},
           e('button',{style:btnOk,onClick:function(){
             var castId=recEditTarget.castId;
             var ns=Object.assign({},recData.status||{});
-            if(ns[castId])ns[castId]=Object.assign({},ns[castId],{time:editTime});
+            var upd={time:editTime};if(editEndTime)upd.endTime=editEndTime;else delete upd.endTime;
+            if(ns[castId])ns[castId]=Object.assign({},ns[castId],upd);
             var newRecData=Object.assign({},recData,{status:ns});
             setRecData(newRecData);
             if(p.roomId)db.collection('rooms').doc(p.roomId).collection('attendance').doc(recDate).set(newRecData);
@@ -6209,14 +6217,17 @@ function AttendancePage(p){
     // 編集モーダル
     editTarget&&e('div',{style:modalBg},
       e('div',{style:Object.assign({},modalBox,{animation:'scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both'})},
-        e('div',{style:modalTitle},getCastName(editTarget.castId)+' 時間編集'),
-        e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle}),
+        e('div',{style:modalTitle},getCastName(editTarget.castId)+' 出退勤時間編集'),
+        e('div',{style:{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}},
+          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'出勤時間'),e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle})),
+          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'退勤時間（任意・早退時）'),e('input',{type:'time',value:editEndTime,onChange:function(ev){setEditEndTime(ev.target.value);},style:timeInputStyle}))
+        ),
         e('div',{style:btnRow},
           e('button',{style:btnOk,onClick:function(){
               var castId=editTarget.castId;
               var ns=Object.assign({},attStatus);
-              if(ns[castId])ns[castId]=Object.assign({},ns[castId],{time:editTime});
-              // 遅刻・当欠を再計算（編集後の時間で）
+              var upd={time:editTime};if(editEndTime)upd.endTime=editEndTime;else delete upd.endTime;
+              if(ns[castId])ns[castId]=Object.assign({},ns[castId],upd);
               var currentStatus=ns[castId]?ns[castId].status:'未通過';
               var nad=updateAbsences(castId,currentStatus,editTime,absenceData,confirmTypes);
               setAbsenceData(nad);saveSettings(timeSetting,nad);
@@ -6529,9 +6540,9 @@ function AttendancePage(p){
           e('button',{style:{background:editMode?'#e8b86d22':'transparent',border:'1px solid '+(editMode?'#e8b86d':'#374151'),borderRadius:'8px',padding:'6px 10px',color:editMode?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setEditMode(!editMode);}},e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},editMode?e('path',{d:'M18 6 6 18M6 6l12 12'}):e('path',{d:'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z'})),editMode?'編集中':'編集'))
         )
       ),
-      boardData.douhan.length>0&&e('div',null,e('div',{style:secStyle},'同伴'),boardData.douhan.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#a78bfa'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));})),
-      boardData.bySlot.map(function(slot){return e('div',{key:slot.label},e('div',{style:{fontSize:'12px',color:'#4b5563',padding:'6px 0 2px',fontWeight:600}},slot.label),slot.casts.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#60a5fa'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));}));}),
-      boardData.passing.length>0&&e('div',null,e('div',{style:secStyle},'通過'),boardData.passing.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#34d399'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));})),
+      boardData.douhan.length>0&&e('div',null,e('div',{style:secStyle},'同伴'),boardData.douhan.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time,endTime:item.endTime});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#a78bfa'}},item.cast.name),e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time+(item.endTime?' → '+item.endTime:'')));})),
+      boardData.bySlot.map(function(slot){return e('div',{key:slot.label},e('div',{style:{fontSize:'12px',color:'#4b5563',padding:'6px 0 2px',fontWeight:600}},slot.label),slot.casts.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time,endTime:item.endTime});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#60a5fa'}},item.cast.name),e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time+(item.endTime?' → '+item.endTime:'')));}));}),
+      boardData.passing.length>0&&e('div',null,e('div',{style:secStyle},'通過'),boardData.passing.map(function(item){return e('div',{key:item.cast.id,style:Object.assign({},rowStyle,{cursor:editMode?'pointer':'default'}),onClick:editMode?function(){setEditTarget({castId:item.cast.id,time:item.time,endTime:item.endTime});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#34d399'}},item.cast.name),e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time+(item.endTime?' → '+item.endTime:''))));})),
       boardData.notPassed.length>0&&e('div',null,e('div',{style:secStyle},'未通過'),boardData.notPassed.map(function(item){return e('div',{key:item.cast.id,style:rowStyle},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#6b7280'}},item.cast.name),item.shiftTime&&e('span',{style:{fontSize:'11px',color:'#fbbf24'}},'予定 '+item.shiftTime));})),
       boardData.absent.length>0&&e('div',null,e('div',{style:secStyle},'当欠'),boardData.absent.map(function(item){return e('div',{key:item.cast.id,style:rowStyle},e('span',{style:{fontWeight:700,fontSize:'14px',color:'#f87171'}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));})),
       boardData.douhan.length===0&&boardData.bySlot.length===0&&boardData.passing.length===0&&boardData.notPassed.length===0&&boardData.absent.length===0&&e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'表示するデータがありません')
@@ -6572,17 +6583,17 @@ function AttendancePage(p){
         (recData.extraCasts||[]).forEach(function(ec){if(!allIds.has(ec.castId)){var fake={id:ec.castId,name:ec.name||ec.castId};casts=casts.concat([fake]);}});
         casts.forEach(function(c){
           var a=st[c.id]||{};
-          var s=a.status;var t=a.time||'';
-          if(s==='同伴')douhan.push({cast:c,time:t});
-          else if(s==='出勤'||s==='通過'&&false)working.push({cast:c,time:t});
-          else if(s==='通過')passing.push({cast:c,time:t});
-          else if(s==='当欠')absent.push({cast:c,time:t});
+          var s=a.status;var t=a.time||'';var et=a.endTime||'';
+          if(s==='同伴')douhan.push({cast:c,time:t,endTime:et});
+          else if(s==='出勤'||s==='通過'&&false)working.push({cast:c,time:t,endTime:et});
+          else if(s==='通過')passing.push({cast:c,time:t,endTime:et});
+          else if(s==='当欠')absent.push({cast:c,time:t,endTime:et});
         });
         var total=douhan.length+working.length+passing.length+absent.length;
         function sortByTime(arr){return arr.slice().sort(function(a,b){if(!a.time&&!b.time)return 0;if(!a.time)return 1;if(!b.time)return -1;return a.time.localeCompare(b.time);});}
         douhan=sortByTime(douhan);working=sortByTime(working);passing=sortByTime(passing);
         if(total===0)return e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'この日の記録はありません');
-        var row=function(item,color){return e('div',{key:item.cast.id,style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#12122a',border:'1px solid '+(recEditMode?'#2d2d4e':'#1e2035'),borderRadius:'10px',marginBottom:'6px',cursor:recEditMode?'pointer':'default'},onClick:recEditMode?function(){setRecEditTarget({castId:item.cast.id,time:item.time});setEditTime(item.time||'');}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:color}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));};
+        var row=function(item,color){return e('div',{key:item.cast.id,style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#12122a',border:'1px solid '+(recEditMode?'#2d2d4e':'#1e2035'),borderRadius:'10px',marginBottom:'6px',cursor:recEditMode?'pointer':'default'},onClick:recEditMode?function(){setRecEditTarget({castId:item.cast.id,time:item.time,endTime:item.endTime||''});}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:color}},item.cast.name),e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time+(item.endTime?' → '+item.endTime:'')));};
         return e('div',null,
           e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px',marginBottom:'12px'}},recDate+' のボード'),
           douhan.length>0&&e('div',{style:{marginBottom:'10px'}},e('div',{style:secStyle},'同伴'),douhan.map(function(i){return row(i,'#a78bfa');})),
