@@ -140,13 +140,15 @@ function renderSummary(){
   var ts=tr.reduce(function(s,r){return s+Number(r.sales||0);},0);
   var tn=tr.reduce(function(s,r){return s+Number(r.nominations||0);},0);
   var tc2=tr.reduce(function(s,r){return s+Number(r.companions||0);},0);
+  var tf=tr.reduce(function(s,r){return s+Number(r.floorCount||0);},0);
+  var avgS=tr.length>0?Math.round(ts/tr.length):0;
   var tgt=gt(tm);
   var pct=tgt>0?Math.min(999,Math.round(ts/tgt*100)):null;
   var pc=pct===null?'#9ca3af':pct>=100?'#34d399':pct>=70?'#fbbf24':'#9ca3af';
   var h='<div class="card">';
   h+='<div style="color:#e8b86d;font-weight:700;font-size:13px;margin-bottom:10px">今月の実績</div>';
   h+='<div class="grid2" style="margin-bottom:'+(tgt>0?'10px':'0')+'">';
-  [['売上',yen(ts),'#e8b86d'],['出勤',tr.length+'日','#fb923c'],['指名',tn+'組','#34d399'],['同伴',tc2+'回','#a78bfa']].forEach(function(x){
+  [['売上',yen(ts),'#e8b86d'],['平均売上',yen(avgS),'#fbbf24'],['出勤',tr.length+'日','#fb923c'],['指名',tn+'組','#34d399'],['同伴',tc2+'回','#a78bfa'],['場内',tf+'組','#818cf8']].forEach(function(x){
     h+='<div class="box"><div class="lbl">'+x[0]+'</div><div class="val" style="color:'+x[2]+'">'+x[1]+'</div></div>';
   });
   h+='</div>';
