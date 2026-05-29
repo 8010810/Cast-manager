@@ -2886,15 +2886,21 @@ function CastViewerPage(){
       e('div',{style:cardStyle},
         e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},'今月の実績'),
         e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px',marginBottom:thisTgt>0?'12px':'0'}},
-          [['売上',yen2(thisSales),'#e8b86d'],['出勤',thisRows.length+'日','#fb923c'],
-           ['指名',thisRows.reduce(function(s,r){return s+Number(r.nominations||0);},0)+'組','#34d399'],
-           ['同伴',thisRows.reduce(function(s,r){return s+Number(r.companions||0);},0)+'回','#a78bfa']
-          ].map(function(x){
-            return e('div',{key:x[0],style:boxStyle},
-              e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},x[0]),
-              e('div',{style:{color:x[2],fontSize:'18px',fontWeight:700}},x[1])
-            );
-          })
+          (function(){
+            var tn=thisRows.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+            var tc=thisRows.reduce(function(s,r){return s+Number(r.companions||0);},0);
+            var tf=thisRows.reduce(function(s,r){return s+Number(r.floorCount||0);},0);
+            var avgS=thisRows.length>0?Math.round(thisSales/thisRows.length):0;
+            return [['売上',yen2(thisSales),'#e8b86d'],['平均売上',yen2(avgS),'#fbbf24'],
+             ['出勤',thisRows.length+'日','#fb923c'],['指名',tn+'組','#34d399'],
+             ['同伴',tc+'回','#a78bfa'],['場内',tf+'組','#818cf8']
+            ].map(function(x){
+              return e('div',{key:x[0],style:boxStyle},
+                e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},x[0]),
+                e('div',{style:{color:x[2],fontSize:'18px',fontWeight:700}},x[1])
+              );
+            });
+          })()
         ),
         thisTgt>0&&e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'10px'}},
           e('div',{style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'目標'),e('div',{style:{color:'#e5e7eb',fontWeight:700}},yen2(thisTgt))),
