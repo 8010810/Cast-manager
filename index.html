@@ -1959,7 +1959,7 @@ function ChartPage(p){
     });
   },[selectedKey,allCust,mode]);
   var handleClick=useCallback(function(ev){if(ev&&ev.activeLabel)setSelKey(function(prev){return prev===ev.activeLabel?null:ev.activeLabel;});},[]);
-  var showTargetLine=activeMetrics.includes('sales')&&chartData.some(function(d){return d.targetLine>0;});
+  var showTargetLine=mode!=='daily'&&activeMetrics.includes('sales')&&chartData.some(function(d){return d.targetLine>0;});
   var curTarget=getMonthlyTarget(castObj,now2.getFullYear()+'-'+pad(now2.getMonth()+1));
 
   function CTooltip(tp){
@@ -1974,7 +1974,7 @@ function ChartPage(p){
         var m=METRICS.find(function(mx){return mx.key===pp.dataKey;});
         return e('div',{key:pp.dataKey,style:{color:pp.color,marginBottom:'2px'}},(m?m.label:pp.dataKey)+': ',e('b',null,pp.dataKey==='sales'?yen(pp.value):pp.value+(m?m.unit:'')));
       }),
-      ttgt>0&&e('div',{style:{color:'#34d399',marginTop:'4px',borderTop:'1px solid #1e2035',paddingTop:'4px'}},'目標: ',e('b',null,yen(ttgt)))
+      ttgt>0&&mode!=='daily'&&e('div',{style:{color:'#34d399',marginTop:'4px',borderTop:'1px solid #1e2035',paddingTop:'4px'}},'目標: ',e('b',null,yen(ttgt)))
     );
   }
 
