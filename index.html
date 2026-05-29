@@ -2963,11 +2963,24 @@ function CastViewerPage(){
         sumMode==='daily'&&e('input',{type:'date',value:selDay,style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#e5e7eb',padding:'7px 12px',width:'100%',marginBottom:'8px',boxSizing:'border-box'},onChange:function(ev){setSelDay(ev.target.value);}}),
         sumMode==='daily'&&dayWorkHours&&e('div',{style:{display:'flex',alignItems:'center',gap:'8px',background:'#0d0d1a',border:'1px solid #1e2035',borderRadius:'8px',padding:'8px 14px',marginBottom:'12px'}},
           e('span',{style:{color:'#60a5fa',fontSize:'12px',fontWeight:700}},'労働時間'),
-          e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'16px'}},dayWorkHours)
+          e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'16px'}},dayWorkHours),
+          (function(){
+            var hw=Number(cast.hourlyWage||0);var wh=parseFloat(dayWorkHours||0);
+            var ds=records.filter(function(r){return r.date===selDay;}).reduce(function(s,r){return s+Number(r.sales||0);},0);
+            if(!hw||!wh||!ds)return null;
+            var rate=(hw*wh/ds*100).toFixed(1)+'%';
+            return e(React.Fragment,null,e('span',{style:{color:'#374151',fontSize:'12px',margin:'0 2px'}},'|'),e('span',{style:{color:'#6b7280',fontSize:'12px'}},'分配率'),e('span',{style:{color:'#a78bfa',fontWeight:700,fontSize:'14px'}},rate));
+          })()
         ),
         sumMode==='monthly'&&monthWorkHours&&e('div',{style:{display:'flex',alignItems:'center',gap:'8px',background:'#0d0d1a',border:'1px solid #1e2035',borderRadius:'8px',padding:'8px 14px',marginBottom:'10px'}},
           e('span',{style:{color:'#60a5fa',fontSize:'12px',fontWeight:700}},'月間労働時間'),
-          e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'16px'}},monthWorkHours)
+          e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'16px'}},monthWorkHours),
+          (function(){
+            var hw=Number(cast.hourlyWage||0);var wh=parseFloat(monthWorkHours||0);
+            if(!hw||!wh||!thisSales)return null;
+            var rate=(hw*wh/thisSales*100).toFixed(1)+'%';
+            return e(React.Fragment,null,e('span',{style:{color:'#374151',fontSize:'12px',margin:'0 2px'}},'|'),e('span',{style:{color:'#6b7280',fontSize:'12px'}},'分配率'),e('span',{style:{color:'#a78bfa',fontWeight:700,fontSize:'14px'}},rate));
+          })()
         ),
         sumMode==='monthly'&&e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px',marginBottom:thisTgt>0?'12px':'0'}},
           (function(){
