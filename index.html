@@ -2767,6 +2767,9 @@ function CastViewerPage(){
   var s7=React.useState('monthly');
   var chartMode=s7[0];var setChartMode=s7[1];
   var s8=React.useState(String(new Date().getFullYear()));
+  var s_sumMode=React.useState('monthly');var sumMode=s_sumMode[0];var setSumMode=s_sumMode[1];
+  var s_selDay=React.useState((function(){var n=new Date();return n.getFullYear()+'-'+(String(n.getMonth()+1).padStart(2,'0'))+'-'+(String(n.getDate()).padStart(2,'0'));})());
+  var selDay=s_selDay[0];var setSelDay=s_selDay[1];
   var chartYear=s8[0];var setChartYear=s8[1];
   var s9=React.useState(null);
   var selChartKey=s9[0];var setSelChartKey=s9[1];
@@ -2884,8 +2887,15 @@ function CastViewerPage(){
     // ── サマリー ──
     tab==='summary'&&e('div',null,
       e('div',{style:cardStyle},
-        e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px',marginBottom:'12px'}},'今月の実績'),
-        e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px',marginBottom:thisTgt>0?'12px':'0'}},
+        e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}},
+          e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},sumMode==='monthly'?'今月の実績':(function(){var p=selDay.split('-');return p[1]+'/'+p[2]+'の実績';})()),
+          e('div',{style:{display:'flex',gap:'4px'}},
+            e('button',{style:{padding:'4px 12px',borderRadius:'6px',border:'1px solid '+(sumMode==='monthly'?'#e8b86d':'#374151'),background:sumMode==='monthly'?'#e8b86d22':'transparent',color:sumMode==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setSumMode('monthly');}},'月'),
+            e('button',{style:{padding:'4px 12px',borderRadius:'6px',border:'1px solid '+(sumMode==='daily'?'#e8b86d':'#374151'),background:sumMode==='daily'?'#e8b86d22':'transparent',color:sumMode==='daily'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:700,cursor:'pointer'},onClick:function(){setSumMode('daily');}},'日')
+          )
+        ),
+        sumMode==='daily'&&e('input',{type:'date',value:selDay,style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#e5e7eb',padding:'7px 12px',width:'100%',marginBottom:'12px',boxSizing:'border-box'},onChange:function(ev){setSelDay(ev.target.value);}}),
+        sumMode==='monthly'&&e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px',marginBottom:thisTgt>0?'12px':'0'}},
           (function(){
             var tn=thisRows.reduce(function(s,r){return s+Number(r.nominations||0);},0);
             var tc=thisRows.reduce(function(s,r){return s+Number(r.companions||0);},0);
@@ -2902,12 +2912,28 @@ function CastViewerPage(){
             });
           })()
         ),
-        thisTgt>0&&e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'10px'}},
+        sumMode==='daily'&&(function(){
+          var dr=records.filter(function(r){return r.date===selDay;});
+          var ds=dr.reduce(function(s,r){return s+Number(r.sales||0);},0);
+          var dn=dr.reduce(function(s,r){return s+Number(r.nominations||0);},0);
+          var dc=dr.reduce(function(s,r){return s+Number(r.companions||0);},0);
+          var df=dr.reduce(function(s,r){return s+Number(r.floorCount||0);},0);
+          if(dr.length===0)return e('div',{style:{color:'#4b5563',fontSize:'13px',textAlign:'center',padding:'20px 0'}},'この日の記録はありません');
+          return e('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'8px'}},
+            [['売上',yen2(ds),'#e8b86d'],['指名',dn+'組','#34d399'],['同伴',dc+'回','#a78bfa'],['場内',df+'組','#818cf8']].map(function(x){
+              return e('div',{key:x[0],style:boxStyle},
+                e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'4px'}},x[0]),
+                e('div',{style:{color:x[2],fontSize:'18px',fontWeight:700}},x[1])
+              );
+            })
+          );
+        })(),
+        sumMode==='monthly'&&thisTgt>0&&e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'10px'}},
           e('div',{style:boxStyle},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'目標'),e('div',{style:{color:'#e5e7eb',fontWeight:700}},yen2(thisTgt))),
           e('div',{style:Object.assign({},boxStyle,{borderColor:thisSales>=thisTgt?'#34d39933':'#fca5a533'})},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'差異'),e('div',{style:{color:thisSales>=thisTgt?'#34d399':'#fca5a5',fontWeight:700}},(thisSales-thisTgt>=0?'+':'')+yen2(thisSales-thisTgt))),
           e('div',{style:Object.assign({},boxStyle,{borderColor:thisPct>=100?'#34d39933':'#1e2035'})},e('div',{style:{color:'#6b7280',fontSize:'10px',marginBottom:'3px'}},'達成率'),e('div',{style:{color:thisPct>=100?'#34d399':thisPct>=70?'#fbbf24':'#fca5a5',fontWeight:700}},thisPct+'%'))
         ),
-        thisTgt>0&&e('div',{style:{background:'#0d0d1a',borderRadius:'99px',height:'5px',overflow:'hidden'}},
+        sumMode==='monthly'&&thisTgt>0&&e('div',{style:{background:'#0d0d1a',borderRadius:'99px',height:'5px',overflow:'hidden'}},
           e('div',{style:{background:thisPct>=100?'#34d399':thisPct>=70?'#fbbf24':'#e8b86d',height:'100%',width:Math.min(100,thisPct||0)+'%',borderRadius:'99px'}})
         )
       ),
