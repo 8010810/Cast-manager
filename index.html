@@ -1799,6 +1799,8 @@ function InputPage(p){
     fetchWorkHours(newDate);
   }
   useEffect(function(){handleDateChange(form.date);},[]);
+  // attEndHourが取得されたら再フェッチ
+  useEffect(function(){if(attEndHour!=null&&form.date)fetchWorkHours(form.date);},[attEndHour]);
   function setF(k,v){setForm(function(f){return Object.assign({},f,{[k]:v});});}
   function setG(i,k,v){setGuests(function(gs){return gs.map(function(g,idx){return idx===i?Object.assign({},g,{[k]:v}):g;});});}
   var existing=(p.data.records[p.castId]||[]).find(function(r){return r.date===form.date;});
@@ -2825,9 +2827,11 @@ function CastViewerPage(){
   React.useEffect(function(){
     if(!castData)return;
     var curTm=new Date().getFullYear()+'-'+(String(new Date().getMonth()+1).padStart(2,'0'));
-    var rows=castData.records.filter(function(r){return r.date&&r.date.slice(0,7)===curTm&&r.workHours;});
+    var rows=castData.records.filter(function(r){return r.date&&r.date.slice(0,7)===curTm;});
     if(rows.length===0){setMonthWorkHours(null);return;}
-    var total=rows.reduce(function(s,r){return s+parseFloat(r.workHours||0);},0);
+    var whRows=rows.filter(function(r){return r.workHours;});
+    if(whRows.length===0){setMonthWorkHours('--');return;}
+    var total=whRows.reduce(function(s,r){return s+parseFloat(r.workHours||0);},0);
     setMonthWorkHours(total.toFixed(1)+'h');
   },[castData]);
 
@@ -2835,7 +2839,8 @@ function CastViewerPage(){
   React.useEffect(function(){
     if(!castData||!selDay)return;
     var rec=castData.records.find(function(r){return r.date===selDay;});
-    setDayWorkHours(rec&&rec.workHours?rec.workHours:null);
+    if(!rec){setDayWorkHours(null);return;}
+    setDayWorkHours(rec.workHours||'--');
   },[castData,selDay]);
 
   var e=React.createElement;
