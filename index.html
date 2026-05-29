@@ -1803,7 +1803,7 @@ function InputPage(p){
   function setG(i,k,v){setGuests(function(gs){return gs.map(function(g,idx){return idx===i?Object.assign({},g,{[k]:v}):g;});});}
   var existing=(p.data.records[p.castId]||[]).find(function(r){return r.date===form.date;});
   function saveData(){
-    var record={date:form.date,sales:Number(form.sales||0),companions:Number(form.companions||0),nominations:Number(form.nominations||0),floorCount:Number(form.floorCount||0)};
+    var record={date:form.date,sales:Number(form.sales||0),companions:Number(form.companions||0),nominations:Number(form.nominations||0),floorCount:Number(form.floorCount||0),workHours:workHoursInfo?workHoursInfo.hours:null};
     var rows=(p.data.records[p.castId]||[]).filter(function(r){return r.date!==form.date;});
     var newEntries=guests.filter(function(g){return g.name.trim();}).map(function(g){return{id:g._id,date:form.date,type:g.type,name:g.name.trim(),sales:Number(g.sales||0),hour:g.hour.trim(),tableNo:g.tableNo.trim(),count:g.count.trim(),partnerCast:g.partnerCast.trim(),bottleNeck:g.bottleNeck.trim(),orderBottle:g.orderBottle.trim(),receipt:g.receipt.trim(),note:g.note.trim()};});
     var prevCust=(p.data.customers[p.castId]||[]).filter(function(c){return c.date!==form.date;});
@@ -2772,8 +2772,7 @@ function CastViewerPage(){
   var selDay=s_selDay[0];var setSelDay=s_selDay[1];
   var s_endHour=React.useState(null);var attEndHour=s_endHour[0];var setAttEndHour=s_endHour[1];
   var s_mwh=React.useState(null);var monthWorkHours=s_mwh[0];var setMonthWorkHours=s_mwh[1];
-  var s_dwh=React.useState(null);var dayWorkHours=s_dwh[0];var setDayWorkHours=s_dwh[1];
-  var chartYear=s8[0];var setChartYear=s8[1];
+  var s_dwh=React.useState(null);var dayWorkHours=s_dwh[0];var setDayWorkHours=s_dwh[1];  var chartYear=s8[0];var setChartYear=s8[1];
   var s9=React.useState(null);
   var selChartKey=s9[0];var setSelChartKey=s9[1];
 
@@ -2822,45 +2821,22 @@ function CastViewerPage(){
     }
   },[]);
 
-  // 勤怠設定（endHour）取得
+  // 月の合計労働時間（レコードのworkHoursフィールドから集計）
   React.useEffect(function(){
-    if(!rid)return;
-    db.collection('rooms').doc(rid).collection('attendance').doc('settings').get()
-      .then(function(doc){if(doc.exists&&doc.data().timeSetting)setAttEndHour(doc.data().timeSetting.endHour||1);})
-      .catch(function(){});
-  },[rid]);
+    if(!castData)return;
+    var curTm=new Date().getFullYear()+'-'+(String(new Date().getMonth()+1).padStart(2,'0'));
+    var rows=castData.records.filter(function(r){return r.date&&r.date.slice(0,7)===curTm&&r.workHours;});
+    if(rows.length===0){setMonthWorkHours(null);return;}
+    var total=rows.reduce(function(s,r){return s+parseFloat(r.workHours||0);},0);
+    setMonthWorkHours(total.toFixed(1)+'h');
+  },[castData]);
 
-  // 月の合計労働時間
+  // 日の労働時間（レコードのworkHoursフィールドから取得）
   React.useEffect(function(){
-    if(!rid||attEndHour==null||!castData)return;
-    var dates=castData.records.filter(function(r){return r.date&&r.date.slice(0,7)===(new Date().getFullYear()+'-'+(String(new Date().getMonth()+1).padStart(2,'0')));}).map(function(r){return r.date;});
-    if(dates.length===0){setMonthWorkHours(null);return;}
-    Promise.all(dates.map(function(d){return db.collection('rooms').doc(rid).collection('attendance').doc(d).get().catch(function(){return null;});}))
-      .then(function(docs){
-        var total=0;var count=0;
-        docs.forEach(function(doc){
-          if(!doc||!doc.exists)return;
-          var st=(doc.data().status||{})[castId];
-          if(!st||!st.time)return;
-          var h=calcWorkHours(st.time,attEndHour);
-          if(h){total+=parseFloat(h);count++;}
-        });
-        setMonthWorkHours(count>0?total.toFixed(1)+'h':null);
-      }).catch(function(){});
-  },[rid,attEndHour,castData]);
-
-  // 日の労働時間
-  React.useEffect(function(){
-    if(!rid||attEndHour==null||!selDay)return;
-    db.collection('rooms').doc(rid).collection('attendance').doc(selDay).get()
-      .then(function(doc){
-        if(!doc.exists){setDayWorkHours(null);return;}
-        var st=(doc.data().status||{})[castId];
-        if(!st||!st.time){setDayWorkHours(null);return;}
-        var h=calcWorkHours(st.time,attEndHour);
-        setDayWorkHours(h?{time:st.time,hours:h}:null);
-      }).catch(function(){setDayWorkHours(null);});
-  },[rid,attEndHour,selDay,castId]);
+    if(!castData||!selDay)return;
+    var rec=castData.records.find(function(r){return r.date===selDay;});
+    setDayWorkHours(rec&&rec.workHours?rec.workHours:null);
+  },[castData,selDay]);
 
   var e=React.createElement;
 
@@ -2940,8 +2916,7 @@ function CastViewerPage(){
         sumMode==='daily'&&e('input',{type:'date',value:selDay,style:{background:'#0d0d1a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#e5e7eb',padding:'7px 12px',width:'100%',marginBottom:'8px',boxSizing:'border-box'},onChange:function(ev){setSelDay(ev.target.value);}}),
         sumMode==='daily'&&dayWorkHours&&e('div',{style:{display:'flex',alignItems:'center',gap:'8px',background:'#0d0d1a',border:'1px solid #1e2035',borderRadius:'8px',padding:'8px 14px',marginBottom:'12px'}},
           e('span',{style:{color:'#60a5fa',fontSize:'12px',fontWeight:700}},'労働時間'),
-          e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'16px'}},dayWorkHours.hours),
-          e('span',{style:{color:'#4b5563',fontSize:'11px'}},'（'+dayWorkHours.time+'〜）')
+          e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'16px'}},dayWorkHours)
         ),
         sumMode==='monthly'&&monthWorkHours&&e('div',{style:{display:'flex',alignItems:'center',gap:'8px',background:'#0d0d1a',border:'1px solid #1e2035',borderRadius:'8px',padding:'8px 14px',marginBottom:'10px'}},
           e('span',{style:{color:'#60a5fa',fontSize:'12px',fontWeight:700}},'月間労働時間'),
