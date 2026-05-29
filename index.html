@@ -1961,8 +1961,10 @@ function ChartPage(p){
     if(!tp.active||!tp.payload||!tp.payload.length)return null;
     var display=mode==='daily'?fmtDate(tp.label):mode==='monthly'?tp.label.replace('-','年')+'月':tp.label+'年';
     var ttgt=tp.label?getCastTarget(tp.label):0;
+    var showWH=mode==='daily'&&tp.label===selectedKey&&chartWorkHours;
     return e('div',{style:{background:'#1a1a2e',border:'1px solid #2d2d4e',borderRadius:'8px',padding:'10px 14px',fontSize:'12px'}},
-      e('div',{style:{color:'#9ca3af',marginBottom:'6px'}},display),
+      e('div',{style:{color:'#9ca3af',marginBottom:showWH?'4px':'6px'}},display),
+      showWH&&e('div',{style:{color:'#60a5fa',fontWeight:700,marginBottom:'6px'}},chartWorkHours.hours,e('span',{style:{color:'#4b5563',fontWeight:400,fontSize:'11px',marginLeft:'4px'}},'（'+chartWorkHours.time+'〜）')),
       tp.payload.filter(function(pp){return pp.dataKey!=='targetLine';}).map(function(pp){
         var m=METRICS.find(function(mx){return mx.key===pp.dataKey;});
         return e('div',{key:pp.dataKey,style:{color:pp.color,marginBottom:'2px'}},(m?m.label:pp.dataKey)+': ',e('b',null,pp.dataKey==='sales'?yen(pp.value):pp.value+(m?m.unit:'')));
@@ -2009,14 +2011,9 @@ function ChartPage(p){
         )
       ),
       selectedKey&&e('div',{style:S.custPanel},
-        e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:chartWorkHours&&mode==='daily'?'6px':'12px'}},
+        e('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'12px'}},
           e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'14px'}},'📋 '+(mode==='daily'?fmtDate(selectedKey):mode==='monthly'?selectedKey.replace('-','年')+'月':selectedKey+'年')+' の来店顧客'),
           e('button',{style:{background:'transparent',border:'none',color:'#6b7280',fontSize:'18px',cursor:'pointer'},onClick:function(){setSelKey(null);}},'✗')
-        ),
-        chartWorkHours&&mode==='daily'&&e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'12px'}},
-          e('span',{style:{color:'#60a5fa',fontSize:'12px',fontWeight:700}},'労働時間'),
-          e('span',{style:{color:'#f3f4f6',fontWeight:700,fontSize:'15px'}},chartWorkHours.hours),
-          e('span',{style:{color:'#4b5563',fontSize:'11px'}},'（'+chartWorkHours.time+' 〜 退勤）')
         ),
         popCustomers.length===0?e('div',{style:{color:'#6b7280',fontSize:'13px',textAlign:'center',padding:'16px 0'}},'来店顧客の記録がありません'):
         popCustomers.map(function(c){var tc=typeColor(c.type);return e('div',{key:c.id,style:S.popRow},e('div',{style:{display:'flex',alignItems:'center',gap:'8px',flex:1,minWidth:0}},e('span',{style:Object.assign({},S.typeBadge,{background:tc.bg,color:tc.fg,borderColor:tc.border})},c.type),e('span',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'13px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},c.name)),e('div',{style:{display:'flex',gap:'12px',flexShrink:0,fontSize:'12px'}},c.sales>0&&e('span',{style:{color:'#e8b86d',fontWeight:600}},yen(c.sales)),c.bottleNeck&&e('span',{style:{color:'#9ca3af'}},'🍾 '+c.bottleNeck)));})
