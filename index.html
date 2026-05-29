@@ -6197,7 +6197,7 @@ function AttendancePage(p){
         e('div',{style:modalTitle},getCastName(recEditTarget.castId)+' 出退勤時間編集'),
         e('div',{style:{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}},
           e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'出勤時間'),e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle})),
-          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'退勤時間（任意・早退時）'),e('input',{type:'time',value:editEndTime,onChange:function(ev){setEditEndTime(ev.target.value);},style:timeInputStyle}))
+          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'退勤時間（任意・早退時など）'),e('input',{type:'time',value:editEndTime,onChange:function(ev){setEditEndTime(ev.target.value);},style:timeInputStyle}))
         ),
         e('div',{style:btnRow},
           e('button',{style:btnOk,onClick:function(){
@@ -6220,7 +6220,7 @@ function AttendancePage(p){
         e('div',{style:modalTitle},getCastName(editTarget.castId)+' 出退勤時間編集'),
         e('div',{style:{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'16px'}},
           e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'出勤時間'),e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle})),
-          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'退勤時間（任意・早退時）'),e('input',{type:'time',value:editEndTime,onChange:function(ev){setEditEndTime(ev.target.value);},style:timeInputStyle}))
+          e('div',null,e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'退勤時間（任意・早退時など）'),e('input',{type:'time',value:editEndTime,onChange:function(ev){setEditEndTime(ev.target.value);},style:timeInputStyle}))
         ),
         e('div',{style:btnRow},
           e('button',{style:btnOk,onClick:function(){
@@ -6242,7 +6242,7 @@ function AttendancePage(p){
     // 時間設定モーダル
     showTimeSetting&&e('div',{style:modalBg},
       e('div',{style:Object.assign({},modalBox,{animation:'scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both'})},
-        e('div',{style:modalTitle},'出勤時間設定'),
+        e('div',{style:modalTitle},'出退勤時間設定'),
         e('div',{style:{marginBottom:'16px'}},
           e('div',{style:{color:'#9ca3af',fontSize:'12px',marginBottom:'6px'}},'開始時間'),
           e('select',{value:settingHour,onChange:function(ev){setSettingHour(ev.target.value);}},
@@ -6256,10 +6256,14 @@ function AttendancePage(p){
           )
         ),
         e('div',{style:{marginBottom:'20px'}},
-          e('div',{style:{color:'#9ca3af',fontSize:'12px',marginBottom:'6px'}},'終了時間'),
+          e('div',{style:{color:'#9ca3af',fontSize:'12px',marginBottom:'6px'}},'退勤時間'),
           e('select',{value:settingEnd,onChange:function(ev){setSettingEnd(ev.target.value);}},
             [1,2,3,4,5,6].map(function(h){return e('option',{key:h,value:String(h)},h+'時');})
-          )
+          ),
+          e('div',{style:{color:'#6b7280',fontSize:'11px',marginTop:'8px',lineHeight:'1.6'}},
+            '設定時間で自動で打刻します'),
+          e('div',{style:{color:'#6b7280',fontSize:'11px',lineHeight:'1.6'}},
+            '個別で退勤時間を編集する場合、ボードの編集からできます')
         ),
         e('div',{style:btnRow},
           e('button',{style:btnOk,onClick:function(){var ts={startHour:parseInt(settingHour),interval:parseInt(settingIntv),endHour:parseInt(settingEnd)};setTimeSetting(ts);saveSettings(ts,absenceData);setShowTimeSetting(false);}},'保存'),
