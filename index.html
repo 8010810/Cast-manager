@@ -1117,7 +1117,7 @@ function CastListPage(p){
     var dispatchFolder=(p.data.folders||[]).find(function(f){return f.name==='派遣';});
     var defaultFid=((p.data.folders||[]).find(function(f){return f.name==='新入店';})||(p.data.folders[0]||{})).id||'';
     var initFid=isDispatch?(dispatchFolder?dispatchFolder.id:'dispatch_folder'):(newFolder||defaultFid);
-    var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',cup:addForm.cup||'',castType:addForm.castType||'',route:addForm.route||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
+    var newCast={id:id,name:finalName,birthday:addForm.birthday||'',memo:addForm.memo||'',monthlyTargets:{},contractShift:newShift,realName:addForm.realName||'',hometown:addForm.hometown||'',height:addForm.height||'',cup:addForm.cup||'',castType:addForm.castType||'',route:addForm.route||'',hourlyWage:addForm.hourlyWage||'',isDispatch:isDispatch,folderHistory:[{folderId:initFid,from:initMK}]};
     var newFolders=(p.data.folders||[]).map(function(f){
       var shouldAdd=f.id===initFid;
       if(shouldAdd)return Object.assign({},f,{castIds:[...(f.castIds||[]),id]});
@@ -1205,7 +1205,7 @@ function CastListPage(p){
         e('div',{style:{display:'flex',gap:'8px'}},
           !isEditing&&e('button',{style:S.btnEdit,onClick:function(){
             var cf=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(detail);});
-            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||'',cup:cast.cup||'',castType:cast.castType||'',route:cast.route||'',isDispatch:cast.isDispatch||false});
+            setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||'',cup:cast.cup||'',castType:cast.castType||'',route:cast.route||'',isDispatch:cast.isDispatch||false,hourlyWage:cast.hourlyWage||''});
           }}, '編集'),
           e('button',{style:S.btnDanger,onClick:function(){deleteCastItem(cast.id,cast.name);}}, '削除')
         )
@@ -1230,7 +1230,7 @@ function CastListPage(p){
                 }
               },editForm.isDispatch?'在籍に変更':'派遣に変更')
             ),
-            [['route','入店経路','text'],['name','キャスト名','text'],['realName','本名','text'],['birthday','誕生日','date'],['hometown','出身地','text'],['height','身長 (cm)','number'],['castType','系統','text'],['contractShift','契約シフト','text']].map(function(f){
+            [['route','入店経路','text'],['name','キャスト名','text'],['realName','本名','text'],['birthday','誕生日','date'],['hometown','出身地','text'],['height','身長 (cm)','number'],['castType','系統','text'],['contractShift','契約シフト','text'],['hourlyWage','時給 (円)','number']].map(function(f){
               return e('div',{key:f[0]},
                 e('label',{style:S.label},f[1]),
                 e('input',{type:f[2],style:S.input,value:editForm[f[0]]||'',placeholder:'',onChange:function(ev){setEditForm(function(fm){return{...fm,[f[0]]:ev.target.value};});}})
@@ -1258,6 +1258,7 @@ function CastListPage(p){
              ['出身地',cast.hometown||'未設定'],
              ['身長',cast.height?cast.height+'cm':'未設定'],
              ['カップ数',cast.cup?cast.cup+'カップ':'未設定'],['系統',cast.castType||'未設定'],
+             ['時給',cast.hourlyWage?cast.hourlyWage+'円':'未設定'],
              ['契約シフト',cast.contractShift||'未設定'],['所属フォルダ',castFolderName||'未設定'],['メモ',cast.memo||'なし']].map(function(row){
               return e('div',{key:row[0],style:{display:'flex',gap:'8px',marginBottom:'10px',fontSize:'14px'}},
                 e('span',{style:{color:'#6b7280',minWidth:'100px',flexShrink:0}},row[0]),
@@ -1315,6 +1316,8 @@ function CastListPage(p){
       e('input',{type:'text',style:S.input,placeholder:'',value:addForm.castType||'',onChange:function(ev){setAddForm(function(f){return{...f,castType:ev.target.value};})}}),
       e('label',{style:S.label},'契約シフト'),
       e('input',{type:'text',style:S.input,placeholder:'',value:newShift,onChange:function(ev){setNewShift(ev.target.value);}}),
+      e('label',{style:S.label},'時給 (円)'),
+      e('input',{type:'number',style:S.input,placeholder:'',value:addForm.hourlyWage||'',onChange:function(ev){setAddForm(function(f){return{...f,hourlyWage:ev.target.value};})}}),
       e('label',{style:S.label},'所属フォルダ'),
       e('select',{style:{...S.input,appearance:'none'},value:newFolder||'',onChange:function(ev){setNewFolder(ev.target.value);}},
         e('option',{value:''},'新入店（デフォルト）'),
