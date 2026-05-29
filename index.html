@@ -5883,6 +5883,8 @@ function AttendancePage(p){
   var s21=useState('');var recDate=s21[0];var setRecDate=s21[1];
   var s22=useState(null);var recData=s22[0];var setRecData=s22[1];
   var s23=useState(false);var recLoading=s23[0];var setRecLoading=s23[1];
+  var s24=useState(false);var recEditMode=s24[0];var setRecEditMode=s24[1];
+  var s25=useState(null);var recEditTarget=s25[0];var setRecEditTarget=s25[1];
   var s12=useState('');var modalTime=s12[0];var setModalTime=s12[1];
   var s15=useState('');var editTime=s15[0];var setEditTime=s15[1];
   var s16=useState(String(20));var settingHour=s16[0];var setSettingHour=s16[1];
@@ -6182,6 +6184,25 @@ function AttendancePage(p){
         e('div',{style:btnRow},
           e('button',{style:btnOk,onClick:function(){setStatus(timeModal.castId,timeModal.status,modalTime);setTimeModal(null);}},'確定'),
           e('button',{style:btnCancel,onClick:function(){setTimeModal(null);}},'キャンセル')
+        )
+      )
+    ),
+    // 記録タブ 時間編集モーダル
+    recEditTarget&&e('div',{style:modalBg},
+      e('div',{style:Object.assign({},modalBox,{animation:'scaleIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both'})},
+        e('div',{style:modalTitle},getCastName(recEditTarget.castId)+' 時間編集'),
+        e('input',{type:'time',value:editTime,onChange:function(ev){setEditTime(ev.target.value);},style:timeInputStyle}),
+        e('div',{style:btnRow},
+          e('button',{style:btnOk,onClick:function(){
+            var castId=recEditTarget.castId;
+            var ns=Object.assign({},recData.status||{});
+            if(ns[castId])ns[castId]=Object.assign({},ns[castId],{time:editTime});
+            var newRecData=Object.assign({},recData,{status:ns});
+            setRecData(newRecData);
+            if(p.roomId)db.collection('rooms').doc(p.roomId).collection('attendance').doc(recDate).set(newRecData);
+            setRecEditTarget(null);setRecEditMode(false);
+          }},'保存'),
+          e('button',{style:btnCancel,onClick:function(){setRecEditTarget(null);}},'キャンセル')
         )
       )
     ),
@@ -6520,10 +6541,18 @@ function AttendancePage(p){
     // ── 記録タブ ──
     subPage==='record'&&e('div',{key:'record',style:{animation:'pageFadeIn 1.4s ease both'}},
       e('div',{style:{marginBottom:'16px'}},
-        e('div',{style:{color:'#9ca3af',fontSize:'12px',marginBottom:'8px'}},'日付を選択するとその日の最終ボードを表示します'),
+        e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'8px'}},
+          e('div',{style:{color:'#9ca3af',fontSize:'12px',flex:1}},'日付を選択するとその日の最終ボードを表示します'),
+          recData&&Object.keys(recData.status||{}).length>0&&e('button',{style:{background:recEditMode?'#e8b86d22':'transparent',border:'1px solid '+(recEditMode?'#e8b86d':'#374151'),borderRadius:'8px',padding:'6px 10px',color:recEditMode?'#e8b86d':'#6b7280',fontSize:'12px',cursor:'pointer'},onClick:function(){setRecEditMode(function(v){return !v;});setRecEditTarget(null);}},
+            e('span',{style:{display:'flex',alignItems:'center',gap:'4px'}},
+              e('svg',{width:12,height:12,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},recEditMode?e('path',{d:'M18 6 6 18M6 6l12 12'}):e('path',{d:'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z'})),
+              recEditMode?'編集中':'編集'
+            )
+          )
+        ),
         e('input',{type:'date',value:recDate,max:todayStr,style:{background:'#12122a',border:'1px solid #2d2d4e',borderRadius:'8px',color:'#e5e7eb',padding:'10px 14px',width:'100%',outline:'none'},onChange:function(ev){
           var d=ev.target.value;
-          setRecDate(d);
+          setRecDate(d);setRecEditMode(false);setRecEditTarget(null);
           if(!d){setRecData(null);return;}
           setRecLoading(true);setRecData(null);
           db.collection('rooms').doc(p.roomId).collection('attendance').doc(d).get()
@@ -6553,7 +6582,7 @@ function AttendancePage(p){
         function sortByTime(arr){return arr.slice().sort(function(a,b){if(!a.time&&!b.time)return 0;if(!a.time)return 1;if(!b.time)return -1;return a.time.localeCompare(b.time);});}
         douhan=sortByTime(douhan);working=sortByTime(working);passing=sortByTime(passing);
         if(total===0)return e('div',{style:{color:'#4b5563',textAlign:'center',padding:'40px 0',fontSize:'14px'}},'この日の記録はありません');
-        var row=function(item,color){return e('div',{key:item.cast.id,style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#12122a',border:'1px solid #1e2035',borderRadius:'10px',marginBottom:'6px'}},e('span',{style:{fontWeight:700,fontSize:'14px',color:color}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));};
+        var row=function(item,color){return e('div',{key:item.cast.id,style:{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#12122a',border:'1px solid '+(recEditMode?'#2d2d4e':'#1e2035'),borderRadius:'10px',marginBottom:'6px',cursor:recEditMode?'pointer':'default'},onClick:recEditMode?function(){setRecEditTarget({castId:item.cast.id,time:item.time});setEditTime(item.time||'');}:undefined},e('span',{style:{fontWeight:700,fontSize:'14px',color:color}},item.cast.name),item.time&&e('span',{style:{fontSize:'12px',color:'#9ca3af'}},item.time));};
         return e('div',null,
           e('div',{style:{color:'#e8b86d',fontWeight:700,fontSize:'13px',marginBottom:'12px'}},recDate+' のボード'),
           douhan.length>0&&e('div',{style:{marginBottom:'10px'}},e('div',{style:secStyle},'同伴'),douhan.map(function(i){return row(i,'#a78bfa');})),
