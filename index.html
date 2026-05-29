@@ -6101,7 +6101,8 @@ function AttendancePage(p){
     e('div',{style:{display:'flex',gap:'4px',marginBottom:'16px',background:'#12122a',borderRadius:'10px',padding:'4px'}},
       ['出確','管理','ボード','記録','当欠・遅刻'].map(function(label,i){
         var keys=['confirm','main','board','record','absence'];var active=subPage===keys[i];
-        return e('button',{key:label,style:{flex:1,padding:'8px',borderRadius:'8px',border:'none',background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',cursor:'pointer',fontSize:'12px',fontWeight:active?700:400},onClick:function(){setSubPage(keys[i]);}},label);
+        var display=label==='当欠・遅刻'?e('span',{style:{display:'flex',flexDirection:'column',lineHeight:1.2}},'当欠','遅刻'):label;
+        return e('button',{key:label,style:{flex:1,padding:'8px',borderRadius:'8px',border:'none',background:active?'#e8b86d22':'transparent',color:active?'#e8b86d':'#6b7280',cursor:'pointer',fontSize:'12px',fontWeight:active?700:400},onClick:function(){setSubPage(keys[i]);}},display);
       })
     ),
 
