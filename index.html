@@ -2775,6 +2775,8 @@ function CastViewerPage(){
   var s_endHour=React.useState(null);var attEndHour=s_endHour[0];var setAttEndHour=s_endHour[1];
   var s_mwh=React.useState(null);var monthWorkHours=s_mwh[0];var setMonthWorkHours=s_mwh[1];
   var s_dwh=React.useState(null);var dayWorkHours=s_dwh[0];var setDayWorkHours=s_dwh[1];  var chartYear=s8[0];var setChartYear=s8[1];
+  var s_cdm=React.useState((function(){var n=new Date();return n.getFullYear()+'-'+(String(n.getMonth()+1).padStart(2,'0'));})());
+  var chartDailyMonth=s_cdm[0];var setChartDailyMonth=s_cdm[1];
   var s9=React.useState(null);
   var selChartKey=s9[0];var setSelChartKey=s9[1];
 
@@ -2853,7 +2855,21 @@ function CastViewerPage(){
   var tm=now.getFullYear()+'-'+padZ(now.getMonth()+1);
   function gt(mk){if(!cast)return 0;if(cast.monthlyTargets&&cast.monthlyTargets[mk]!=null)return Number(cast.monthlyTargets[mk]);return 0;}
   var allYears=React.useMemo(function(){var ys=new Set();records.forEach(function(r){ys.add(r.date.slice(0,4));});ys.add(String(now.getFullYear()));return Array.from(ys).sort(function(a,b){return b.localeCompare(a);});},[records]);
-  var chartData=React.useMemo(function(){if(chartMode==='monthly'){var list=[];for(var mi=1;mi<=12;mi++){var mk=chartYear+'-'+padZ(mi);var rows=records.filter(function(r){return r.date&&r.date.slice(0,7)===mk;});list.push({key:mk,label:mi+'月',sales:rows.reduce(function(a,r){return a+Number(r.sales||0);},0),target:gt(mk)});}return list;}return allYears.slice().reverse().map(function(yr){var rows=records.filter(function(r){return r.date&&r.date.slice(0,4)===yr;});return{key:yr,label:yr+'年',sales:rows.reduce(function(a,r){return a+Number(r.sales||0);},0),target:0};});},[chartMode,chartYear,records]);
+  var allMonths=React.useMemo(function(){var ms=new Set();records.forEach(function(r){if(r.date)ms.add(r.date.slice(0,7));});ms.add(now.getFullYear()+'-'+padZ(now.getMonth()+1));return Array.from(ms).sort(function(a,b){return b.localeCompare(a);}).slice(0,18);},[records]);
+  var chartData=React.useMemo(function(){
+    if(chartMode==='daily'){
+      var parts=chartDailyMonth.split('-');var dy=parseInt(parts[0]);var dm=parseInt(parts[1]);
+      var daysInMonth=new Date(dy,dm,0).getDate();var list=[];
+      for(var di=1;di<=daysInMonth;di++){
+        var dk=chartDailyMonth+'-'+padZ(di);
+        var drows=records.filter(function(r){return r.date===dk;});
+        list.push({key:dk,label:String(di),sales:drows.reduce(function(a,r){return a+Number(r.sales||0);},0),target:0});
+      }
+      return list;
+    }
+    if(chartMode==='monthly'){var mlist=[];for(var mi=1;mi<=12;mi++){var mk=chartYear+'-'+padZ(mi);var rows=records.filter(function(r){return r.date&&r.date.slice(0,7)===mk;});mlist.push({key:mk,label:mi+'月',sales:rows.reduce(function(a,r){return a+Number(r.sales||0);},0),target:gt(mk)});}return mlist;}
+    return allYears.slice().reverse().map(function(yr){var rows=records.filter(function(r){return r.date&&r.date.slice(0,4)===yr;});return{key:yr,label:yr+'年',sales:rows.reduce(function(a,r){return a+Number(r.sales||0);},0),target:0};});
+  },[chartMode,chartYear,chartDailyMonth,records]);
   var maxSales=React.useMemo(function(){var m=Math.max.apply(null,chartData.map(function(d){return Math.max(d.sales,d.target||0);}));return m>0?m:1;},[chartData]);
   var filteredCust=React.useMemo(function(){var q=query.toLowerCase();if(!q)return customers;return customers.filter(function(c){return[c.name,c.type,c.bottleNeck,c.note].join(' ').toLowerCase().includes(q);});},[query,customers]);
 
@@ -2997,7 +3013,7 @@ function CastViewerPage(){
     // ── グラフ ──
     tab==='chart'&&e('div',null,
       e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px'}},
-        [['monthly','月別'],['yearly','年別']].map(function(m){
+        [['monthly','月別'],['yearly','年別'],['daily','日別']].map(function(m){
           var active=chartMode===m[0];
           return e('button',{key:m[0],style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,.3)':'#2d2d4e'),borderRadius:'8px',color:active?'#e8b86d':'#9ca3af',fontSize:'12px',padding:'5px 12px',cursor:'pointer',fontWeight:active?700:400},onClick:function(){setChartMode(m[0]);setSelChartKey(null);}},m[1]);
         })
@@ -3006,6 +3022,13 @@ function CastViewerPage(){
         allYears.map(function(y){
           var active=chartYear===y;
           return e('button',{key:y,style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,.3)':'#2d2d4e'),borderRadius:'8px',color:active?'#e8b86d':'#9ca3af',fontSize:'12px',padding:'4px 10px',cursor:'pointer'},onClick:function(){setChartYear(y);setSelChartKey(null);}},y+'年');
+        })
+      ),
+      chartMode==='daily'&&e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px',flexWrap:'wrap'}},
+        allMonths.map(function(m){
+          var active=chartDailyMonth===m;
+          var mp=m.split('-');var lbl=parseInt(mp[0])+'年'+parseInt(mp[1])+'月';
+          return e('button',{key:m,style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,.3)':'#2d2d4e'),borderRadius:'8px',color:active?'#e8b86d':'#9ca3af',fontSize:'12px',padding:'4px 10px',cursor:'pointer'},onClick:function(){setChartDailyMonth(m);setSelChartKey(null);}},lbl);
         })
       ),
       e('div',{style:{color:'#6b7280',fontSize:'11px',marginBottom:'4px'}},'タップで詳細表示'),
@@ -3034,7 +3057,7 @@ function CastViewerPage(){
       ),
       selChartKey&&e('div',{style:{background:'#1a1a2e',border:'1px solid #e8b86d44',borderRadius:'12px',padding:'14px',marginBottom:'10px'}},
         e('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:'10px'}},
-          e('div',{style:{color:'#e8b86d',fontWeight:700}},(function(){var d=chartData.find(function(x){return x.key===selChartKey;});return d?d.label:'';})()),
+          e('div',{style:{color:'#e8b86d',fontWeight:700}},(function(){var d=chartData.find(function(x){return x.key===selChartKey;});if(!d)return'';if(chartMode==='daily'){var kp=selChartKey.split('-');return parseInt(kp[1])+'月'+parseInt(kp[2])+'日';}return d.label;})()),
           e('button',{style:{background:'transparent',border:'none',color:'#6b7280',cursor:'pointer'},onClick:function(){setSelChartKey(null);}},'✗')
         ),
         e('div',{style:{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'6px',marginBottom:'12px'}},
@@ -3053,7 +3076,7 @@ function CastViewerPage(){
         e('div',{style:{color:'#9ca3af',fontSize:'12px',fontWeight:600,marginBottom:'8px'}},'この期間の来店顧客'),
         (function(){
           var filtK=customers.filter(function(c){
-            return chartMode==='monthly'?c.date&&c.date.slice(0,7)===selChartKey:c.date&&c.date.slice(0,4)===selChartKey;
+            return chartMode==='daily'?c.date===selChartKey:chartMode==='monthly'?c.date&&c.date.slice(0,7)===selChartKey:c.date&&c.date.slice(0,4)===selChartKey;
           });
           if(filtK.length===0)return e('div',{style:{color:'#4b5563',fontSize:'13px'}},'記録なし');
           return filtK.map(function(c,i){
