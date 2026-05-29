@@ -3013,7 +3013,7 @@ function CastViewerPage(){
     // ── グラフ ──
     tab==='chart'&&e('div',null,
       e('div',{style:{display:'flex',gap:'6px',marginBottom:'10px'}},
-        [['monthly','月別'],['yearly','年別'],['daily','日別']].map(function(m){
+        [['daily','日別'],['monthly','月別'],['yearly','年別']].map(function(m){
           var active=chartMode===m[0];
           return e('button',{key:m[0],style:{background:active?'#1e2035':'transparent',border:'1px solid '+(active?'rgba(232,184,109,.3)':'#2d2d4e'),borderRadius:'8px',color:active?'#e8b86d':'#9ca3af',fontSize:'12px',padding:'5px 12px',cursor:'pointer',fontWeight:active?700:400},onClick:function(){setChartMode(m[0]);setSelChartKey(null);}},m[1]);
         })
