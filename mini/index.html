@@ -1564,7 +1564,26 @@ function ChartPage(p){
             e('div',{style:{color:'#e5e7eb',fontSize:'15px',fontWeight:700}},m.key==='sales'?yen(summaryTotals[m.key]):summaryTotals[m.key]+m.unit)
           ));
           return acc;
-        },[]))
+        },[])),
+        mode==='daily'&&(function(){
+          var hw=Number(castObj.hourlyWage||0);
+          var mkey=selYear+'-'+pad(now3.getMonth()+1);
+          var mrows=allRows.filter(function(r){return r.date.slice(0,7)===mkey;});
+          var whRows=mrows.filter(function(r){return r.workHours;});
+          var totalWH=whRows.reduce(function(s,r){return s+parseFloat(r.workHours||0);},0);
+          var rate=hw>0&&totalWH>0&&summaryTotals.sales>0?(hw*totalWH/summaryTotals.sales*100).toFixed(1)+'%':null;
+          if(!hw&&!rate)return null;
+          return e('div',{style:{display:'flex',gap:'8px',flexWrap:'wrap',marginTop:'10px',paddingTop:'10px',borderTop:'1px solid #1e2035'}},
+            hw>0&&e('div',{key:'hw',style:S.summaryCell},
+              e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'登録時給'),
+              e('div',{style:{color:'#e5e7eb',fontSize:'15px',fontWeight:700}},hw.toLocaleString()+'円')
+            ),
+            rate&&e('div',{key:'dr',style:S.summaryCell},
+              e('div',{style:{color:'#9ca3af',fontSize:'11px',marginBottom:'4px'}},'分配率'),
+              e('div',{style:{color:'#60a5fa',fontSize:'15px',fontWeight:700}},rate)
+            )
+          );
+        })()
       )
     )
   );
