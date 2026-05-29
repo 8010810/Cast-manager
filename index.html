@@ -2919,7 +2919,7 @@ function CastViewerPage(){
           var rows=records.filter(function(r){return r.date&&r.date.slice(0,7)===mk;});
           var s=rows.reduce(function(a,r){return a+Number(r.sales||0);},0);
           var tg=gt(mk);
-          var pct=tg>0?Math.min(100,Math.round(s/tg*100)):null;
+          var pct=tg>0?Math.round(s/tg*100):null;
           var pc=pct===null?'#9ca3af':pct>=100?'#34d399':pct>=70?'#fbbf24':'#9ca3af';
           return e('div',{key:mk,style:{padding:'7px 0',borderBottom:i<5?'1px solid #1e2035':'none'}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:tg>0?'4px':'0'}},
@@ -2929,7 +2929,7 @@ function CastViewerPage(){
               pct!==null&&e('span',{style:{color:pc,fontSize:'12px',fontWeight:700}},pct+'%')
             ),
             tg>0&&e('div',{style:{background:'#0d0d1a',borderRadius:'99px',height:'4px',overflow:'hidden'}},
-              e('div',{style:{background:pct>=100?'#34d399':pct>=70?'#fbbf24':'#e8b86d',height:'100%',width:(pct||0)+'%',borderRadius:'99px'}})
+              e('div',{style:{background:pct>=100?'#34d399':pct>=70?'#fbbf24':'#e8b86d',height:'100%',width:Math.min(100,pct||0)+'%',borderRadius:'99px'}})
             )
           );
         })
