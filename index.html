@@ -6207,9 +6207,9 @@ function AttendancePage(p){
           e('button',{style:btnOk,onClick:function(){
             var castId=recEditTarget.castId;
             var ns=Object.assign({},recData.status||{});
-            var upd={time:editTime};if(editEndTime)upd.endTime=editEndTime;else delete upd.endTime;
-            var brk=parseInt(editBreakMinutes);if(brk>0)upd.breakMinutes=brk;else delete upd.breakMinutes;
-            if(ns[castId])ns[castId]=Object.assign({},ns[castId],upd);
+            var upd={time:editTime};if(editEndTime)upd.endTime=editEndTime;
+            var brk=parseInt(editBreakMinutes);if(brk>0)upd.breakMinutes=brk;
+            if(ns[castId]){ns[castId]=Object.assign({},ns[castId],upd);if(!editEndTime)delete ns[castId].endTime;if(!(brk>0))delete ns[castId].breakMinutes;}
             var newRecData=Object.assign({},recData,{status:ns});
             setRecData(newRecData);
             if(p.roomId)db.collection('rooms').doc(p.roomId).collection('attendance').doc(recDate).set(newRecData);
@@ -6232,9 +6232,9 @@ function AttendancePage(p){
           e('button',{style:btnOk,onClick:function(){
               var castId=editTarget.castId;
               var ns=Object.assign({},attStatus);
-              var upd={time:editTime};if(editEndTime)upd.endTime=editEndTime;else delete upd.endTime;
-              var brk=parseInt(editBreakMinutes);if(brk>0)upd.breakMinutes=brk;else delete upd.breakMinutes;
-              if(ns[castId])ns[castId]=Object.assign({},ns[castId],upd);
+              var upd={time:editTime};if(editEndTime)upd.endTime=editEndTime;
+              var brk=parseInt(editBreakMinutes);if(brk>0)upd.breakMinutes=brk;
+              if(ns[castId]){ns[castId]=Object.assign({},ns[castId],upd);if(!editEndTime)delete ns[castId].endTime;if(!(brk>0))delete ns[castId].breakMinutes;}
               var currentStatus=ns[castId]?ns[castId].status:'未通過';
               var nad=updateAbsences(castId,currentStatus,editTime,absenceData,confirmTypes);
               setAbsenceData(nad);saveSettings(timeSetting,nad);
