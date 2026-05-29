@@ -686,8 +686,8 @@ function MyCastPage(p){
       e('button',{style:{background:'transparent',border:'1px solid #374151',borderRadius:'8px',padding:'6px 10px',color:'#9ca3af',cursor:'pointer',display:'flex',alignItems:'center'},onClick:function(){if(p.onRefresh)p.onRefresh();}},e('svg',{width:16,height:16,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:2,strokeLinecap:'round',strokeLinejoin:'round'},e('polyline',{points:'23 4 23 10 17 10'}),e('path',{d:'M20.49 15a9 9 0 1 1-2.12-9.36L23 10'})))
     ),
     e('div',{style:{display:'flex',gap:'8px',marginBottom:'10px',justifyContent:'flex-end'}},
-        e('button',{style:S.btnPrimary,onClick:function(){setShowAddFolder(!showAddFolder);setEditFolderMode(false);}},showAddFolder?'キャンセル':'+ フォルダ追加'),
-        e('button',{style:{background:editFolderMode?'#e8b86d22':'transparent',border:'1px solid '+(editFolderMode?'#e8b86d':'#4b5563'),borderRadius:'8px',padding:'6px 12px',color:editFolderMode?'#e8b86d':'#9ca3af',fontSize:'12px',fontWeight:700,cursor:'pointer'},
+        canManage&&e('button',{style:S.btnPrimary,onClick:function(){setShowAddFolder(!showAddFolder);setEditFolderMode(false);}},showAddFolder?'キャンセル':'+ フォルダ追加'),
+        canManage&&e('button',{style:{background:editFolderMode?'#e8b86d22':'transparent',border:'1px solid '+(editFolderMode?'#e8b86d':'#4b5563'),borderRadius:'8px',padding:'6px 12px',color:editFolderMode?'#e8b86d':'#9ca3af',fontSize:'12px',fontWeight:700,cursor:'pointer'},
           onClick:function(){setEditFolderMode(!editFolderMode);setSelectedCastIds({});setShowAddFolder(false);}
         },editFolderMode?'完了':'編集')
       ),
@@ -1077,6 +1077,7 @@ function CastListPage(p){
   var s_sm=useState(false);var showSortMenu=s_sm[0];var setShowSortMenu=s_sm[1];
   var SORT_OPTS=[['default','登録順'],['name','50音順'],['age','年齢順'],['height','身長順'],['cup','カップ数順']];
   var SORT_LABEL=(SORT_OPTS.find(function(o){return o[0]===sortBy;})||SORT_OPTS[0])[1];
+  var canManage=!p.roomId||p.roomRole==='admin'||p.roomRole==='sub-admin';
 
   var folders=p.data.folders||[];
 
@@ -1207,7 +1208,7 @@ function CastListPage(p){
             var cf=(p.data.folders||[]).find(function(f){return(f.castIds||[]).includes(detail);});
             setEditCast(detail);setEditForm({name:cast.name||'',birthday:cast.birthday||'',memo:cast.memo||'',contractShift:cast.contractShift||'',folderId:cf?cf.id:'',realName:cast.realName||'',hometown:cast.hometown||'',height:cast.height||'',cup:cast.cup||'',castType:cast.castType||'',route:cast.route||'',isDispatch:cast.isDispatch||false,hourlyWage:cast.hourlyWage||''});
           }}, '編集'),
-          e('button',{style:S.btnDanger,onClick:function(){deleteCastItem(cast.id,cast.name);}}, '削除')
+          canManage&&e('button',{style:S.btnDanger,onClick:function(){deleteCastItem(cast.id,cast.name);}}, '削除')
         )
       ),
       e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'16px',padding:'24px',marginBottom:'16px'}},
@@ -5834,7 +5835,7 @@ function App(){
       isHomeLayer&&e(HomeScreen,{data:data,onNavigate:navigate,roomName:currentRoom&&currentRoom.name||''}),
       layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',roomId:roomId||'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
-      layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);}}),
+      layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomId:roomId||'',roomRole:roomRole}),
       layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,holidays:roomHolidays}),
       layer==='attendance'&&e(AttendancePage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',roomId:roomId||'',attData:attData,setAttData:setAttData}),
       layer==='visit'&&e(VisitPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
