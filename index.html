@@ -614,6 +614,7 @@ function MyCastPage(p){
   var s_sel=useState({});var selectedCastIds=s_sel[0];var setSelectedCastIds=s_sel[1];
   var s_tgt=useState('');var targetFolderId=s_tgt[0];var setTargetFolderId=s_tgt[1];
 
+  var canManage=!p.roomId||p.roomRole==='admin'||p.roomRole==='sub-admin';
   var folders=p.data.folders||[];
 
   // フォルダ開いた時にsubBackを設定
@@ -722,8 +723,8 @@ function MyCastPage(p){
                   e('div',{style:{fontWeight:700,color:'#f3f4f6',fontSize:'14px'}},folder.name),
                   e('div',{style:{color:'#6b7280',fontSize:'12px'}},fCasts.length+'名')
                 ),
-                e('button',{style:S.bdEditBtn,onClick:function(ev){ev.stopPropagation();setEditFolderId(folder.id);setFolderName(folder.name);}},'編集'),
-                e('button',{style:{...S.btnDanger,marginLeft:'4px'},onClick:function(ev){ev.stopPropagation();deleteFolder(folder.id,folder.name);}},'削除'),
+                canManage&&e('button',{style:S.bdEditBtn,onClick:function(ev){ev.stopPropagation();setEditFolderId(folder.id);setFolderName(folder.name);}},'編集'),
+                canManage&&e('button',{style:{...S.btnDanger,marginLeft:'4px'},onClick:function(ev){ev.stopPropagation();deleteFolder(folder.id,folder.name);}},'削除'),
                 e('span',{style:{color:'#4b5563',fontSize:'14px'}}, '›')
               )
           ),
@@ -5833,7 +5834,7 @@ function App(){
           },'決済方法を登録する')
         ),
       isHomeLayer&&e(HomeScreen,{data:data,onNavigate:navigate,roomName:currentRoom&&currentRoom.name||''}),
-      layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',roomId:roomId||'',onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
+      layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',roomId:roomId||'',roomRole:roomRole,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
       layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomId:roomId||'',roomRole:roomRole}),
       layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,holidays:roomHolidays}),
