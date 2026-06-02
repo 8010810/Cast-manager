@@ -1401,6 +1401,14 @@ function ShiftPage(p){
   var s6=useState(false);var aiLoading=s6[0];var setAiLoading=s6[1];
   var s7=useState('');var aiResult=s7[0];var setAiResult=s7[1];
   var s8=useState(false);var showAI=s8[0];var setShowAI=s8[1];
+  var s_sar=useState([]);var shiftAiReports=s_sar[0];var setShiftAiReports=s_sar[1];
+  var s_sri=useState(null);var openReportId=s_sri[0];var setOpenReportId=s_sri[1];
+  React.useEffect(function(){
+    if(!p.uid)return;
+    db.collection('users').doc(p.uid).collection('meta').doc('shiftAiReports').get()
+      .then(function(doc){if(doc.exists&&doc.data().reports)setShiftAiReports(doc.data().reports);})
+      .catch(function(){});
+  },[p.uid]);
   var s9=useState(function(){var d=new Date();d.setDate(d.getDate()-d.getDay());return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());});
   var weekStart=s9[0];var setWeekStart=s9[1];
   var s10=useState(false);var showCalView=s10[0];var setShowCalView=s10[1];
@@ -1478,7 +1486,16 @@ function ShiftPage(p){
       +summary.map(function(c){return c.name+': 契約シフト['+c.contract+'] / 今月出勤'+c.workDays+'日';}).join('\n')
       +'\n\n各キャストの契約シフトと実際の出勤日数を比較し、不足しているキャストへのアドバイスと改善策を日本語500文字以内でまとめてください。';
     fetch('/api/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})})
-    .then(function(r){return r.json();}).then(function(d){setAiResult(d.content&&d.content[0]?d.content[0].text:'分析失敗');setAiLoading(false);})
+    .then(function(r){return r.json();}).then(function(d){
+      var text=d.content&&d.content[0]?d.content[0].text:'分析失敗';
+      setAiResult(text);setAiLoading(false);
+      if(p.uid){
+        var rpt={id:String(Date.now()),date:new Date().toISOString().slice(0,10),text:text};
+        var newRpts=shiftAiReports.concat([rpt]);
+        setShiftAiReports(newRpts);
+        db.collection('users').doc(p.uid).collection('meta').doc('shiftAiReports').set({reports:newRpts}).catch(function(){});
+      }
+    })
     .catch(function(){setAiResult('ネットワークエラー');setAiLoading(false);});
   }
 
@@ -1710,6 +1727,18 @@ function ShiftPage(p){
     showAI&&e('div',{style:{background:'#12122a',border:'1px solid #a78bfa44',borderRadius:'12px',padding:'20px',marginBottom:'16px'}},
       e('div',{style:{display:'flex',alignItems:'center',gap:'8px',marginBottom:'12px'}},e('span',{style:{fontSize:'16px'}},'🤖'),e('span',{style:{color:'#a78bfa',fontWeight:700}},'シフト分析結果')),
       aiLoading?e('div',{style:{color:'#6b7280',fontSize:'13px'}},'分析中...'):e('div',{style:{color:'#e5e7eb',fontSize:'14px',lineHeight:'1.8',whiteSpace:'pre-wrap'}},aiResult)
+    ),
+    // 過去のシフトAIレポート一覧
+    shiftAiReports.length>0&&e('div',{style:{background:'#12122a',border:'1px solid #1e2035',borderRadius:'12px',padding:'16px',marginBottom:'16px'}},
+      e('div',{style:{color:'#a78bfa',fontWeight:700,fontSize:'13px',marginBottom:'10px'}},'過去の分析レポート'),
+      shiftAiReports.slice().reverse().map(function(rpt){return e('div',{key:rpt.id,style:{borderBottom:'1px solid #1e2035',paddingBottom:'8px',marginBottom:'8px'}},
+        e('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}},
+          e('div',{style:{fontSize:'12px',color:'#6b7280'}},rpt.date),
+          e('button',{style:{fontSize:'11px',padding:'2px 8px',borderRadius:'6px',border:'1px solid #a78bfa44',background:'transparent',color:'#a78bfa',cursor:'pointer'},onClick:function(){setOpenReportId(openReportId===rpt.id?null:rpt.id);}},(openReportId===rpt.id?'閉じる':'表示'))
+        ),
+        openReportId===rpt.id&&e('div',{style:{color:'#e5e7eb',fontSize:'13px',lineHeight:'1.8',whiteSpace:'pre-wrap'}},rpt.text)
+      );}
+      )
     ),
     // カレンダービューモーダル
     showCalView&&e(CalendarView,null),
@@ -5079,8 +5108,9 @@ function App(){
     // カテゴリページ共通: 分析開始ボタン＋レポート一覧スタイル
     var aiCat=AI_CATS.find(function(c){return c.key===aiPage;})||{label:'',color:'#a78bfa'};
     var _aiNow=new Date();var _aiYM=_aiNow.getFullYear()+'-'+pad(_aiNow.getMonth()+1);
-    var catReports=(aiCatReports[aiPage]||[]).filter(function(r){return r.date&&r.date.slice(0,7)===_aiYM;}).sort(function(a,b){return Number(b.id)-Number(a.id);});
-    var catRemain=4-catReports.length;
+    var catReports=(aiCatReports[aiPage]||[]).sort(function(a,b){return Number(b.id)-Number(a.id);});
+    var catMonthReports=catReports.filter(function(r){return r.date&&r.date.slice(0,7)===_aiYM;});
+    var catRemain=4-catMonthReports.length;
     var catAcd=aiCatData.catKey===aiPage?aiCatData:{catKey:aiPage,status:'idle'};
     var catIsLoading=catAcd.status==='loading';
     var catIsError=catAcd.status==='error';
@@ -5837,7 +5867,7 @@ function App(){
       layer==='mycast'&&e(MyCastPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast,uid:user?user.uid:'',roomId:roomId||'',roomRole:roomRole,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},openFolderProp:appOpenFolder,setOpenFolderProp:setAppOpenFolder,isActive:layer==='mycast'}),
       layer==='sales'&&e(SalesPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onOpenCast:openCast}),
       layer==='castlist'&&e(CastListPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,onSetSubBack:function(fn){setSubBack(fn?function(){return fn;}:null);},roomId:roomId||'',roomRole:roomRole}),
-      layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,holidays:roomHolidays}),
+      layer==='shift'&&e(ShiftPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,holidays:roomHolidays,uid:user?user.uid:''}),
       layer==='attendance'&&e(AttendancePage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify,uid:user?user.uid:'',roomId:roomId||'',attData:attData,setAttData:setAttData}),
       layer==='visit'&&e(VisitPage,{onGoBack:goBack,onRefresh:function(){refreshData(true);},data:data,persist:persist,notify:notify}),
       isCastLayer&&selectedCast&&e('div',{key:navStack.join(','),style:{animation:'pageFadeIn 1.4s ease both'}},
