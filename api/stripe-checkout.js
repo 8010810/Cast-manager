@@ -37,6 +37,7 @@ export default async function handler(req, res) {
 
     var sessionParams = {
       mode: 'subscription',
+      payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: quantity }],
       client_reference_id: uid,
       metadata: { uid: uid, plan: plan, roomId: roomId, roomName: roomName },
