@@ -4806,7 +4806,7 @@ function App(){
             e('ul',{style:{margin:'0 0 14px',paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:1.9}},
               e('li',null,'キャスト管理 + AI分析'),
               e('li',null,'売上・シフト・来店予定管理'),
-              e('li',null,'月額¥1,980~')
+              e('li',null,'月額¥1,980')
             ),
             e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
               e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='monthly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='monthly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='monthly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'monthly'});});}},'月額 ¥1,980'),
@@ -4833,7 +4833,7 @@ function App(){
             e('ul',{style:{margin:'0 0 14px',paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:1.9}},
               e('li',null,'店舗運営 + AI分析'),
               e('li',null,'キャスト一括管理'),
-              e('li',null,'月額¥9,800~（+¥1,000/登録キャスト1人）')
+              e('li',null,'月額¥9,800~（+¥1,000/連携アカウント1つ）')
             ),
             e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
               e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='monthly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'monthly'});});}},'月額 ¥9,800'),
