@@ -42,6 +42,11 @@ export default async function handler(req, res) {
       metadata: { uid: uid, plan: plan, roomId: roomId, roomName: roomName },
       success_url: BASE_URL + successPath + (successPath.includes('?') ? '&' : '?') + 'session_id={CHECKOUT_SESSION_ID}',
       cancel_url: BASE_URL + cancelPath,
+      custom_text: {
+        submit: {
+          message: '解約はログイン後の設定画面からいつでも可能です。解約後は次回更新日まで利用できます。',
+        },
+      },
     };
 
     var session = await stripe.checkout.sessions.create(sessionParams);
