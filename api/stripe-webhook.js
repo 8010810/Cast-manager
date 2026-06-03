@@ -107,7 +107,7 @@ export default async function handler(req, res) {
         }
         // トライアル中に承認済みのメンバーをStripeに同期・請求
         try {
-          var ACCOUNT_ADD_PRICE = 'price_1TXgqSQaq3EwNY4QdQVc6rNT';
+          var ACCOUNT_ADD_PRICE = 'price_1TeLkWHoTkoUKrRrkV4IKH3w';
           var stripeSync = new Stripe(process.env.STRIPE_SECRET_KEY);
           var membersSnap = await db.collection('rooms').doc(roomId).collection('members').get();
           var invitedCount = membersSnap.docs.filter(function(d) { return d.data().isInvited === true; }).length;

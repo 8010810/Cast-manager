@@ -3,8 +3,8 @@ import Stripe from 'stripe';
 const BASE_URL = 'https://cast-manager-seven.vercel.app';
 
 const MINI_PRICES = [
-  'price_1TXgkgQaq3EwNY4QyYQ6sea2',
-  'price_1TXgmOQaq3EwNY4QKovRRNqb',
+  'price_1TeLmXHoTkoUKrRrpYisWdwY',
+  'price_1TeLmXHoTkoUKrRr8QCP4Kol',
 ];
 
 export default async function handler(req, res) {

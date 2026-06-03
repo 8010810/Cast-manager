@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 
-const ACCOUNT_ADD_PRICE = 'price_1TXgqSQaq3EwNY4QdQVc6rNT';
+const ACCOUNT_ADD_PRICE = 'price_1TeLkWHoTkoUKrRrkV4IKH3w';
 
 function getDb() {
   try {

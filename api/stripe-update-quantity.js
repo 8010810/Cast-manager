@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 
-const ACCOUNT_ADD_PRICE = 'price_1TXgqSQaq3EwNY4QdQVc6rNT';
+const ACCOUNT_ADD_PRICE = 'price_1TeLkWHoTkoUKrRrkV4IKH3w';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
