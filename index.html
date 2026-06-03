@@ -4812,6 +4812,7 @@ function App(){
               e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='monthly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='monthly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='monthly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'monthly'});});}},'月額 ¥1,980'),
               e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.mini==='yearly'?'#a78bfa':'#2d2d4e'),background:checkoutPeriod.mini==='yearly'?'rgba(167,139,250,0.15)':'transparent',color:checkoutPeriod.mini==='yearly'?'#a78bfa':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{mini:'yearly'});});}},'年額 ¥19,800')
             ),
+            e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'10px'}},'選択後は自動更新されます。解約はいつでも設定画面から可能です。'),
             e('button',{style:{width:'100%',background:'linear-gradient(135deg,#7c3aed,#a78bfa)',border:'none',borderRadius:'10px',padding:'12px',color:'#fff',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},onClick:function(){
               if(Date.now()-planSelectShownAtRef.current<400)return;
               handleCheckout(checkoutPeriod.mini==='yearly'?PRICE_IDS.MINI_YEARLY:PRICE_IDS.MINI_MONTHLY,'/mini?checkout=success','/mini?checkout=cancel');
@@ -4819,7 +4820,8 @@ function App(){
             e('button',{style:{width:'100%',background:'transparent',border:'1px solid rgba(167,139,250,0.35)',borderRadius:'10px',padding:'10px',color:'#a78bfa',fontWeight:600,fontSize:'13px',cursor:createRoomStdLoading?'default':'pointer',opacity:createRoomStdLoading?0.6:1,marginTop:'8px'},onClick:function(){
               if(Date.now()-planSelectShownAtRef.current<400)return;
               handleStartMiniTrial();
-            }},createRoomStdLoading?'処理中...':'30日間無料で試す（カード不要）')
+            }},createRoomStdLoading?'処理中...':'30日間無料で試す（カード不要）'),
+            e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginTop:'6px'}},'無料期間終了後の自動課金はありません。継続利用には有料プランの登録が必要です。')
           ),
           e('div',{style:{background:'#12122a',border:'1px solid rgba(232,184,109,0.4)',borderRadius:'16px',padding:'24px',textAlign:'left'}},
             e('div',{style:{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}},
@@ -4831,12 +4833,13 @@ function App(){
             e('ul',{style:{margin:'0 0 14px',paddingLeft:'16px',fontSize:'12px',color:'#9ca3af',lineHeight:1.9}},
               e('li',null,'店舗運営 + AI分析'),
               e('li',null,'キャスト一括管理'),
-              e('li',null,'月額¥9,800~(+¥1,000/人)')
+              e('li',null,'月額¥9,800~（+¥1,000/登録キャスト1人）')
             ),
             e('div',{style:{display:'flex',gap:'6px',marginBottom:'12px'}},
               e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='monthly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='monthly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='monthly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'monthly'});});}},'月額 ¥9,800'),
               e('button',{style:{flex:1,padding:'6px',borderRadius:'8px',border:'1px solid '+(checkoutPeriod.std==='yearly'?'#e8b86d':'#2d2d4e'),background:checkoutPeriod.std==='yearly'?'rgba(232,184,109,0.12)':'transparent',color:checkoutPeriod.std==='yearly'?'#e8b86d':'#6b7280',fontSize:'12px',fontWeight:600,cursor:'pointer'},onClick:function(){setCheckoutPeriod(function(p){return Object.assign({},p,{std:'yearly'});});}},'年額 ¥98,000')
             ),
+            e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginBottom:'10px'}},'選択後は自動更新されます。解約はいつでも設定画面から可能です。'),
             e('button',{style:{width:'100%',background:'linear-gradient(135deg,#c9983a,#e8b86d)',border:'none',borderRadius:'10px',padding:'12px',color:'#0d0d1a',fontWeight:700,fontSize:'14px',cursor:checkoutLoading?'default':'pointer',opacity:checkoutLoading?0.6:1},onClick:function(){
               if(Date.now()-planSelectShownAtRef.current<400)return;
               if(adminNeedsSub){
@@ -4851,7 +4854,8 @@ function App(){
               if(Date.now()-planSelectShownAtRef.current<400)return;
               setCreateRoomName('');
               setConsentState('create-room-for-trial');
-            }},createRoomStdLoading?'処理中...':'30日間無料で試す（カード不要）')
+            }},createRoomStdLoading?'処理中...':'30日間無料で試す（カード不要）'),
+            !adminNeedsSub&&e('div',{style:{fontSize:'11px',color:'#6b7280',textAlign:'center',marginTop:'6px'}},'無料期間終了後の自動課金はありません。継続利用には有料プランの登録が必要です。')
           )
         ),
         e('button',{style:{display:'block',margin:'20px auto 0',background:'none',border:'none',color:'#4b5563',fontSize:'12px',cursor:'pointer',textDecoration:'underline'},onClick:function(){auth.signOut();}},
